@@ -5,6 +5,6 @@ cc_test(
         "//src/filters:pipe",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
-        "@envoy_api//envoy/service/auth/v2:external_auth_service_cc_grpc",
+        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
     ],
 )
