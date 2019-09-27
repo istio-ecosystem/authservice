@@ -20,7 +20,6 @@ if [ ${SIG} != ${BAZEL_INSTALLER_SIG} ]; then
     exit 1
 fi
 
-ls -al
 chmod u+x bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 ./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 popd
