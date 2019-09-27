@@ -20,5 +20,3 @@ USER auth-server-usr
 WORKDIR /app
 ENTRYPOINT ["/app/auth-server"]
 CMD ["--log-level", "trace", "--address", "127.0.0.1", "--port", "10003"]
-
-

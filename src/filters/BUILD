@@ -8,7 +8,7 @@ xx_library(
     deps = [
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_google_googleapis//google/rpc:code_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:external_auth_service_cc_grpc",
+        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
     ],
 )
 
