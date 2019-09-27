@@ -1,0 +1,75 @@
+admin:
+  access_log_path: /tmp/admin_access.log
+  address:
+    socket_address: { address: 127.0.0.1, port_value: 9901 }
+
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8443 }
+      filter_chains:
+        - tls_context:
+            common_tls_context:
+              tls_params:
+                tls_minimum_protocol_version: TLSv1_2
+              tls_certificates:
+                private_key:
+                  filename: "/etc/envoy/tls.pem"
+                certificate_chain:
+                  filename: "/etc/envoy/tls.crt"
+              alpn_protocols: "h2,http/1.1"
+          filters:
+            - name: envoy.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+                stat_prefix: HTTPConnMgr
+                http_protocol_options:
+                  allow_absolute_url: true
+                server_name: transparent-auth
+                generate_request_id: true
+                codec_type: AUTO
+                route_config:
+                  name: all_routes
+                  virtual_hosts:
+                    - name: service
+                      domains: ["*"]
+                      routes:
+                        - match: { prefix: "/" }
+                          route: { cluster: external_service }
+                http_filters:
+                  - name: envoy.ext_authz
+                    config:
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: ext_authz
+                        timeout: 300s
+                  - name: envoy.router
+  clusters:
+    - name: ext_authz
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {}
+      load_assignment:
+        cluster_name: ext_authz_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: auth
+                      port_value: 10003
+    - name: external_service
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: external_service_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: www.thales.com
+                      port_value: 80
