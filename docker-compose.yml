@@ -1,0 +1,14 @@
+version: '3.7'
+services:
+  envoy:
+    image: "envoyproxy/envoy:v1.10.0"
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "trace"]
+    ports:
+      - "8080:8443"
+    volumes:
+      - ./run/envoy:/etc/envoy:ro
+  auth:
+    image: authservice
+    command: ["--loglevel", "trace", "--address", "0.0.0.0", "--port", "10003"]
+    ports:
+      - "10003:10003"
