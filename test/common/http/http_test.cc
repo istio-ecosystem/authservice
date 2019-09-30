@@ -1,4 +1,5 @@
 #include "src/common/http/http.h"
+#include "config/common/config.pb.h"
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"
 
@@ -30,13 +31,20 @@ struct {
   const std::multimap<absl::string_view, absl::string_view> encoded;
 } form_test_case = {.raw = R"RAW(abc=123&cde=456+7&987=%0D%0A)RAW",
                     .encoded = {
-                        {"abc", "123"}, {"cde", "456 7"}, {"987", "\r\n"},
+                        {"abc", "123"},
+                        {"cde", "456 7"},
+                        {"987", "\r\n"},
                     }};
 }  // namespace
 
-TEST(Endpoint, ToUrl) {
+TEST(Http, ToUrl) {
   struct {
-    Endpoint endpoint;
+    struct {
+      const char *scheme;
+      const char *hostname;
+      int port;
+      const char *path;
+    } endpoint;
     const char *url;
   } test_cases[] = {
       {
@@ -67,7 +75,13 @@ TEST(Endpoint, ToUrl) {
       },
   };
   for (auto test : test_cases) {
-    ASSERT_STREQ(test.endpoint.ToUrl().c_str(), test.url);
+    authservice::config::common::Endpoint e;
+    e.set_scheme(test.endpoint.scheme);
+    e.set_hostname(test.endpoint.hostname);
+    e.set_port(test.endpoint.port);
+    e.set_path(test.endpoint.path);
+    auto url = http::ToUrl(e);
+    ASSERT_STREQ(url.c_str(), test.url);
   }
 }
 

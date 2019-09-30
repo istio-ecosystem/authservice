@@ -11,7 +11,7 @@ class TokenResponseParserMock final : public TokenResponseParser {
                      absl::optional<TokenResponse>(absl::string_view nonce,
                                                    absl::string_view raw));
 };
-}  // namespace http
-}  // namespace common
+}  // namespace oidc
+}  // namespace filters
 }  // namespace transparent_auth
 #endif  // TRANSPARENT_AUTH_TEST_FILTERS_OIDC_MOCKS_H_

@@ -9,55 +9,12 @@
 #include <vector>
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "config/common/config.pb.h"
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
 namespace transparent_auth {
 namespace common {
 namespace http {
-
-/** @brief Endpoint represents a url endpoint including scheme, host, port and
- * path.
- *
- * Endpoint represents a url endpoint including scheme, host, port and path.
- */
-class Endpoint {
- public:
-  /**
-   * One of HTTP or HTTPS
-   */
-  std::string scheme;
-  /**
-   * Hostname
-   */
-  std::string hostname;
-  /**
-   * Port
-   */
-  uint16_t port;
-  /**
-   * Path
-   */
-  std::string path;
-
-  /***
-  * Compare 2 Endpoints for equality.
-  * @param rhs the endpoint to compare against.
-  * @return True or false
-  */
-  bool operator==(const Endpoint &rhs) const;
-
-  /**
-   * Generate a well-formed URL from endpoint.
-   * @return The generated URL
-   */
-  std::string ToUrl() const;
-  /**
-   * Generate a host name from the endpoint.
-   * If the port is not one of 80 or 443 it will be appended to the hostname.
-   * @return
-   */
-  std::string Host() const;
-};
 
 class http;
 typedef std::shared_ptr<http> ptr_t;
@@ -149,15 +106,27 @@ class http {
    * @return the decoded triple
    */
   static std::array<std::string, 3> DecodePath(absl::string_view path);
+
+  /**
+   * Return a URL encoding of the given endpoint.
+   * @param endpoint the endpoint to encode.
+   * @return A url.
+   */
+  static std::string ToUrl(
+      const authservice::config::common::Endpoint &endpoint);
+  /**
+   * Virtual destructor
+   */
+  virtual ~http() = default;
   /** @brief Send a Post http message.
-  *
-  * @param endpoint the endpoint to call
-  * @param headers the http headers
-  *  @param body the http request body
-  * @return http response.
-  */
+   *
+   * @param endpoint the endpoint to call
+   * @param headers the http headers
+   *  @param body the http request body
+   * @return http response.
+   */
   virtual response_t Post(
-      const Endpoint &endpoint,
+      const authservice::config::common::Endpoint &endpoint,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body)
       const = 0;  // TODO: use string_view instead of const char *
@@ -168,13 +137,13 @@ class http {
  */
 class http_impl : public http {
  public:
-  response_t Post(const Endpoint &Endpoint,
+  response_t Post(const authservice::config::common::Endpoint &Endpoint,
                   const std::map<absl::string_view, absl::string_view> &headers,
                   absl::string_view body) const override;
 };
 
 }  // namespace http
 }  // namespace common
-}  // name transparent_auth
+}  // namespace transparent_auth
 
 #endif  // TRANSPARENT_AUTH_SRC_COMMON_HTTP_HTTP_H_

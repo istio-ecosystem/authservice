@@ -33,7 +33,7 @@ const std::map<const char *, const char *> standard_headers = {
 }  // namespace
 
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
-                       const OidcIdPConfiguration &idp_config,
+                       const authservice::config::oidc::OIDCConfig &idp_config,
                        TokenResponseParser &parser,
                        common::session::TokenEncryptorPtr cryptor)
     : http_ptr_(http_ptr),
@@ -109,12 +109,12 @@ google::rpc::Code OidcFilter::RedirectToIdP(
   auto state = generator.Generate(32);
   auto nonce = generator.Generate(32);
 
-  auto callback = idp_config_.CallbackPath().ToUrl();
-  auto encoded_scopes = absl::StrJoin(idp_config_.Scopes(), " ");
+  auto callback = common::http::http::ToUrl(idp_config_.callback());
+  auto encoded_scopes = absl::StrJoin(idp_config_.scopes(), " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
       {"scope", encoded_scopes},
-      {"client_id", idp_config_.ClientId()},
+      {"client_id", idp_config_.client_secret()},
       {"nonce", nonce.Str()},
       {"state", state.Str()},
       {"redirect_uri", callback}};
@@ -122,7 +122,8 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
   // Set redirect
   SetRedirectHeaders(
-      absl::StrJoin({idp_config_.AuthorizationEndpoint().ToUrl(), query}, "?"),
+      absl::StrJoin(
+          {common::http::http::ToUrl(idp_config_.authorization()), query}, "?"),
       response);
 
   // Create a secure state cookie that contains the state and nonce.
@@ -191,11 +192,11 @@ google::rpc::Code OidcFilter::Process(
                 request->attributes().request().http().host(),
                 request->attributes().request().http().path());
 
-  auto callback_host = idp_config_.CallbackPath().Host();
+  auto callback_host = idp_config_.callback().hostname();
   auto path_parts = common::http::http::DecodePath(
       request->attributes().request().http().path());
   if (request->attributes().request().http().host() == callback_host &&
-      path_parts[0] == idp_config_.CallbackPath().path) {
+      path_parts[0] == idp_config_.callback().path()) {
     return RetrieveToken(request, response, path_parts[1]);
   }
   return RedirectToIdP(response);
@@ -265,7 +266,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   // Build headers
   auto authorization = common::http::http::EncodeBasicAuth(
-      idp_config_.ClientId(), idp_config_.ClientSecret());
+      idp_config_.client_id(), idp_config_.client_secret());
   std::map<absl::string_view, absl::string_view> headers = {
       {common::http::headers::ContentType,
        common::http::headers::ContentTypeDirectives::FormUrlEncoded},
@@ -273,16 +274,15 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   // Build body
-  auto redirect_uri = idp_config_.CallbackPath().ToUrl();
+  auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"code", code->second},
       {"redirect_uri", redirect_uri},
       {"grant_type", "authorization_code"},
   };
 
-  auto retrieve_token_response =
-      http_ptr_->Post(idp_config_.TokenEndpoint(), headers,
-                      common::http::http::EncodeFormData(params));
+  auto retrieve_token_response = http_ptr_->Post(
+      idp_config_.token(), headers, common::http::http::EncodeFormData(params));
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");
@@ -303,7 +303,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
                            "Invalid token response");
       return google::rpc::Code::INVALID_ARGUMENT;
     }
-    SetRedirectHeaders(idp_config_.LandingPage(), response);
+    SetRedirectHeaders(idp_config_.landing_page(), response);
     // TODO: secure cookies, set timeout etc
     std::set<absl::string_view> token_set_cookie_header_directives = {
         common::http::headers::SetCookieDirectives::HttpOnly,
