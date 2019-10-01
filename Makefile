@@ -7,8 +7,8 @@ BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
 
 all: build test
 
-docker: build
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile -t authservice:$(USER) .
+docker:
+	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
 
 bazel-bin/src/main/auth-server:
 	bazel build $(BAZEL_FLAGS) //src/main:auth-server
