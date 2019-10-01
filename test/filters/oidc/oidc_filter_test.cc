@@ -208,7 +208,7 @@ TEST(OidcFilterTest, ValidSessionToken) {
   ASSERT_EQ(response.ok_response().headers().size(), 1);
   ASSERT_STREQ(common::http::headers::Authorization,
                response.ok_response().headers()[0].header().key().c_str());
-  ASSERT_STREQ("secret",
+  ASSERT_STREQ("Bearer secret",
                response.ok_response().headers()[0].header().value().c_str());
 }
 
