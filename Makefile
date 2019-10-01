@@ -10,6 +10,9 @@ all: build test
 docker: build
 	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile -t authservice:$(USER) .
 
+docker-compile-env:
+	docker build -f build/Dockerfile.interactive-compile-environment -t authservice-build-env:$(USER) .
+
 bazel-bin/src/main/auth-server:
 	bazel build $(BAZEL_FLAGS) //src/main:auth-server
 
