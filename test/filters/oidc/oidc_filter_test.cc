@@ -7,6 +7,7 @@
 #include "test/common/http/mocks.h"
 #include "test/common/session/mocks.h"
 #include "test/filters/oidc/mocks.h"
+#include <regex>
 
 namespace transparent_auth {
 namespace filters {
@@ -92,7 +93,8 @@ TEST(OidcFilterTest, NoAuthorization) {
 
   for (auto iter : response.denied_response().headers()) {
     if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(authorization_endpoint.ToUrl()), 0);
+      std::regex re("^https://acme-idp\\.tld/authorization\\?client_id=example-app&nonce=[A-Za-z0-9_-]{43}&redirect_uri=https%3A%2F%2Fme\\.tld%2Fcallback&response_type=code&scope=openid&state=[A-Za-z0-9_-]{43}$");
+      ASSERT_TRUE(std::regex_match(iter.header().value(), re));
     } else if (iter.header().key() == common::http::headers::CacheControl) {
       ASSERT_EQ(iter.header().value(),
                 common::http::headers::CacheControlDirectives::NoCache);

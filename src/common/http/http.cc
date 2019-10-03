@@ -147,7 +147,7 @@ std::string http::EncodeQueryData(
     std::replace(value.begin(), value.end(), ' ', '+');
     builder << SafeEncode(pair->first.data(), IsUrlSafeCharacter) << '='
             << SafeEncode(pair->second.data(), IsUrlSafeCharacter);
-    if (++pair != data.end()) {
+    if (++pair != data.cend()) {
       builder << "&";
     }
   }

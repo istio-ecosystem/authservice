@@ -105,8 +105,8 @@ google::rpc::Code OidcFilter::RedirectToIdP(
     ::envoy::service::auth::v2::CheckResponse *response) {
   // TODO: store state for use later in resuming the authentication protocol.
   common::utilities::RandomGenerator generator;
-  auto state = generator.Generate(32);
-  auto nonce = generator.Generate(32);
+  auto state = generator.Generate(32).Str();
+  auto nonce = generator.Generate(32).Str();
 
   auto callback = idp_config_.CallbackPath().ToUrl();
   auto encoded_scopes = absl::StrJoin(idp_config_.Scopes(), " ");
@@ -114,8 +114,8 @@ google::rpc::Code OidcFilter::RedirectToIdP(
       {"response_type", "code"},
       {"scope", encoded_scopes},
       {"client_id", idp_config_.ClientId()},
-      {"nonce", nonce.Str()},
-      {"state", state.Str()},
+      {"nonce", nonce},
+      {"state", state},
       {"redirect_uri", callback}};
   auto query = common::http::http::EncodeQueryData(params);
 
@@ -126,7 +126,7 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
   // Create a secure state cookie that contains the state and nonce.
   StateCookieCodec codec;
-  auto state_token = codec.Encode(state.Str(), nonce.Str());
+  auto state_token = codec.Encode(state, nonce);
   auto encrypted_state_token = cryptor_->Encrypt(state_token);
   SetStateCookie(response->mutable_denied_response()->mutable_headers(),
                  encrypted_state_token);

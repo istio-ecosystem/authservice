@@ -20,9 +20,10 @@ struct {
 struct {
   const char *raw;
   const std::multimap<absl::string_view, absl::string_view> encoded;
-} query_test_case = {.raw = R"RAW(cde=456%207)RAW",
+} query_test_case = {.raw = R"RAW(cde=456%207&state=abc%20123)RAW",
                      .encoded = {
                          {"cde", "456 7"},
+                         {"state", "abc 123"}
                      }};
 
 struct {
@@ -87,6 +88,8 @@ TEST(Http, UrlSafeDecode) {
 
 TEST(Http, EncodeQueryData) {
   auto result = http::EncodeQueryData(query_test_case.encoded);
+  std::string expectedResult = query_test_case.raw;
+  ASSERT_EQ(expectedResult, result);
   auto decoded = http::DecodeQueryData(result);
   ASSERT_TRUE(decoded.has_value());
   ASSERT_EQ(query_test_case.encoded.size(), decoded->size());
