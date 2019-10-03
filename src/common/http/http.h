@@ -28,7 +28,7 @@ class http {
    * encode the given url for use e.g. in an http query field.
    *
    * @param url the url to encode.
-   * @return the encode url.
+   * @return the encoded url.
    */
   static std::string UrlSafeEncode(absl::string_view url);
   /**

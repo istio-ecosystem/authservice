@@ -20,6 +20,7 @@ namespace oidc {
 
 namespace {
 const char *filter_name_ = "oidc";
+const char *mandatory_scope_ = "openid";
 const char *cookie_name_ = "__Host-acme-id-token-session-cookie";
 const char *state_cookie_name_ = "__Host-acme-state-cookie";
 const std::string bearer_prefix_ = "Bearer";
@@ -104,19 +105,22 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
 
 google::rpc::Code OidcFilter::RedirectToIdP(
     ::envoy::service::auth::v2::CheckResponse *response) {
-  // TODO: store state for use later in resuming the authentication protocol.
   common::utilities::RandomGenerator generator;
-  auto state = generator.Generate(32);
-  auto nonce = generator.Generate(32);
+  auto state = generator.Generate(32).Str();
+  auto nonce = generator.Generate(32).Str();
+  std::set<absl::string_view> scopes = {mandatory_scope_};
+  for (const auto &scope : idp_config_.scopes()) {
+    scopes.insert(scope);
+  }
 
   auto callback = common::http::http::ToUrl(idp_config_.callback());
-  auto encoded_scopes = absl::StrJoin(idp_config_.scopes(), " ");
+  auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
       {"scope", encoded_scopes},
-      {"client_id", idp_config_.client_secret()},
-      {"nonce", nonce.Str()},
-      {"state", state.Str()},
+      {"client_id", idp_config_.client_id()},
+      {"nonce", nonce},
+      {"state", state},
       {"redirect_uri", callback}};
   auto query = common::http::http::EncodeQueryData(params);
 
@@ -128,7 +132,7 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
   // Create a secure state cookie that contains the state and nonce.
   StateCookieCodec codec;
-  auto state_token = codec.Encode(state.Str(), nonce.Str());
+  auto state_token = codec.Encode(state, nonce);
   auto encrypted_state_token = cryptor_->Encrypt(state_token);
   SetStateCookie(response->mutable_denied_response()->mutable_headers(),
                  encrypted_state_token);

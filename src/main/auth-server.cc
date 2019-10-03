@@ -86,10 +86,10 @@ bool AbslParseFlag(absl::string_view text, LogLevel *level,
   return true;
 }
 
-ABSL_FLAG(LogLevel, loglevel, LogLevel(), "log level");
+ABSL_FLAG(LogLevel, log_level, LogLevel(), "log level");
 ABSL_FLAG(std::string, address, "0.0.0.0", "address to bind to");
 ABSL_FLAG(uint16_t, port, 5001, "port to listen on");
-ABSL_FLAG(std::string, filter, "/etc/authservice/config.json",
+ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json",
           "path to filter config");
 
 int main(int argc, char **argv) {
@@ -97,15 +97,15 @@ int main(int argc, char **argv) {
   absl::ParseCommandLine(argc, argv);
   auto console = spdlog::stdout_logger_mt("console");
   spdlog::set_default_logger(console);
-  console->set_level(absl::GetFlag(FLAGS_loglevel).level);
+  console->set_level(absl::GetFlag(FLAGS_log_level).level);
   std::stringstream builder;
   builder << absl::GetFlag(FLAGS_address) << ":" << std::dec
           << absl::GetFlag(FLAGS_port);
   try {
     transparent_auth::service::RunServer(builder.str(),
-                                         absl::GetFlag(FLAGS_filter));
+                                         absl::GetFlag(FLAGS_filter_config));
   } catch (const std::exception &e) {
-    spdlog::error("{}: Unexpected error {}", __func__, e.what());
+    spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;
   }
   return EXIT_SUCCESS;
