@@ -9,14 +9,15 @@ using namespace envoy::service::auth::v2;
 namespace transparent_auth {
 namespace filters {
 /** @brief Filter defines an abstract class for processing requests.
-*
-* Filter defines an abstract class for processing requests. Filters are
-* composed into pipelines and processing passes
-* from one filter to the next.
-*/
+ *
+ * Filter defines an abstract class for processing requests. Filters are
+ * composed into pipelines and processing passes
+ * from one filter to the next.
+ */
 
 class Filter {
  public:
+  virtual ~Filter() = default;
   /** @brief Process a request mutating the response.
    *
    * Process the given request mutating the response to include new and amended
@@ -48,6 +49,6 @@ class Filter {
   virtual absl::string_view Name() const = 0;
 };
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth
 
 #endif  // TRANSPARENT_AUTH_SRC_FILTERS_FILTER_H_
