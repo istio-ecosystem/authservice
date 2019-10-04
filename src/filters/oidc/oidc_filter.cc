@@ -194,9 +194,7 @@ google::rpc::Code OidcFilter::Process(
   auto path_parts = common::http::http::DecodePath(
       request->attributes().request().http().path());
   if (request->attributes().request().http().host() == callback_host &&
-      path_parts[0] == idp_config_.CallbackPath().path &&
-      request->attributes().request().http().scheme() ==
-          idp_config_.CallbackPath().scheme) {
+      path_parts[0] == idp_config_.CallbackPath().path) {
     return RetrieveToken(request, response, path_parts[1]);
   }
   return RedirectToIdP(response);

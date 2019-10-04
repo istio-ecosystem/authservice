@@ -230,7 +230,7 @@ TEST(OidcFilterTest, RetrieveToken) {
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->set_scheme("https");
+  httpRequest->set_scheme(""); // Seems like it should be "https", but in practice is empty
   httpRequest->set_host(callback_path.hostname);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-acme-state-cookie=valid"});
