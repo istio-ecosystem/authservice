@@ -25,10 +25,10 @@ class OidcFilterTest : public ::testing::Test {
     config_.mutable_token()->set_hostname("acme-idp.tld");
     config_.mutable_token()->set_port(443);
     config_.mutable_token()->set_path("/token");
-    config_.mutable_jwks()->set_scheme("https");
-    config_.mutable_jwks()->set_hostname("acme-idp.tld");
-    config_.mutable_jwks()->set_port(443);
-    config_.mutable_jwks()->set_path("/token");
+    config_.mutable_jwks_uri()->set_scheme("https");
+    config_.mutable_jwks_uri()->set_hostname("acme-idp.tld");
+    config_.mutable_jwks_uri()->set_port(443);
+    config_.mutable_jwks_uri()->set_path("/token");
     config_.mutable_callback()->set_scheme("https");
     config_.mutable_callback()->set_hostname("me.tld");
     config_.mutable_callback()->set_port(443);
