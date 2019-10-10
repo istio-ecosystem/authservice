@@ -56,5 +56,5 @@ class TokenResponseParserImpl final : public TokenResponseParser {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth
 #endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_

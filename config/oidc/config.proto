@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package authservice.config.oidc;
+
+import "config/common/config.proto";
+
+message OIDCConfig {
+    common.Endpoint authorization = 1;
+    common.Endpoint token = 2;
+    common.Endpoint jwks = 3;
+    common.Endpoint callback = 4;
+    string landing_page = 5;
+    string client_id = 6;
+    string client_secret = 7;
+    repeated string scopes = 8;
+}

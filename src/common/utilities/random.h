@@ -72,7 +72,7 @@ class RandomGenerator {
   Random Generate(size_t sz);
 };
 
-}  // namspace utilities
+}  // namespace utilities
 }  // namespace common
 }  // namespace transparent_auth
 #endif  // TRANSPARENT_AUTH_SRC_COMMON_UTILITIES_RANDOM_H_

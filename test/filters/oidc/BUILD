@@ -39,12 +39,3 @@ cc_test(
         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
     ],
 )
-
-cc_test(
-    name = "oidc_idp_configuration_test",
-    srcs = ["oidc_idp_configuration_test.cc"],
-    deps = [
-        "//src/filters/oidc:oidc_filter_config",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
