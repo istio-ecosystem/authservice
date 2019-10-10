@@ -11,9 +11,8 @@ using namespace authservice::config;
 
 namespace transparent_auth {
 namespace config {
-std::unique_ptr<authservice::config::Config> GetConfig(
+std::shared_ptr<authservice::config::Config> GetConfig(
     const std::string& configFileName) {
-  std::unique_ptr<Config> config;
   ifstream configFile(configFileName);
   if (!configFile) {
     throw std::runtime_error("failed to open filter config");
@@ -21,7 +20,8 @@ std::unique_ptr<authservice::config::Config> GetConfig(
   stringstream buf;
   buf << configFile.rdbuf();
   configFile.close();
-  config.reset(new Config());
+
+  std::shared_ptr<Config> config = std::make_shared<Config>();
   auto status = JsonStringToMessage(buf.str(), config.get());
   if (!status.ok()) {
     throw std::runtime_error(status.error_message());

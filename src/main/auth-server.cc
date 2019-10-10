@@ -12,6 +12,7 @@
 #include "spdlog/common.h"
 #include "spdlog/sinks/stdout_sinks.h"
 #include "spdlog/spdlog.h"
+#include "src/config/getconfig.h"
 #include "src/service/serviceimpl.h"
 
 using grpc::Server;
@@ -20,7 +21,7 @@ using grpc::ServerBuilder;
 namespace transparent_auth {
 namespace service {
 
-void RunServer(const std::string &address, const std::string &config) {
+void RunServer(const std::string &address, std::shared_ptr<authservice::config::Config> config) {
   AuthServiceImpl auth_service(config);
   ServerBuilder builder;
   builder.AddListeningPort(address, grpc::InsecureServerCredentials());
@@ -95,15 +96,18 @@ ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json",
 int main(int argc, char **argv) {
   absl::SetProgramUsageMessage(absl::StrCat("run an auth server:\n", argv[0]));
   absl::ParseCommandLine(argc, argv);
+
   auto console = spdlog::stdout_logger_mt("console");
   spdlog::set_default_logger(console);
   console->set_level(absl::GetFlag(FLAGS_log_level).level);
-  std::stringstream builder;
-  builder << absl::GetFlag(FLAGS_address) << ":" << std::dec
-          << absl::GetFlag(FLAGS_port);
+
+  std::stringstream address_string_builder;
+  address_string_builder << absl::GetFlag(FLAGS_address) << ":" << std::dec
+                         << absl::GetFlag(FLAGS_port);
+
   try {
-    transparent_auth::service::RunServer(builder.str(),
-                                         absl::GetFlag(FLAGS_filter_config));
+    auto config = transparent_auth::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
+    transparent_auth::service::RunServer(address_string_builder.str(), config);
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;

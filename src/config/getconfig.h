@@ -6,7 +6,7 @@
 
 namespace transparent_auth {
 namespace config {
-std::unique_ptr<authservice::config::Config> GetConfig(
+std::shared_ptr<authservice::config::Config> GetConfig(
     const std::string &configFile);
 }  // namespace config
 }  // namespace transparent_auth
