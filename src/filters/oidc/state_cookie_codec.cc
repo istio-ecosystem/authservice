@@ -24,4 +24,4 @@ StateCookieCodec::Decode(absl::string_view value) {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth

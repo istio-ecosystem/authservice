@@ -1,10 +1,10 @@
 #ifndef TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_
 #define TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_
+#include "config/oidc/config.pb.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "src/common/http/http.h"
 #include "src/common/session/token_encryptor.h"
 #include "src/filters/filter.h"
-#include "src/filters/oidc/oidc_idp_configuration.h"
 #include "src/filters/oidc/token_response.h"
 
 namespace transparent_auth {
@@ -21,7 +21,7 @@ namespace oidc {
 class OidcFilter final : public filters::Filter {
  private:
   common::http::ptr_t http_ptr_;
-  OidcIdPConfiguration idp_config_;
+  const authservice::config::oidc::OIDCConfig &idp_config_;
   TokenResponseParser &parser_;
   common::session::TokenEncryptorPtr cryptor_;
 
@@ -96,7 +96,7 @@ class OidcFilter final : public filters::Filter {
 
  public:
   OidcFilter(common::http::ptr_t http_ptr,
-             const OidcIdPConfiguration &idp_config,
+             const authservice::config::oidc::OIDCConfig &idp_config,
              TokenResponseParser &parser,
              common::session::TokenEncryptorPtr cryptor);
 
@@ -108,6 +108,6 @@ class OidcFilter final : public filters::Filter {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth
 
 #endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_

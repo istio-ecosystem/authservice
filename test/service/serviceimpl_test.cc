@@ -4,7 +4,7 @@
 namespace transparent_auth {
 namespace service {
 TEST(ServiceImplTest, Check) {
-  AuthServiceImpl service;
+  AuthServiceImpl service("test/service/data/config.json");
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
 

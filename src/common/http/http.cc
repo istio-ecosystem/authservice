@@ -108,26 +108,6 @@ absl::optional<std::string> SafeDecode(absl::string_view in,
 
 }  // namespace
 
-bool Endpoint::operator==(const Endpoint &rhs) const {
-  return scheme == rhs.scheme && hostname == rhs.hostname && port == rhs.port &&
-         path == rhs.path;
-}
-
-std::string Endpoint::ToUrl() const {
-  std::stringstream builder;
-  builder << scheme << "://" << Host() << path;
-  return builder.str();
-}
-
-std::string Endpoint::Host() const {
-  std::stringstream builder;
-  builder << hostname;
-  if (!(port == 80 || port == 443)) {
-    builder << ":" << port;
-  }
-  return builder.str();
-}
-
 std::string http::UrlSafeEncode(absl::string_view url) {
   return SafeEncode(url, IsUrlSafeCharacter);
 }
@@ -295,8 +275,18 @@ std::array<std::string, 3> http::DecodePath(absl::string_view path) {
   return result;
 }
 
+std::string http::ToUrl(const authservice::config::common::Endpoint &endpoint) {
+  std::stringstream builder;
+  builder << endpoint.scheme() << "://" << endpoint.hostname();
+  if (endpoint.port() != 80 && endpoint.port() != 443) {
+    builder << ":" << std::to_string(endpoint.port());
+  }
+  builder << endpoint.path();
+  return builder.str();
+}
+
 response_t http_impl::Post(
-    const Endpoint &endpoint,
+    const authservice::config::common::Endpoint &endpoint,
     const std::map<absl::string_view, absl::string_view> &headers,
     absl::string_view body) const {
   spdlog::trace("{}", __func__);
@@ -314,19 +304,19 @@ response_t http_impl::Post(
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
     if (!SSL_set_tlsext_host_name(stream.native_handle(),
-                                  endpoint.hostname.c_str())) {
+                                  endpoint.hostname().c_str())) {
       boost::system::error_code ec{static_cast<int>(::ERR_get_error()),
                                    boost::asio::error::get_ssl_category()};
       throw boost::system::system_error{ec};
     }
     const auto results =
-        resolver.resolve(endpoint.hostname, std::to_string(endpoint.port));
+        resolver.resolve(endpoint.hostname(), std::to_string(endpoint.port()));
     beast::get_lowest_layer(stream).connect(results);
     stream.handshake(ssl::stream_base::client);
     // Set up an HTTP POST request message
-    beast::http::request<beast::http::string_body> req{beast::http::verb::post,
-                                                       endpoint.path, version};
-    req.set(beast::http::field::host, endpoint.Host());
+    beast::http::request<beast::http::string_body> req{
+        beast::http::verb::post, endpoint.path(), version};
+    req.set(beast::http::field::host, endpoint.hostname());
     for (auto header : headers) {
       req.set(boost::beast::string_view(header.first.data()),
               boost::beast::string_view(header.second.data()));
@@ -361,4 +351,4 @@ response_t http_impl::Post(
 
 }  // namespace http
 }  // namespace common
-}  // name transparent_auth
+}  // namespace transparent_auth
