@@ -1,6 +1,5 @@
 #include "oidc_filter.h"
 #include <boost/beast.hpp>
-#include <sstream>
 #include "absl/strings/str_join.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
@@ -35,7 +34,7 @@ const std::map<const char *, const char *> standard_headers = {
 
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
                        const authservice::config::oidc::OIDCConfig &idp_config,
-                       TokenResponseParser &parser,
+                       TokenResponseParserPtr parser,
                        common::session::TokenEncryptorPtr cryptor)
     : http_ptr_(http_ptr),
       idp_config_(idp_config),
@@ -300,7 +299,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::UNKNOWN;
   } else {
     // TODO: fill in nonce from state and validate JWT.
-    auto token = parser_.Parse("", retrieve_token_response->body());
+    auto token = parser_->Parse("", retrieve_token_response->body());
     if (!token.has_value()) {
       spdlog::info("{}: Invalid token response", __func__);
       ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,

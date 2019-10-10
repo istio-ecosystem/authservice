@@ -1,5 +1,6 @@
 #include "serviceimpl.h"
 #include <grpcpp/grpcpp.h>
+#include <memory>
 #include "spdlog/spdlog.h"
 #include "src/config/getconfig.h"
 #include "src/filters/oidc/oidc_filter.h"
@@ -8,16 +9,7 @@
 namespace transparent_auth {
 namespace service {
 
-namespace {
-// TODO: dynamically load config.
-const char *jwks =
-    R"({"keys":[{"kid":"xxx","kty":"RSA","alg":"RS256","use":"sig","n":"xxx","e":"AQAB","x5c":["xxx"]}]})";
-const std::string cryptor_secret = "xxx";
-}  // namespace
-
-AuthServiceImpl::AuthServiceImpl(const std::string &config)
-    : token_request_parser_(google::jwt_verify::Jwks::createFrom(
-          jwks, google::jwt_verify::Jwks::Type::JWKS)) {
+AuthServiceImpl::AuthServiceImpl(const std::string &config) {
   root_.reset(new filters::Pipe);
   config_ = config::GetConfig(config);
   for (const auto &filter : config_->filters()) {
@@ -25,12 +17,18 @@ AuthServiceImpl::AuthServiceImpl(const std::string &config)
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");
     }
-    root_->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
-        common::http::ptr_t(new common::http::http_impl), filter.oidc(),
-        token_request_parser_,
-        common::session::TokenEncryptor::Create(
-            cryptor_secret, common::session::EncryptionAlg::AES256GCM,
-            common::session::HKDFHash::SHA512))));
+
+    auto token_request_parser = std::make_shared<filters::oidc::TokenResponseParserImpl>(
+        google::jwt_verify::Jwks::createFrom(filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
+
+    auto token_encryptor = common::session::TokenEncryptor::Create(
+        filter.oidc().cryptor_secret(), common::session::EncryptionAlg::AES256GCM,
+        common::session::HKDFHash::SHA512);
+
+    auto http = common::http::ptr_t(new common::http::http_impl);
+
+    root_->AddFilter(filters::FilterPtr(
+        new filters::oidc::OidcFilter(http, filter.oidc(), token_request_parser, token_encryptor)));
   }
 }
 

@@ -22,7 +22,7 @@ class OidcFilter final : public filters::Filter {
  private:
   common::http::ptr_t http_ptr_;
   const authservice::config::oidc::OIDCConfig &idp_config_;
-  TokenResponseParser &parser_;
+  TokenResponseParserPtr parser_;
   common::session::TokenEncryptorPtr cryptor_;
 
   /**
@@ -97,7 +97,7 @@ class OidcFilter final : public filters::Filter {
  public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
-             TokenResponseParser &parser,
+             TokenResponseParserPtr parser,
              common::session::TokenEncryptorPtr cryptor);
 
   google::rpc::Code Process(

@@ -29,31 +29,33 @@ class OidcFilterTest : public ::testing::Test {
     config_.mutable_jwks_uri()->set_hostname("acme-idp.tld");
     config_.mutable_jwks_uri()->set_port(443);
     config_.mutable_jwks_uri()->set_path("/token");
+    config_.set_jwks("some-jwks");
     config_.mutable_callback()->set_scheme("https");
     config_.mutable_callback()->set_hostname("me.tld");
     config_.mutable_callback()->set_port(443);
     config_.mutable_callback()->set_path("/callback");
     config_.set_client_id("example-app");
     config_.set_client_secret("ZXhhbXBsZS1hcHAtc2VjcmV0");
+    config_.set_cryptor_secret("xxx123");
     config_.set_landing_page("/landing-page");
   }
 };
 
 TEST_F(OidcFilterTest, Constructor) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
 }
 
 TEST_F(OidcFilterTest, Name) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ASSERT_EQ(filter.Name().compare("oidc"), 0);
 }
 
 TEST_F(OidcFilterTest, NoHttpHeader) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
 
@@ -74,7 +76,7 @@ TEST_F(OidcFilterTest, NoHttpSchema) {
  */
 
 TEST_F(OidcFilterTest, NoAuthorization) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
       .WillOnce(::testing::Return("encrypted"));
@@ -112,7 +114,7 @@ TEST_F(OidcFilterTest, NoAuthorization) {
 }
 
 TEST_F(OidcFilterTest, InvalidCookies) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
       .WillOnce(::testing::Return("encrypted"));
@@ -151,7 +153,7 @@ TEST_F(OidcFilterTest, InvalidCookies) {
 }
 
 TEST_F(OidcFilterTest, InvalidSessionToken) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
       .WillOnce(::testing::Return("encrypted"));
@@ -194,7 +196,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
 }
 
 TEST_F(OidcFilterTest, ValidSessionToken) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
@@ -220,9 +222,9 @@ TEST_F(OidcFilterTest, ValidSessionToken) {
 
 TEST_F(OidcFilterTest, RetrieveToken) {
   google::jwt_verify::Jwt jwt = {};
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(parser_mock, Parse(::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock, Parse(::testing::_, ::testing::_))
       .WillOnce(::testing::Return(absl::make_optional<TokenResponse>(jwt)));
   common::http::http_mock *mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
@@ -230,8 +232,7 @@ TEST_F(OidcFilterTest, RetrieveToken) {
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -276,11 +277,10 @@ TEST_F(OidcFilterTest, RetrieveToken) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   common::http::http_mock *mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -313,11 +313,10 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   common::http::http_mock *mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -354,11 +353,10 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   common::http::http_mock *mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -396,7 +394,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
@@ -432,7 +430,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
@@ -468,7 +466,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
@@ -504,14 +502,13 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   common::http::http_mock *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t();
   EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -550,17 +547,16 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
-  TokenResponseParserMock parser_mock;
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(parser_mock, Parse(::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock, Parse(::testing::_, ::testing::_))
       .WillOnce(::testing::Return(absl::nullopt));
   common::http::http_mock *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
   EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock, cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =

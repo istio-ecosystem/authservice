@@ -23,6 +23,9 @@ class TokenResponse {
   const google::jwt_verify::Jwt &IDToken() const;
 };
 
+class TokenResponseParser;
+typedef std::shared_ptr<TokenResponseParser> TokenResponseParserPtr;
+
 /**
  * TokenResponseParser provides methods for parsing a raw input stream into a
  * @refitem TokenResponse.
