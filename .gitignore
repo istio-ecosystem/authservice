@@ -1,2 +1,4 @@
 .idea
 .clwb
+/bazel-*
+/build-release
