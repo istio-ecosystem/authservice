@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package authservice.config.common;
+
+message Endpoint {
+    string scheme = 1;
+    string hostname = 2;
+    int32 port = 3;
+    string path = 4;
+}

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package authservice.config;
+
+import "config/oidc/config.proto";
+
+message Filter {
+    oneof type {
+        oidc.OIDCConfig oidc = 1;
+    }
+}
+
+message Config {
+    repeated Filter filters = 1;
+}

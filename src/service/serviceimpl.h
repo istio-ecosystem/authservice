@@ -1,5 +1,6 @@
 #ifndef TRANSPARENT_AUTH_SERVICEIMPL_H
 #define TRANSPARENT_AUTH_SERVICEIMPL_H
+#include "config/config.pb.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "src/filters/oidc/token_response.h"
 #include "src/filters/pipe.h"
@@ -13,9 +14,10 @@ class AuthServiceImpl final : public Authorization::Service {
  private:
   filters::oidc::TokenResponseParserImpl token_request_parser_;
   std::unique_ptr<filters::Pipe> root_;
+  std::unique_ptr<authservice::config::Config> config_;
 
  public:
-  AuthServiceImpl();
+  AuthServiceImpl(const std::string& config);
   ::grpc::Status Check(
       ::grpc::ServerContext* context,
       const ::envoy::service::auth::v2::CheckRequest* request,
