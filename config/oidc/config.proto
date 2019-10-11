@@ -10,9 +10,10 @@ message OIDCConfig {
     common.Endpoint jwks_uri = 3;
     string jwks = 4;
     common.Endpoint callback = 5;
-    string landing_page = 6;
-    string client_id = 7;
-    string client_secret = 8;
-    string cryptor_secret = 9;
-    repeated string scopes = 10;
+    string client_id = 6;
+    string client_secret = 7;
+    repeated string scopes = 8;
+    string landing_page = 9;
+    string cryptor_secret = 10;
+    string cookie_name_prefix = 11;
 }

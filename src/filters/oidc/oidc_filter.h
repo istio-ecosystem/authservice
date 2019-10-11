@@ -57,7 +57,7 @@ class OidcFilter final : public filters::Filter {
    * @param headers The headers to add to.
    * @param value The value of the state cookie.
    */
-  static void SetStateCookie(
+  void SetStateCookie(
       ::google::protobuf::RepeatedPtrField<
           ::envoy::api::v2::core::HeaderValueOption> *headers,
       absl::string_view value);
@@ -104,6 +104,12 @@ class OidcFilter final : public filters::Filter {
       const ::envoy::service::auth::v2::CheckRequest *request,
       ::envoy::service::auth::v2::CheckResponse *response) override;
   absl::string_view Name() const override;
+
+  /** @brief Get state cookie name. */
+  std::string GetStateCookieName();
+
+  /** @brief Get id token cookie name. */
+  std::string GetIdTokenCookieName();
 };
 
 }  // namespace oidc
