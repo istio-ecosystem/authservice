@@ -9,10 +9,9 @@
 namespace transparent_auth {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(const std::string &config) {
+AuthServiceImpl::AuthServiceImpl(std::shared_ptr<authservice::config::Config> config) {
   root_.reset(new filters::Pipe);
-  config_ = config::GetConfig(config);
-  for (const auto &filter : config_->filters()) {
+  for (const auto &filter : config->filters()) {
     // TODO: implement filter specific construction.
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");
