@@ -12,7 +12,6 @@ namespace service {
 
 class AuthServiceImpl final : public Authorization::Service {
  private:
-  filters::oidc::TokenResponseParserImpl token_request_parser_;
   std::unique_ptr<filters::Pipe> root_;
   std::unique_ptr<authservice::config::Config> config_;
 
