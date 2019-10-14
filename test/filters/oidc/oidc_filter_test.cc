@@ -38,6 +38,7 @@ class OidcFilterTest : public ::testing::Test {
     config_.set_client_secret("ZXhhbXBsZS1hcHAtc2VjcmV0");
     config_.set_cryptor_secret("xxx123");
     config_.set_landing_page("/landing-page");
+    config_.set_cookie_name_prefix("cookie-prefix");
   }
 };
 
@@ -52,6 +53,32 @@ TEST_F(OidcFilterTest, Name) {
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
   ASSERT_EQ(filter.Name().compare("oidc"), 0);
+}
+
+TEST_F(OidcFilterTest, GetStateCookieName) {
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+
+  config_.clear_cookie_name_prefix();
+  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ASSERT_EQ(filter1.GetStateCookieName(), "authservice-state-cookie");
+
+  config_.set_cookie_name_prefix("my-prefix");
+  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ASSERT_EQ(filter2.GetStateCookieName(), "my-prefix-authservice-state-cookie");
+}
+
+TEST_F(OidcFilterTest, GetIdTokenCookieName) {
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+
+  config_.clear_cookie_name_prefix();
+  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ASSERT_EQ(filter1.GetIdTokenCookieName(), "authservice-id-token-session-cookie");
+
+  config_.set_cookie_name_prefix("my-prefix");
+  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ASSERT_EQ(filter2.GetIdTokenCookieName(), "my-prefix-authservice-id-token-session-cookie");
 }
 
 TEST_F(OidcFilterTest, NoHttpHeader) {
@@ -105,7 +132,7 @@ TEST_F(OidcFilterTest, NoAuthorization) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -144,7 +171,7 @@ TEST_F(OidcFilterTest, InvalidCookies) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -165,7 +192,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-acme-id-token-session-cookie=invalid"});
+       "cookie-prefix-authservice-id-token-session-cookie=invalid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
       .WillOnce(::testing::Return(absl::nullopt));
 
@@ -187,7 +214,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -206,7 +233,7 @@ TEST_F(OidcFilterTest, ValidSessionToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-acme-id-token-session-cookie=valid"});
+       "cookie-prefix-authservice-id-token-session-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(::testing::Return(absl::optional<std::string>("secret")));
 
@@ -240,7 +267,7 @@ TEST_F(OidcFilterTest, RetrieveToken) {
   httpRequest->set_scheme(""); // Seems like it should be "https", but in practice is empty
   httpRequest->set_host(config_.callback().hostname());
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie, "__Host-acme-state-cookie=valid"});
+      {common::http::headers::Cookie, "cookie-prefix-authservice-state-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(::testing::Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
@@ -264,10 +291,10 @@ TEST_F(OidcFilterTest, RetrieveToken) {
       ASSERT_EQ(iter.header().value(),
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_TRUE((iter.header().value() == "__Host-acme-id-token-session-"
+      ASSERT_TRUE((iter.header().value() == "cookie-prefix-authservice-id-token-session-"
                                             "cookie=encryptedtoken; HttpOnly; "
                                             "Path=/; SameSite=Lax; Secure") ||
-                  (iter.header().value() == "__Host-acme-state-cookie=deleted; "
+                  (iter.header().value() == "cookie-prefix-authservice-state-cookie=deleted; "
                                             "HttpOnly; Path=/; SameSite=Lax; "
                                             "Secure"));
     } else {
@@ -304,7 +331,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -324,7 +351,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
   httpRequest->set_scheme("https");
   httpRequest->set_host(config_.callback().hostname());
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie, "__Host-acme-state-cookie=invalid"});
+      {common::http::headers::Cookie, "cookie-prefix-authservice-state-cookie=invalid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
       .WillOnce(::testing::Return(absl::nullopt));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
@@ -344,7 +371,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -364,7 +391,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
   httpRequest->set_scheme("https");
   httpRequest->set_host(config_.callback().hostname());
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie, "__Host-acme-state-cookie=valid"});
+      {common::http::headers::Cookie, "cookie-prefix-authservice-state-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(
           ::testing::Return(absl::optional<std::string>("invalidformat")));
@@ -385,7 +412,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -421,7 +448,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -457,7 +484,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -493,7 +520,7 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -517,7 +544,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
   httpRequest->set_host(config_.callback().hostname());
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie, "__Host-acme-state-cookie=valid"});
+      {common::http::headers::Cookie, "cookie-prefix-authservice-state-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(::testing::Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
@@ -538,7 +565,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -565,7 +592,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   httpRequest->set_host(config_.callback().hostname());
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie, "__Host-acme-state-cookie=valid"});
+      {common::http::headers::Cookie, "cookie-prefix-authservice-state-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(::testing::Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
@@ -586,7 +613,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "__Host-acme-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
