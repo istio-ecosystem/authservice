@@ -1,0 +1,17 @@
+{
+  "filters": [
+    {
+      "oidc":
+      {
+        "authorization": {
+        },
+        "token": {
+        },
+        "jwks_uri": {
+        },
+        "callback": {
+        }
+      }
+    }
+  ]
+}

@@ -27,8 +27,8 @@
         "jwks": "some-jwks",
         "callback": {
           "scheme": "https",
-          "hostname": "google3",
-          "path": "path3",
+          "hostname": "google4",
+          "path": "path4",
           "port": 443
         },
         "client_id": "foo",
