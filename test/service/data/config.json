@@ -15,7 +15,7 @@
           "path": "path2",
           "port": 443
         },
-        "jwks": {
+        "jwks_uri": {
           "scheme": "https",
           "hostname": "google1",
           "path": "path1",
