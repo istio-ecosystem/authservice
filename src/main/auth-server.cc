@@ -21,7 +21,48 @@ using grpc::ServerBuilder;
 namespace transparent_auth {
 namespace service {
 
-void RunServer(const std::string &address, std::shared_ptr<authservice::config::Config> config) {
+spdlog::level::level_enum GetConfiguredLogLevel(const std::shared_ptr<authservice::config::Config>& config) {
+  auto log_level_string = config->log_level();
+  spdlog::level::level_enum level;
+
+  if (log_level_string == "trace" || log_level_string.empty()) {
+    level = spdlog::level::level_enum::trace;
+  } else if (log_level_string == "debug") {
+    level = spdlog::level::level_enum::debug;
+  } else if (log_level_string == "info") {
+    level = spdlog::level::level_enum::info;
+  } else if (log_level_string == "error") {
+    level = spdlog::level::level_enum::err;
+  } else if (log_level_string == "critical") {
+    level = spdlog::level::level_enum::critical;
+  } else {
+    spdlog::error("{}: Unexpected log_level config '{}': must be one of [trace, debug, info, error, critical]",
+                  __func__, log_level_string);
+    abort();
+  }
+
+  return level;
+}
+
+std::string GetConfiguredAddress(const std::shared_ptr<authservice::config::Config>& config) {
+  std::stringstream address_string_builder;
+  auto configured_address = config->listen_address();
+  auto configured_port = config->listen_port();
+
+  if (configured_address.empty()) {
+    configured_address = "127.0.0.1";
+  }
+  if (configured_port.empty()) {
+    configured_port = "10003";
+  }
+
+  address_string_builder << configured_address << ":" << std::dec << configured_port;
+  auto address = address_string_builder.str();
+  return address;
+}
+
+void RunServer(const std::shared_ptr<authservice::config::Config>& config) {
+  auto address = GetConfiguredAddress(config);
   AuthServiceImpl auth_service(config);
   ServerBuilder builder;
   builder.AddListeningPort(address, grpc::InsecureServerCredentials());
@@ -30,68 +71,11 @@ void RunServer(const std::string &address, std::shared_ptr<authservice::config::
   spdlog::info("{}: Server listening on {}", __func__, address);
   server->Wait();
 }
+
 }  // namespace service
 }  // namespace transparent_auth
 
-#define LOG_LEVELS \
-  LEVEL(trace)     \
-  LEVEL(debug)     \
-  LEVEL(info)      \
-  LEVEL(err)       \
-  LEVEL(critical)
-
-static bool StrToLogLevel(const std::string &str,
-                          spdlog::level::level_enum *level) {
-#define LEVEL(name)                           \
-  if (str == #name) {                         \
-    *level = spdlog::level::level_enum::name; \
-    return true;                              \
-  }
-  LOG_LEVELS
-#undef LEVEL
-  return false;
-}
-
-static std::string LogLevelToStr(spdlog::level::level_enum input) {
-  switch (input) {
-#define LEVEL(name)                     \
-  case spdlog::level::level_enum::name: \
-    return #name;
-    LOG_LEVELS
-#undef LEVEL
-    default:
-      assert(false);
-      return "info";
-  }
-}
-
-struct LogLevel {
-  explicit LogLevel() {}
-  spdlog::level::level_enum level = spdlog::level::level_enum::info;
-};
-
-std::string AbslUnparseFlag(const LogLevel &level) {
-  return LogLevelToStr(level.level);
-}
-
-bool AbslParseFlag(absl::string_view text, LogLevel *level,
-                   std::string *error) {
-  std::string str;
-  if (!absl::ParseFlag(text, &str, error)) {
-    return false;
-  }
-  if (!StrToLogLevel(str, &level->level)) {
-    *error = "one of [trace, debug, info, error, critical]";
-    return false;
-  }
-  return true;
-}
-
-ABSL_FLAG(LogLevel, log_level, LogLevel(), "log level");
-ABSL_FLAG(std::string, address, "0.0.0.0", "address to bind to");
-ABSL_FLAG(uint16_t, port, 5001, "port to listen on");
-ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json",
-          "path to filter config");
+ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json", "path to filter config");
 
 int main(int argc, char **argv) {
   absl::SetProgramUsageMessage(absl::StrCat("run an auth server:\n", argv[0]));
@@ -99,15 +83,11 @@ int main(int argc, char **argv) {
 
   auto console = spdlog::stdout_logger_mt("console");
   spdlog::set_default_logger(console);
-  console->set_level(absl::GetFlag(FLAGS_log_level).level);
-
-  std::stringstream address_string_builder;
-  address_string_builder << absl::GetFlag(FLAGS_address) << ":" << std::dec
-                         << absl::GetFlag(FLAGS_port);
 
   try {
     auto config = transparent_auth::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
-    transparent_auth::service::RunServer(address_string_builder.str(), config);
+    console->set_level(transparent_auth::service::GetConfiguredLogLevel(config));
+    transparent_auth::service::RunServer(config);
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;
