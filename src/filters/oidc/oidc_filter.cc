@@ -22,6 +22,7 @@ namespace {
 const char *filter_name_ = "oidc";
 const char *cookie_name_ = "__Host-acme-id-token-session-cookie";
 const char *state_cookie_name_ = "__Host-acme-state-cookie";
+const std::string bearer_prefix_ = "Bearer";
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl,
@@ -177,7 +178,7 @@ google::rpc::Code OidcFilter::Process(
     if (session_token.has_value()) {
       // We have a valid token. Append to headers and let processing continue.
       SetHeader(response->mutable_ok_response()->mutable_headers(),
-                common::http::headers::Authorization, *session_token);
+                common::http::headers::Authorization, absl::StrJoin({bearer_prefix_, session_token.value()}, " "));
       return google::rpc::Code::OK;
     } else {
       spdlog::info("{}: cookie decryption failed", __func__);
