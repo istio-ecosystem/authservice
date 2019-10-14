@@ -1,0 +1,49 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: sidecar-token-service-filter
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: productpage # target the app to which you want to apply the filter
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.jwt_authn"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+       name: envoy.ext_authz
+       config:
+         stat_prefix: ext_authz
+         grpc_service:
+           envoy_grpc:
+             cluster_name: ext_authz
+           timeout: 10s # time out for the entire request (including the token acquisition flow)
+  - applyTo: CLUSTER
+    match:
+      context: ANY
+    patch:
+      operation: ADD
+      value:
+        name: ext_authz
+        connect_timeout: 5s # This timeout controls the initial TCP handshake timeout - not the timeout for the entire request
+        type: LOGICAL_DNS
+        lb_policy: ROUND_ROBIN
+        http2_protocol_options: {}
+        load_assignment:
+          cluster_name: ext_authz
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: 127.0.0.1
+                        port_value: 10003

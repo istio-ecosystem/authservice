@@ -1,0 +1,45 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: bookinfo-authservice-configmap
+data:
+  # DO NOT COMMIT SECRETS
+  config.json: |
+    {
+      "filters": [
+      {
+        "oidc":
+          {
+            "authorization": {
+              "scheme": "https",
+              "hostname": "demo.example.change.me",
+              "path": "/oauth/authorize/change/me",
+              "port": "443"
+            },
+            "token": {
+               "scheme": "https",
+               "hostname": "demo.example.change.me",
+               "path": "/oauth/token/change/me",
+               "port": "443"
+            },
+            "jwks": {
+              "scheme": "https",
+              "hostname": "demo.example.change.me",
+              "path": "/token_keys/change/me",
+              "port": "443"
+            },
+            "callback": {
+              "scheme": "https",
+              "hostname": "INGRESS_HOST_CHANGE_ME",
+              "path": "/productpage/oauth/callback",
+              "port": "443",
+            },
+            "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
+            "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
+            "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
+            "scopes": []
+          }
+        }
+      ]
+    }
