@@ -38,11 +38,12 @@ data:
               "path": "/productpage/oauth/callback",
               "port": "443",
             },
-            "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
             "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
             "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
+            "scopes": [],
+            "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
             "cryptor_secret": "xxx_CHANGE_ME",
-            "scopes": []
+            "cookie_name_prefix": "productpage"
           }
         }
       ]
