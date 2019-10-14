@@ -1,0 +1,9 @@
+#
+# The grpc library currently does not compile on a Mac, which makes it hard to run unit tests during development.
+#
+# The compile error looks like this:
+#   ERROR: [...]/external/com_github_grpc_grpc/BUILD:2095:1: Linking of rule '@com_github_grpc_grpc//:grpc++_base' failed (Exit 1) cc_wrapper.sh failed: error executing command external/local_config_cc/cc_wrapper.sh -lc++ -fobjc-link-runtime -Wl,-S -shared -o bazel-out/darwin-fastbuild/bin/external/com_github_grpc_grpc/libgrpc++_base.so ... (remaining 41 argument(s) skipped)
+#
+# The following workaround was suggested by https://github.com/grpc/grpc/issues/19645
+#
+build --copt -DGRPC_BAZEL_BUILD
