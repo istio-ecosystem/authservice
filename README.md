@@ -1,19 +1,22 @@
 # authservice
-An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter), focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
+An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
+focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
 
 ## Introduction
-`authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth) to the Istio mesh. `authservice` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features, including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/). Together, they allow developers to protect their APIs and Web Apps without any application code change. 
-
-## Architecture
-TBD
+`authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+to the Istio mesh. `authservice` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
+including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
+Together, they allow developers to protect their APIs and web apps without any application code required.
 
 ## Example
 Please refer to the [bookinfo-example](./bookinfo-example) directory for an example integration. 
 
-## Building an `authservice` image
-TBD
+## Developer Notes
+See the [Makefile](Makefile) for common tasks.
 
 ## Roadmap
+See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)
+
 Features not yet implemented:
  - Token renewal via refresh token.
  - Start new flow to fetch new tokens when either the ID token or the access token has expired.
