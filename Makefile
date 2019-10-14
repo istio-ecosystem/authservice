@@ -1,4 +1,4 @@
-.PHONY: all compose docker build run test coverage format clean
+.PHONY: all compose docker docker-from-scratch docker-compile-env build run test coverage format clean
 .DEFAULT_GOAL:=all
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
@@ -13,6 +13,9 @@ compose: docker
 
 docker:
 	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.builder -t authservice:$(USER) .
+
+docker-from-scratch:
+	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
 
 docker-compile-env:
 	docker build -f build/Dockerfile.interactive-compile-environment -t authservice-build-env:$(USER) .
