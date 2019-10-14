@@ -21,6 +21,7 @@
           "path": "path1",
           "port": 443
         },
+        "jwks": "some-jwks",
         "callback": {
           "scheme": "https",
           "hostname": "google3",
@@ -30,6 +31,7 @@
         "landing_page": "page",
         "client_id": "foo",
         "client_secret": "bar",
+        "cryptor_secret": "some-secret",
         "scopes": ["scope"]
       }
     }
