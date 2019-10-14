@@ -4,11 +4,13 @@ services:
     image: "envoyproxy/envoy:v1.10.0"
     command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "trace"]
     ports:
-      - "8080:8443"
+      - "8443:8443"
     volumes:
       - ./run/envoy:/etc/envoy:ro
   auth:
     image: authservice
-    command: ["--loglevel", "trace", "--address", "0.0.0.0", "--port", "10003"]
+    command: ["-log_level", "trace", "-address", "0.0.0.0", "-port", "10004", "-filter_config", "/etc/authservice/config.json"]
     ports:
-      - "10003:10003"
+      - "10004:10004"
+    volumes:
+      - /tmp/config/config.json:/etc/authservice/config.json:ro

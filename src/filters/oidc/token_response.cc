@@ -75,4 +75,4 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth
