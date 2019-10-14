@@ -1,4 +1,7 @@
 {
+  "listen_address": "127.0.0.1",
+  "listen_port": "10003",
+  "log_level": "trace",
   "filters": [
     {
       "oidc":

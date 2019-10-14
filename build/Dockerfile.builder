@@ -19,4 +19,3 @@ RUN chgrp auth-server-grp /app/auth-server && chown auth-server-usr /app/auth-se
 USER auth-server-usr
 WORKDIR /app
 ENTRYPOINT ["/app/auth-server"]
-CMD ["-log_level", "trace", "-address", "127.0.0.1", "-port", "10003"]
