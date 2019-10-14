@@ -266,7 +266,7 @@ spec:
         ports:
         - containerPort: 9080
       - name: authservice # authservice needs to be deployed in the sample Pod as the productpage
-        image: gcr.io/cf-identity-service-oak/authservice:10-3-with-config
+        image: <AUTHSERVICE_IMAGE> # TODO replace this with an official authservice image
         imagePullPolicy: Always
         ports:
           - containerPort: 10003
