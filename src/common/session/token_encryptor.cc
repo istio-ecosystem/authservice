@@ -10,7 +10,7 @@ namespace session {
 namespace {
 const size_t NONCE_SIZE = 32;
 const size_t DERIVED_KEY_SIZE = 32;
-}
+}  // namespace
 
 class TokenEncryptorImpl : public TokenEncryptor {
  public:

@@ -30,5 +30,5 @@ class StateCookieCodec {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_Auth
+}  // namespace transparent_auth
 #endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_

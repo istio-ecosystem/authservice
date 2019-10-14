@@ -30,21 +30,14 @@ xx_library(
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],
     deps = [
+        "//config/oidc:config_cc",
         "//src/common/http",
         "//src/common/session:token_encryptor",
         "//src/common/utilities:random",
         "//src/filters:filter",
-        "//src/filters/oidc:oidc_filter_config",
         "//src/filters/oidc:state_cookie_codec",
         "//src/filters/oidc:token_response",
         "@boost//:all",
         "@com_github_gabime_spdlog//:spdlog",
     ],
-)
-
-xx_library(
-    name = "oidc_filter_config",
-    srcs = ["oidc_idp_configuration.cc"],
-    hdrs = ["oidc_idp_configuration.h"],
-    deps = ["//src/common/http"],
 )
