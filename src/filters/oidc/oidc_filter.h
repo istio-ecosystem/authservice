@@ -22,7 +22,7 @@ class OidcFilter final : public filters::Filter {
  private:
   common::http::ptr_t http_ptr_;
   const authservice::config::oidc::OIDCConfig &idp_config_;
-  TokenResponseParser &parser_;
+  TokenResponseParserPtr parser_;
   common::session::TokenEncryptorPtr cryptor_;
 
   /**
@@ -57,7 +57,7 @@ class OidcFilter final : public filters::Filter {
    * @param headers The headers to add to.
    * @param value The value of the state cookie.
    */
-  static void SetStateCookie(
+  void SetStateCookie(
       ::google::protobuf::RepeatedPtrField<
           ::envoy::api::v2::core::HeaderValueOption> *headers,
       absl::string_view value);
@@ -97,13 +97,19 @@ class OidcFilter final : public filters::Filter {
  public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
-             TokenResponseParser &parser,
+             TokenResponseParserPtr parser,
              common::session::TokenEncryptorPtr cryptor);
 
   google::rpc::Code Process(
       const ::envoy::service::auth::v2::CheckRequest *request,
       ::envoy::service::auth::v2::CheckResponse *response) override;
   absl::string_view Name() const override;
+
+  /** @brief Get state cookie name. */
+  std::string GetStateCookieName();
+
+  /** @brief Get id token cookie name. */
+  std::string GetIdTokenCookieName();
 };
 
 }  // namespace oidc

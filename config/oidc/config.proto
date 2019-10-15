@@ -7,10 +7,13 @@ import "config/common/config.proto";
 message OIDCConfig {
     common.Endpoint authorization = 1;
     common.Endpoint token = 2;
-    common.Endpoint jwks = 3;
-    common.Endpoint callback = 4;
-    string landing_page = 5;
+    common.Endpoint jwks_uri = 3;
+    string jwks = 4;
+    common.Endpoint callback = 5;
     string client_id = 6;
     string client_secret = 7;
     repeated string scopes = 8;
+    string landing_page = 9;
+    string cryptor_secret = 10;
+    string cookie_name_prefix = 11;
 }

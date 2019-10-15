@@ -12,4 +12,7 @@ message Filter {
 
 message Config {
     repeated Filter filters = 1;
+    string listen_address = 2;
+    string listen_port = 3;
+    string log_level = 4;
 }

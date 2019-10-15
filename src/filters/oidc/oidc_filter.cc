@@ -1,6 +1,5 @@
 #include "oidc_filter.h"
 #include <boost/beast.hpp>
-#include <sstream>
 #include "absl/strings/str_join.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
@@ -21,8 +20,6 @@ namespace oidc {
 namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
-const char *cookie_name_ = "__Host-acme-id-token-session-cookie";
-const char *state_cookie_name_ = "__Host-acme-state-cookie";
 const std::string bearer_prefix_ = "Bearer";
 
 const std::map<const char *, const char *> standard_headers = {
@@ -35,7 +32,7 @@ const std::map<const char *, const char *> standard_headers = {
 
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
                        const authservice::config::oidc::OIDCConfig &idp_config,
-                       TokenResponseParser &parser,
+                       TokenResponseParserPtr parser,
                        common::session::TokenEncryptorPtr cryptor)
     : http_ptr_(http_ptr),
       idp_config_(idp_config),
@@ -71,6 +68,24 @@ void OidcFilter::SetRedirectHeaders(
             common::http::headers::Location, redirect_url.data());
 }
 
+std::string OidcFilter::GetStateCookieName() {
+  const auto base_state_cookie_name = "authservice-state-cookie";
+  auto prefix = idp_config_.cookie_name_prefix();
+  if (prefix.empty()) {
+    return base_state_cookie_name;
+  }
+  return prefix + '-' + base_state_cookie_name;
+}
+
+std::string OidcFilter::GetIdTokenCookieName() {
+  const auto base_id_token_cookie_name = "authservice-id-token-session-cookie";
+  auto prefix = idp_config_.cookie_name_prefix();
+  if (prefix.empty()) {
+    return base_id_token_cookie_name;
+  }
+  return prefix + "-" + base_id_token_cookie_name;
+}
+
 void OidcFilter::SetStateCookie(
     ::google::protobuf::RepeatedPtrField<
         ::envoy::api::v2::core::HeaderValueOption> *headers,
@@ -81,7 +96,7 @@ void OidcFilter::SetStateCookie(
        common::http::headers::SetCookieDirectives::SameSiteLax,
        common::http::headers::SetCookieDirectives::Secure, "Path=/"};
   auto state_cookie_header = common::http::http::EncodeSetCookie(
-      state_cookie_name_, value, token_set_cookie_header_directives);
+      GetStateCookieName(), value, token_set_cookie_header_directives);
   SetHeader(headers, common::http::headers::SetCookie, state_cookie_header);
 }
 
@@ -177,7 +192,7 @@ google::rpc::Code OidcFilter::Process(
 
   // Check if we have a valid session cookie, If not go through authentication
   // redirection dance.
-  auto session_cookie = CookieFromHeaders(headers, cookie_name_);
+  auto session_cookie = CookieFromHeaders(headers, GetIdTokenCookieName());
   if (session_cookie.has_value()) {
     auto session_token = cryptor_->Decrypt(*session_cookie);
     if (session_token.has_value()) {
@@ -219,7 +234,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   // Extract state and nonce from encrypted cookie.
   auto encrypted_state_cookie = CookieFromHeaders(
-      request->attributes().request().http().headers(), state_cookie_name_);
+      request->attributes().request().http().headers(), GetStateCookieName());
   if (!encrypted_state_cookie.has_value()) {
     spdlog::info("{}: missing state cookie", __func__);
     ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
@@ -300,7 +315,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::UNKNOWN;
   } else {
     // TODO: fill in nonce from state and validate JWT.
-    auto token = parser_.Parse("", retrieve_token_response->body());
+    auto token = parser_->Parse("", retrieve_token_response->body());
     if (!token.has_value()) {
       spdlog::info("{}: Invalid token response", __func__);
       ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
@@ -315,7 +330,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
         common::http::headers::SetCookieDirectives::Secure, "Path=/"};
     auto cookie_value = cryptor_->Encrypt(token->IDToken().jwt_);
     auto token_set_cookie_header = common::http::http::EncodeSetCookie(
-        cookie_name_, cookie_value, token_set_cookie_header_directives);
+        GetIdTokenCookieName(), cookie_value, token_set_cookie_header_directives);
     SetHeader(response->mutable_denied_response()->mutable_headers(),
               common::http::headers::SetCookie, token_set_cookie_header);
     ::grpc::Status error(::grpc::StatusCode::UNAUTHENTICATED,

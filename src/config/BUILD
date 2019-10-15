@@ -9,6 +9,7 @@ xx_library(
         "getconfig.h",
     ],
     deps = [
+        "@boost//:all",
         "//config:config_cc",
     ],
 )

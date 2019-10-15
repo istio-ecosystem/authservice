@@ -12,12 +12,10 @@ namespace service {
 
 class AuthServiceImpl final : public Authorization::Service {
  private:
-  filters::oidc::TokenResponseParserImpl token_request_parser_;
   std::unique_ptr<filters::Pipe> root_;
-  std::unique_ptr<authservice::config::Config> config_;
 
  public:
-  AuthServiceImpl(const std::string& config);
+  AuthServiceImpl(std::shared_ptr<authservice::config::Config> config);
   ::grpc::Status Check(
       ::grpc::ServerContext* context,
       const ::envoy::service::auth::v2::CheckRequest* request,
