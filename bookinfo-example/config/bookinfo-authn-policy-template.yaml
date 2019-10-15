@@ -1,0 +1,13 @@
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "bookinfo-authn-policy"
+spec:
+  targets:
+    - name: productpage
+  origins:
+    - jwt:
+        issuer: https://demo.example.replace.me.com/oauth/token
+        jwksUri: https://demo.example.replace.me.com/token_keys
+  principalBinding: USE_ORIGIN
+

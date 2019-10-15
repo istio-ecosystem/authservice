@@ -1,0 +1,50 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: bookinfo-authservice-configmap
+data:
+  config.json: |
+    {
+      "listen_address": "127.0.0.1",
+      "listen_port": "10003",
+      "log_level": "trace",
+      "filters": [
+      {
+        "oidc":
+          {
+            "authorization": {
+              "scheme": "https",
+              "hostname": "demo.example.change.me",
+              "path": "/oauth/authorize/change/me",
+              "port": "443"
+            },
+            "token": {
+               "scheme": "https",
+               "hostname": "demo.example.change.me",
+               "path": "/oauth/token/change/me",
+               "port": "443"
+            },
+            "jwks_uri": {
+              "scheme": "https",
+              "hostname": "demo.example.change.me",
+              "path": "/token_keys/change/me",
+              "port": "443"
+            },
+            "jwks": "{\"keys\":[{\"kty\":\"RSA\",\"e\":\"AQAB\",\"use\":\"sig\",\"kid\":\"sha2-2017-01-20-key\",\"alg\":\"RS256\",\"value\":\"-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyH6kYCP29faDAUPKtei3\nV/Zh8eCHyHRDHrD0iosvgHuaakK1AFHjD19ojuPiTQm8r8nEeQtHb6mDi1LvZ03e\nEWxpvWwFfFVtCyBqWr5wn6IkY+ZFXfERLn2NCn6sMVxcFV12sUtuqD+jrW8MnTG7\nhofQqxmVVKKsZiXCvUSzfiKxDgoiRuD3MJSoZ0nQTHVmYxlFHuhTEETuTqSPmOXd\n/xJBVRi5WYCjt1aKRRZEz04zVEBVhVkr2H84qcVJHcfXFu4JM6dg0nmTjgd5cZUN\ncwA1KhK2/Qru9N0xlk9FGD2cvrVCCPWFPvZ1W7U7PBWOSBBH6GergA+dk2vQr7Ho\nlQIDAQAB\n-----END PUBLIC KEY-----\",\"n\":\"AMh-pGAj9vX2gwFDyrXot1f2YfHgh8h0Qx6w9IqLL4B7mmpCtQBR4w9faI7j4k0JvK_JxHkLR2-pg4tS72dN3hFsab1sBXxVbQsgalq-cJ-iJGPmRV3xES59jQp-rDFcXBVddrFLbqg_o61vDJ0xu4aH0KsZlVSirGYlwr1Es34isQ4KIkbg9zCUqGdJ0Ex1ZmMZRR7oUxBE7k6kj5jl3f8SQVUYuVmAo7dWikUWRM9OM1RAVYVZK9h_OKnFSR3H1xbuCTOnYNJ5k44HeXGVDXMANSoStv0K7vTdMZZPRRg9nL61Qgj1hT72dVu1OzwVjkgQR-hnq4APnZNr0K-x6JU\"}]}",
+            "callback": {
+              "scheme": "https",
+              "hostname": "INGRESS_HOST_CHANGE_ME",
+              "path": "/productpage/oauth/callback",
+              "port": "443",
+            },
+            "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
+            "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
+            "scopes": [],
+            "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
+            "cryptor_secret": "xxx_CHANGE_ME",
+            "cookie_name_prefix": "productpage"
+          }
+        }
+      ]
+    }
