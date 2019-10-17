@@ -106,10 +106,13 @@ class OidcFilter final : public filters::Filter {
   absl::string_view Name() const override;
 
   /** @brief Get state cookie name. */
-  std::string GetStateCookieName();
+  std::string GetStateCookieName() const;
 
   /** @brief Get id token cookie name. */
-  std::string GetIdTokenCookieName();
+  std::string GetIdTokenCookieName() const;
+
+    /** @brief Get access token cookie name. */
+  std::string GetAccessTokenCookieName() const;
 };
 
 }  // namespace oidc

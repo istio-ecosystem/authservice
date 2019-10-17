@@ -23,7 +23,7 @@ class TokenResponse {
   TokenResponse(const google::jwt_verify::Jwt &id_token);
   void SetAccessToken(absl::string_view access_token);
   const google::jwt_verify::Jwt &IDToken() const;
-  absl::string_view AccessToken() const;
+  const std::string &AccessToken() const;
 };
 
 class TokenResponseParser;

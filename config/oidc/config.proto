@@ -11,8 +11,6 @@ message AccessTokenConfig {
     string header = 1;
     // any preamble to include in the header when forwarding the access token.
     string preamble = 2;
-    // the name of the cookie to store the access token.
-    string cookie_name = 3;
 }
 
 message OIDCConfig {

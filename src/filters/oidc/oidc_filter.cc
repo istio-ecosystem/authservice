@@ -68,22 +68,28 @@ void OidcFilter::SetRedirectHeaders(
             common::http::headers::Location, redirect_url.data());
 }
 
-std::string OidcFilter::GetStateCookieName() {
-  const auto base_state_cookie_name = "authservice-state-cookie";
-  auto prefix = idp_config_.cookie_name_prefix();
-  if (prefix.empty()) {
-    return base_state_cookie_name;
+std::string OidcFilter::GetStateCookieName() const {
+  const std::string base_state_cookie_name = "authservice-state-cookie";
+  if (idp_config_.cookie_name_prefix() == "") {
+    return "__Secure-" + base_state_cookie_name;
   }
-  return prefix + '-' + base_state_cookie_name;
+  return "__Secure-" + idp_config_.cookie_name_prefix() + '-' + base_state_cookie_name;
 }
 
-std::string OidcFilter::GetIdTokenCookieName() {
-  const auto base_id_token_cookie_name = "authservice-id-token-session-cookie";
-  auto prefix = idp_config_.cookie_name_prefix();
-  if (prefix.empty()) {
-    return base_id_token_cookie_name;
+std::string OidcFilter::GetIdTokenCookieName() const {
+  const std::string base_id_token_cookie_name = "authservice-id-token-session-cookie";
+  if (idp_config_.cookie_name_prefix() == "") {
+    return "__Secure-" + base_id_token_cookie_name;
   }
-  return prefix + "-" + base_id_token_cookie_name;
+  return "__Secure-" + idp_config_.cookie_name_prefix() + "-" + base_id_token_cookie_name;
+}
+
+std::string OidcFilter::GetAccessTokenCookieName() const {
+  const std::string base_access_token_cookie_name = "authservice-access-token-session-cookie";
+  if (idp_config_.cookie_name_prefix() == "") {
+    return "__Secure-" + base_access_token_cookie_name;
+  }
+  return "__Secure-" + idp_config_.cookie_name_prefix() + "-" + base_access_token_cookie_name;
 }
 
 void OidcFilter::SetStateCookie(
@@ -322,12 +328,28 @@ google::rpc::Code OidcFilter::RetrieveToken(
                            "Invalid token response");
       return google::rpc::Code::INVALID_ARGUMENT;
     }
-    SetRedirectHeaders(idp_config_.landing_page(), response);
-    // TODO: secure cookies, set timeout etc
     std::set<absl::string_view> token_set_cookie_header_directives = {
         common::http::headers::SetCookieDirectives::HttpOnly,
         common::http::headers::SetCookieDirectives::SameSiteLax,
-        common::http::headers::SetCookieDirectives::Secure, "Path=/"};
+        common::http::headers::SetCookieDirectives::Secure, "Path=/"
+    };
+    // Check whether access_token forwarding is configured and if it is we have an access token in our token response.
+    if (idp_config_.has_access_token()) {
+      if (token->AccessToken() == "") {
+        spdlog::info("{}: Missing expected access_token", __func__);
+        ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
+                             "Missing expected access_token");
+        return google::rpc::Code::INVALID_ARGUMENT;
+      }
+      // TODO: secure cookies, set timeout etc
+      auto cookie_value = cryptor_->Encrypt(token->AccessToken());
+      auto token_set_cookie_header = common::http::http::EncodeSetCookie(
+          GetAccessTokenCookieName(), cookie_value, token_set_cookie_header_directives);
+      SetHeader(response->mutable_denied_response()->mutable_headers(),
+                common::http::headers::SetCookie, token_set_cookie_header);
+    }
+    SetRedirectHeaders(idp_config_.landing_page(), response);
+    // TODO: secure cookies, set timeout etc
     auto cookie_value = cryptor_->Encrypt(token->IDToken().jwt_);
     auto token_set_cookie_header = common::http::http::EncodeSetCookie(
         GetIdTokenCookieName(), cookie_value, token_set_cookie_header_directives);

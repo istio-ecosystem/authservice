@@ -24,7 +24,7 @@ const google::jwt_verify::Jwt &TokenResponse::IDToken() const {
   return id_token_;
 }
 
-absl::string_view TokenResponse::AccessToken() const {
+const std::string & TokenResponse::AccessToken() const {
     return access_token_;
 }
 

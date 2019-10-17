@@ -102,7 +102,7 @@ TEST(TokenResponseParser, Parse) {
   auto result = parser.Parse("", valid_token_response_no_access_token);
   ASSERT_TRUE(result.has_value());
   auto access_token = result->AccessToken();
-  ASSERT_EQ(access_token, absl::string_view());
+  ASSERT_EQ(access_token, std::string());
 
   result = parser.Parse("", valid_token_response_with_access_token);
   ASSERT_TRUE(result.has_value());
