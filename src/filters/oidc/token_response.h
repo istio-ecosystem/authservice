@@ -17,10 +17,13 @@ namespace oidc {
 class TokenResponse {
  private:
   google::jwt_verify::Jwt id_token_;
+  std::string access_token_;
 
  public:
   TokenResponse(const google::jwt_verify::Jwt &id_token);
+  void SetAccessToken(absl::string_view access_token);
   const google::jwt_verify::Jwt &IDToken() const;
+  absl::string_view AccessToken() const;
 };
 
 class TokenResponseParser;

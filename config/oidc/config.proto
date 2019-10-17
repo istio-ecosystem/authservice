@@ -4,6 +4,17 @@ package authservice.config.oidc;
 
 import "config/common/config.proto";
 
+// AccessTokenConfig defines how an access token obtained through an OIDC flow is forwarded to downstream services as
+// well as the cookie name it is included in when returned to a browser
+message AccessTokenConfig {
+    // the name of the header in which to insert an access token when forwarding to internal mesh services.
+    string header = 1;
+    // any preamble to include in the header when forwarding the access token.
+    string preamble = 2;
+    // the name of the cookie to store the access token.
+    string cookie_name = 3;
+}
+
 message OIDCConfig {
     common.Endpoint authorization = 1;
     common.Endpoint token = 2;
@@ -16,4 +27,5 @@ message OIDCConfig {
     string landing_page = 9;
     string cryptor_secret = 10;
     string cookie_name_prefix = 11;
+    AccessTokenConfig access_token = 12;
 }
