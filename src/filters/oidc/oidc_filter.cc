@@ -20,7 +20,6 @@ namespace oidc {
 namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
-const std::string bearer_prefix_ = "Bearer";
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl,

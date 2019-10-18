@@ -21,7 +21,7 @@ namespace oidc {
 class OidcFilter final : public filters::Filter {
  private:
   common::http::ptr_t http_ptr_;
-  const authservice::config::oidc::OIDCConfig &idp_config_;
+  const authservice::config::oidc::OIDCConfig idp_config_;
   TokenResponseParserPtr parser_;
   common::session::TokenEncryptorPtr cryptor_;
 
