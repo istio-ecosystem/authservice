@@ -57,10 +57,9 @@ class OidcFilter final : public filters::Filter {
    * @param headers The headers to add to.
    * @param value The value of the state cookie.
    */
-  void SetStateCookie(
-      ::google::protobuf::RepeatedPtrField<
-          ::envoy::api::v2::core::HeaderValueOption> *headers,
-      absl::string_view value);
+  void SetStateCookie(::google::protobuf::RepeatedPtrField<
+                          ::envoy::api::v2::core::HeaderValueOption> *headers,
+                      absl::string_view value);
 
   /** @brief Extract the requested cookie from the given headers
    *
@@ -94,11 +93,12 @@ class OidcFilter final : public filters::Filter {
       ::envoy::service::auth::v2::CheckResponse *response,
       absl::string_view query);
 
-    /** @brief Get a cookie name. */
+  /** @brief Get a cookie name. */
   std::string GetCookieName(const std::string &cookie) const;
 
   /** @brief Encode a cookie value with optional preamble. */
-  std::string EncodeHeaderValue(const std::string &premable, const std::string &value);
+  std::string EncodeHeaderValue(const std::string &premable,
+                                const std::string &value);
 
  public:
   OidcFilter(common::http::ptr_t http_ptr,

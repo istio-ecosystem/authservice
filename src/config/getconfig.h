@@ -8,7 +8,7 @@ namespace transparent_auth {
 namespace config {
 
 std::shared_ptr<authservice::config::Config> GetConfig(
-    const std::string &configFile);
+    const std::string& configFile);
 
 void ValidateOidcConfig(const authservice::config::oidc::OIDCConfig& oidc);
 

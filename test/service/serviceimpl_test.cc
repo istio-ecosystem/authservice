@@ -1,11 +1,12 @@
 #include "src/service/serviceimpl.h"
-#include "src/config/getconfig.h"
 #include "gtest/gtest.h"
+#include "src/config/getconfig.h"
 
 namespace transparent_auth {
 namespace service {
 TEST(ServiceImplTest, Check) {
-  AuthServiceImpl service(transparent_auth::config::GetConfig("test/fixtures/valid-config.json"));
+  AuthServiceImpl service(
+      transparent_auth::config::GetConfig("test/fixtures/valid-config.json"));
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
 

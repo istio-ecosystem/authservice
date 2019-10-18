@@ -5,20 +5,24 @@ namespace transparent_auth {
 namespace config {
 
 class GetConfigTest : public ::testing::Test {
-public:
+ public:
   constexpr static const char *const expected_error_message =
       "Missing required configuration: "
-      "filters.oidc.authorization.scheme, filters.oidc.authorization.hostname, filters.oidc.authorization.path, filters.oidc.authorization.port, "
-      "filters.oidc.token.scheme, filters.oidc.token.hostname, filters.oidc.token.path, filters.oidc.token.port, "
+      "filters.oidc.authorization.scheme, filters.oidc.authorization.hostname, "
+      "filters.oidc.authorization.path, filters.oidc.authorization.port, "
+      "filters.oidc.token.scheme, filters.oidc.token.hostname, "
+      "filters.oidc.token.path, filters.oidc.token.port, "
       "filters.oidc.jwks, "
-      "filters.oidc.callback.scheme, filters.oidc.callback.hostname, filters.oidc.callback.path, filters.oidc.callback.port, "
-      "filters.oidc.client_id, filters.oidc.client_secret, filters.oidc.landing_page, filters.oidc.cryptor_secret";
-
+      "filters.oidc.callback.scheme, filters.oidc.callback.hostname, "
+      "filters.oidc.callback.path, filters.oidc.callback.port, "
+      "filters.oidc.client_id, filters.oidc.client_secret, "
+      "filters.oidc.landing_page, filters.oidc.cryptor_secret";
 };
 
 TEST_F(GetConfigTest, ReturnsTheConfig) {
   auto config = GetConfig("test/fixtures/valid-config.json");
-  const authservice::config::oidc::OIDCConfig &oidc = config->filters().at(0).oidc();
+  const authservice::config::oidc::OIDCConfig &oidc =
+      config->filters().at(0).oidc();
 
   ASSERT_EQ(config->listen_port(), "10003");
   ASSERT_EQ(config->log_level(), "trace");
@@ -68,8 +72,10 @@ TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
   ASSERT_TRUE(validate_config_threw);
 }
 
-TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
-  auto invalid_config = GetConfig("test/fixtures/invalid-config-with-intermediate-nodes.json");
+TEST_F(GetConfigTest,
+       ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
+  auto invalid_config =
+      GetConfig("test/fixtures/invalid-config-with-intermediate-nodes.json");
   bool validate_config_threw = false;
   try {
     ValidateOidcConfig(invalid_config->filters().at(0).oidc());

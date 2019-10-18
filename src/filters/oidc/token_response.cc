@@ -8,13 +8,13 @@ namespace transparent_auth {
 namespace filters {
 namespace oidc {
 namespace {
-    const char *token_type_field = "token_type";
-    const char *bearer_token_type = "Bearer";
-    const char *id_token_field = "id_token";
-    const char *access_token_field = "access_token";
-} // namespace
+const char *token_type_field = "token_type";
+const char *bearer_token_type = "Bearer";
+const char *id_token_field = "id_token";
+const char *access_token_field = "access_token";
+}  // namespace
 TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
-    : id_token_(id_token){}
+    : id_token_(id_token) {}
 
 void TokenResponse::SetAccessToken(absl::string_view access_token) {
   access_token_ = std::string(access_token.data(), access_token.size());
@@ -24,9 +24,7 @@ const google::jwt_verify::Jwt &TokenResponse::IDToken() const {
   return id_token_;
 }
 
-const std::string & TokenResponse::AccessToken() const {
-    return access_token_;
-}
+const std::string &TokenResponse::AccessToken() const { return access_token_; }
 
 TokenResponseParserImpl::TokenResponseParserImpl(
     google::jwt_verify::JwksPtr keys)

@@ -68,12 +68,12 @@ void OidcFilter::SetRedirectHeaders(
             common::http::headers::Location, redirect_url.data());
 }
 
-
-std::string OidcFilter::GetCookieName(const std::string &cookie) const{
+std::string OidcFilter::GetCookieName(const std::string &cookie) const {
   if (idp_config_.cookie_name_prefix() == "") {
     return "__Secure-authservice-" + cookie + "-cookie";
   }
-  return "__Secure-" + idp_config_.cookie_name_prefix() + "-authservice-" + cookie + "-cookie";
+  return "__Secure-" + idp_config_.cookie_name_prefix() + "-authservice-" +
+         cookie + "-cookie";
 }
 
 std::string OidcFilter::GetStateCookieName() const {
@@ -88,7 +88,8 @@ std::string OidcFilter::GetAccessTokenCookieName() const {
   return GetCookieName("access-token");
 }
 
-std::string OidcFilter::EncodeHeaderValue(const std::string &preamble, const std::string &value) {
+std::string OidcFilter::EncodeHeaderValue(const std::string &preamble,
+                                          const std::string &value) {
   if (preamble != "") {
     return preamble + " " + value;
   }
@@ -199,24 +200,28 @@ google::rpc::Code OidcFilter::Process(
     return google::rpc::Code::OK;
   }
 
-  // Check if we have a valid id_token cookie and optionally an access token cookie, If not go through authentication
-  // redirection dance.
+  // Check if we have a valid id_token cookie and optionally an access token
+  // cookie, If not go through authentication redirection dance.
   auto id_token_cookie = CookieFromHeaders(headers, GetIdTokenCookieName());
   if (id_token_cookie.has_value()) {
     auto id_token = cryptor_->Decrypt(*id_token_cookie);
     if (id_token.has_value()) {
-      auto value = EncodeHeaderValue(idp_config_.id_token().preamble(), id_token.value());
+      auto value = EncodeHeaderValue(idp_config_.id_token().preamble(),
+                                     id_token.value());
       // We have a valid token. Append to headers and let processing continue.
       SetHeader(response->mutable_ok_response()->mutable_headers(),
                 idp_config_.id_token().header(), value);
       // If it exists, extract the access token cookie and forward
       if (idp_config_.has_access_token()) {
-        auto access_token_cookie = CookieFromHeaders(headers, GetAccessTokenCookieName());
+        auto access_token_cookie =
+            CookieFromHeaders(headers, GetAccessTokenCookieName());
         if (access_token_cookie.has_value()) {
           auto access_token = cryptor_->Decrypt(*access_token_cookie);
           if (access_token.has_value()) {
-            auto value = EncodeHeaderValue(idp_config_.access_token().preamble(), access_token.value());
-            // We have a valid token. Append to headers and let processing continue.
+            auto value = EncodeHeaderValue(
+                idp_config_.access_token().preamble(), access_token.value());
+            // We have a valid token. Append to headers and let processing
+            // continue.
             SetHeader(response->mutable_ok_response()->mutable_headers(),
                       idp_config_.access_token().header(), value);
             return google::rpc::Code::OK;
@@ -354,9 +359,9 @@ google::rpc::Code OidcFilter::RetrieveToken(
     std::set<absl::string_view> token_set_cookie_header_directives = {
         common::http::headers::SetCookieDirectives::HttpOnly,
         common::http::headers::SetCookieDirectives::SameSiteLax,
-        common::http::headers::SetCookieDirectives::Secure, "Path=/"
-    };
-    // Check whether access_token forwarding is configured and if it is we have an access token in our token response.
+        common::http::headers::SetCookieDirectives::Secure, "Path=/"};
+    // Check whether access_token forwarding is configured and if it is we have
+    // an access token in our token response.
     if (idp_config_.has_access_token()) {
       if (token->AccessToken() == "") {
         spdlog::info("{}: Missing expected access_token", __func__);
@@ -367,7 +372,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
       // TODO: secure cookies, set timeout etc
       auto cookie_value = cryptor_->Encrypt(token->AccessToken());
       auto token_set_cookie_header = common::http::http::EncodeSetCookie(
-          GetAccessTokenCookieName(), cookie_value, token_set_cookie_header_directives);
+          GetAccessTokenCookieName(), cookie_value,
+          token_set_cookie_header_directives);
       SetHeader(response->mutable_denied_response()->mutable_headers(),
                 common::http::headers::SetCookie, token_set_cookie_header);
     }
@@ -375,7 +381,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
     // TODO: secure cookies, set timeout etc
     auto cookie_value = cryptor_->Encrypt(token->IDToken().jwt_);
     auto token_set_cookie_header = common::http::http::EncodeSetCookie(
-        GetIdTokenCookieName(), cookie_value, token_set_cookie_header_directives);
+        GetIdTokenCookieName(), cookie_value,
+        token_set_cookie_header_directives);
     SetHeader(response->mutable_denied_response()->mutable_headers(),
               common::http::headers::SetCookie, token_set_cookie_header);
     ::grpc::Status error(::grpc::StatusCode::UNAUTHENTICATED,
