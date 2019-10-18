@@ -40,6 +40,8 @@ class OidcFilterTest : public ::testing::Test {
     config_.set_cryptor_secret("xxx123");
     config_.set_landing_page("/landing-page");
     config_.set_cookie_name_prefix("cookie-prefix");
+    config_.mutable_id_token()->set_header("authorization");
+    config_.mutable_id_token()->set_preamble("Bearer");
   }
 };
 
@@ -75,11 +77,11 @@ TEST_F(OidcFilterTest, GetIdTokenCookieName) {
 
   config_.clear_cookie_name_prefix();
   OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter1.GetIdTokenCookieName(), "__Secure-authservice-id-token-session-cookie");
+  ASSERT_EQ(filter1.GetIdTokenCookieName(), "__Secure-authservice-id-token-cookie");
 
   config_.set_cookie_name_prefix("my-prefix");
   OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter2.GetIdTokenCookieName(), "__Secure-my-prefix-authservice-id-token-session-cookie");
+  ASSERT_EQ(filter2.GetIdTokenCookieName(), "__Secure-my-prefix-authservice-id-token-cookie");
 }
 
 TEST_F(OidcFilterTest, GetAccessTokenCookieName) {
@@ -88,11 +90,11 @@ TEST_F(OidcFilterTest, GetAccessTokenCookieName) {
 
   config_.clear_cookie_name_prefix();
   OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter1.GetAccessTokenCookieName(), "__Secure-authservice-access-token-session-cookie");
+  ASSERT_EQ(filter1.GetAccessTokenCookieName(), "__Secure-authservice-access-token-cookie");
 
   config_.set_cookie_name_prefix("my-prefix");
   OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter2.GetAccessTokenCookieName(), "__Secure-my-prefix-authservice-access-token-session-cookie");
+  ASSERT_EQ(filter2.GetAccessTokenCookieName(), "__Secure-my-prefix-authservice-access-token-cookie");
 }
 
 TEST_F(OidcFilterTest, NoHttpHeader) {
@@ -192,7 +194,7 @@ TEST_F(OidcFilterTest, InvalidCookies) {
   }
 }
 
-TEST_F(OidcFilterTest, InvalidSessionToken) {
+TEST_F(OidcFilterTest, InvalidIdToken) {
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
@@ -205,7 +207,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Secure-cookie-prefix-authservice-id-token-session-cookie=invalid"});
+       "__Secure-cookie-prefix-authservice-id-token-cookie=invalid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
       .WillOnce(::testing::Return(absl::nullopt));
 
@@ -235,7 +237,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
   }
 }
 
-TEST_F(OidcFilterTest, ValidSessionToken) {
+TEST_F(OidcFilterTest, ValidIdToken) {
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
@@ -246,18 +248,138 @@ TEST_F(OidcFilterTest, ValidSessionToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Secure-cookie-prefix-authservice-id-token-session-cookie=valid"});
+       "__Secure-cookie-prefix-authservice-id-token-cookie=valid"});
   EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
       .WillOnce(::testing::Return(absl::optional<std::string>("secret")));
 
   auto status = filter.Process(&request, &response);
-  // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::OK);
   ASSERT_EQ(response.ok_response().headers().size(), 1);
   ASSERT_STREQ(common::http::headers::Authorization,
                response.ok_response().headers()[0].header().key().c_str());
   ASSERT_STREQ("Bearer secret",
                response.ok_response().headers()[0].header().value().c_str());
+}
+
+TEST_F(OidcFilterTest, MissingAccessToken) {
+  config_.mutable_access_token()->set_header("access_token");
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+  EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
+      .WillOnce(::testing::Return("encrypted"));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest =
+      request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Secure-cookie-prefix-authservice-id-token-cookie=valid"});
+  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+      .WillOnce(::testing::Return(absl::optional<std::string>("secret")));
+
+  auto status = filter.Process(&request, &response);
+  // We expect to be redirected to authenticate
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response.denied_response().headers().size(), 4);
+
+  for (auto iter : response.denied_response().headers()) {
+    if (iter.header().key() == common::http::headers::Location) {
+      ASSERT_EQ(iter.header().value().find(
+          common::http::http::ToUrl(config_.authorization())),
+                0);
+    } else if (iter.header().key() == common::http::headers::CacheControl) {
+      ASSERT_EQ(iter.header().value(),
+                common::http::headers::CacheControlDirectives::NoCache);
+    } else if (iter.header().key() == common::http::headers::Pragma) {
+      ASSERT_EQ(iter.header().value(),
+                common::http::headers::PragmaDirectives::NoCache);
+    } else if (iter.header().key() == common::http::headers::SetCookie) {
+      ASSERT_EQ(iter.header().value(),
+                "__Secure-cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
+                "SameSite=Lax; Secure");
+    } else {
+      FAIL();  // Unexpected header!
+    }
+  }
+}
+
+TEST_F(OidcFilterTest, InvalidAccessToken) {
+  config_.mutable_access_token()->set_header("access_token");
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+  EXPECT_CALL(*cryptor_mock, Encrypt(::testing::_))
+      .WillOnce(::testing::Return("encrypted"));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest =
+      request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Secure-cookie-prefix-authservice-id-token-cookie=valid; __Secure-cookie-prefix-authservice-access-token-cookie=invalid"});
+  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+      .WillOnce(::testing::Return(absl::optional<std::string>("secret")));
+  EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
+      .WillOnce(::testing::Return(absl::nullopt));
+
+  auto status = filter.Process(&request, &response);
+  // We expect to be redirected to authenticate
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response.denied_response().headers().size(), 4);
+
+  for (auto iter : response.denied_response().headers()) {
+    if (iter.header().key() == common::http::headers::Location) {
+      ASSERT_EQ(iter.header().value().find(
+          common::http::http::ToUrl(config_.authorization())),
+                0);
+    } else if (iter.header().key() == common::http::headers::CacheControl) {
+      ASSERT_EQ(iter.header().value(),
+                common::http::headers::CacheControlDirectives::NoCache);
+    } else if (iter.header().key() == common::http::headers::Pragma) {
+      ASSERT_EQ(iter.header().value(),
+                common::http::headers::PragmaDirectives::NoCache);
+    } else if (iter.header().key() == common::http::headers::SetCookie) {
+      ASSERT_EQ(iter.header().value(),
+                "__Secure-cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
+                "SameSite=Lax; Secure");
+    } else {
+      FAIL();  // Unexpected header!
+    }
+  }
+}
+
+TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
+  config_.mutable_access_token()->set_header("access_token");
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest =
+      request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Secure-cookie-prefix-authservice-id-token-cookie=identity; __Secure-cookie-prefix-authservice-access-token-cookie=access"});
+  EXPECT_CALL(*cryptor_mock, Decrypt("identity"))
+      .WillOnce(::testing::Return(absl::optional<std::string>("id_secret")));
+  EXPECT_CALL(*cryptor_mock, Decrypt("access"))
+      .WillOnce(::testing::Return(absl::optional<std::string>("access_secret")));
+
+  auto status = filter.Process(&request, &response);
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_EQ(response.ok_response().headers().size(), 2);
+  ASSERT_STREQ(common::http::headers::Authorization,
+               response.ok_response().headers()[0].header().key().c_str());
+  ASSERT_STREQ("Bearer id_secret",
+               response.ok_response().headers()[0].header().value().c_str());
+  ASSERT_STREQ("access_token",
+               response.ok_response().headers()[1].header().key().c_str());
+  ASSERT_STREQ("access_secret",
+               response.ok_response().headers()[1].header().value().c_str());
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
@@ -305,7 +427,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
       ASSERT_EQ(iter.header().value(),
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_TRUE((iter.header().value() == "__Secure-cookie-prefix-authservice-id-token-session-"
+      ASSERT_TRUE((iter.header().value() == "__Secure-cookie-prefix-authservice-id-token-"
                                             "cookie=encryptedtoken; HttpOnly; "
                                             "Path=/; SameSite=Lax; Secure") ||
                   (iter.header().value() == "__Secure-cookie-prefix-authservice-state-cookie=deleted; "
@@ -363,13 +485,13 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
       ASSERT_EQ(iter.header().value(),
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_TRUE((iter.header().value() == "__Secure-cookie-prefix-authservice-id-token-session-"
+      ASSERT_TRUE((iter.header().value() == "__Secure-cookie-prefix-authservice-id-token-"
                                             "cookie=encryptedtoken; HttpOnly; "
                                             "Path=/; SameSite=Lax; Secure") ||
                   (iter.header().value() == "__Secure-cookie-prefix-authservice-state-cookie=deleted; "
                                             "HttpOnly; Path=/; SameSite=Lax; "
                                             "Secure") ||
-                    (iter.header().value() == "__Secure-cookie-prefix-authservice-access-token-session-"
+                    (iter.header().value() == "__Secure-cookie-prefix-authservice-access-token-"
                                               "cookie=encryptedtoken; HttpOnly; "
                                               "Path=/; SameSite=Lax; Secure"));
     } else {

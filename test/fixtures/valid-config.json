@@ -36,7 +36,14 @@
         "scopes": ["scope"],
         "landing_page": "page",
         "cryptor_secret": "some-secret",
-        "cookie_name_prefix": "my-app"
+        "cookie_name_prefix": "my-app",
+        "id_token": {
+          "preamble": "Bearer",
+          "header": "authorization"
+        },
+        "access_token": {
+          "header": "x-access-token"
+        }
       }
     }
   ]

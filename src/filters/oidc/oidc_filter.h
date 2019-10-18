@@ -94,6 +94,12 @@ class OidcFilter final : public filters::Filter {
       ::envoy::service::auth::v2::CheckResponse *response,
       absl::string_view query);
 
+    /** @brief Get a cookie name. */
+  std::string GetCookieName(const std::string &cookie) const;
+
+  /** @brief Encode a cookie value with optional preamble. */
+  std::string EncodeHeaderValue(const std::string &premable, const std::string &value);
+
  public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
@@ -111,7 +117,7 @@ class OidcFilter final : public filters::Filter {
   /** @brief Get id token cookie name. */
   std::string GetIdTokenCookieName() const;
 
-    /** @brief Get access token cookie name. */
+  /** @brief Get access token cookie name. */
   std::string GetAccessTokenCookieName() const;
 };
 
