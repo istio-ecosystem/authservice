@@ -69,9 +69,9 @@ void OidcFilter::SetRedirectHeaders(
 
 std::string OidcFilter::GetCookieName(const std::string &cookie) const {
   if (idp_config_.cookie_name_prefix() == "") {
-    return "__Secure-authservice-" + cookie + "-cookie";
+    return "__Host-authservice-" + cookie + "-cookie";
   }
-  return "__Secure-" + idp_config_.cookie_name_prefix() + "-authservice-" +
+  return "__Host-" + idp_config_.cookie_name_prefix() + "-authservice-" +
          cookie + "-cookie";
 }
 
