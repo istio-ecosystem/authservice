@@ -3,28 +3,30 @@ syntax = "proto3";
 package authservice.config.oidc;
 
 import "config/common/config.proto";
+import "validate/validate.proto";
 
-// AccessTokenConfig defines how an access token obtained through an OIDC flow is forwarded to downstream services as
+// TokenConfig defines how an access token obtained through an OIDC flow is forwarded to downstream services as
 // well as the cookie name it is included in when returned to a browser
 message TokenConfig {
-    // the name of the header in which to insert an access token when forwarding to internal mesh services.
-    string header = 1;
-    // any preamble to include in the header when forwarding the access token.
+    // the name of the http header in which to insert a token when forwarding to internal mesh services.
+    string header = 1 [(validate.rules).string.min_len = 1];
+    // any preamble to include in the header when forwarding a token. For example "Bearer"
     string preamble = 2;
 }
 
 message OIDCConfig {
-    common.Endpoint authorization = 1;
-    common.Endpoint token = 2;
+    common.Endpoint authorization = 1 [(validate.rules).message.required = true];
+    common.Endpoint token = 2 [(validate.rules).message.required = true];
+    // TODO: make JWKS config oneof
     common.Endpoint jwks_uri = 3;
     string jwks = 4;
-    common.Endpoint callback = 5;
-    string client_id = 6;
-    string client_secret = 7;
+    common.Endpoint callback = 5 [(validate.rules).message.required = true];
+    string client_id = 6 [(validate.rules).string.min_len = 1];
+    string client_secret = 7 [(validate.rules).string.min_len = 1];
     repeated string scopes = 8;
-    string landing_page = 9;
-    string cryptor_secret = 10;
+    string landing_page = 9 [(validate.rules).string.min_len = 1]; // TODO: use [(validate.rules).string.uri_ref = true] when implemented
+    string cryptor_secret = 10 [(validate.rules).string.min_len = 1];
     string cookie_name_prefix = 11;
-    TokenConfig id_token = 12;
+    TokenConfig id_token = 12 [(validate.rules).message.required = true];
     TokenConfig access_token = 13;
 }

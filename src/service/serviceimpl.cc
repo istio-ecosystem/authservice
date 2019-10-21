@@ -17,8 +17,6 @@ AuthServiceImpl::AuthServiceImpl(
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");
     }
-    transparent_auth::config::ValidateOidcConfig(filter.oidc());
-
     auto token_request_parser =
         std::make_shared<filters::oidc::TokenResponseParserImpl>(
             google::jwt_verify::Jwks::createFrom(

@@ -50,18 +50,9 @@ spdlog::level::level_enum GetConfiguredLogLevel(
 std::string GetConfiguredAddress(
     const std::shared_ptr<authservice::config::Config>& config) {
   std::stringstream address_string_builder;
-  auto configured_address = config->listen_address();
-  auto configured_port = config->listen_port();
 
-  if (configured_address.empty()) {
-    configured_address = "127.0.0.1";
-  }
-  if (configured_port.empty()) {
-    configured_port = "10003";
-  }
-
-  address_string_builder << configured_address << ":" << std::dec
-                         << configured_port;
+  address_string_builder << config->listen_address() << ":" << std::dec
+                         << config->listen_port();
   auto address = address_string_builder.str();
   return address;
 }
