@@ -35,22 +35,24 @@ provider will be needed to configure `authservice`.
 to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`.
 See the following table for the description of each field:    
 
-    | Field                   | Optionality | Description
-    |-------------------------|-------------|-----------------------------------------------------------------------------------
-    | listen_address          |  Optional   | The ip address the authservice will listen on. Defaults to 127.0.0.1. 
-    | listen_port             |  Optional   | The port the authservice will listen on. Defaults to 10003
-    | log_level               |  Optional   | Log verbosity. Must be one of trace, debug, info, error, critical. Defaults to trace.
-    | oidc.authorization      |  Required   | The Authorization Endpoint of your OIDC provider.
-    | oidc.token              |  Required   | The Token Endpoint of your OIDC provider
-    | oidc.jwks_uri           |  Ignored    | *This is currently ignored.* In a future version it will be the URL of your OIDC provider’s public key set to validate signature of the JWT. See [OpenID Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata). This should match the `jwksUri` value of [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/).
-    | oidc.jwks               |  Required   | The JSON JWKS response from your OIDC provider’s `jwks_uri` URI which can be found in your OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
-    | oidc.callback           |  Required   | This value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request. You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider. See [OIDC spec](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). You must also prepare your [Istio VirtualService](https://istio.io/docs/reference/config/networking/v1alpha3/virtual-service/) to ensure that this URL will get routed to `productpage`.
-    | oidc.client_id          |  Required   | The Client ID of your OIDC Client.
-    | oidc.client_secret      |  Required   | The Client Secret of your OIDC Client.
-    | oidc.scopes             |  Optional   | A list of scopes to request when the authservice obtains a token. In addition to this list, the `openid` scope will always be requested. This value will be used as the `scope` param of the Authorization Code Grant Authentication Request.
-    | oidc.landing_page       |  Required   | After the user logs in, they will be redirected back to this URL. This should be the homepage URL of `productpage`.
-    | oidc.cryptor_secret     |  Required   | The secret to be used to encrypt and decrypt the authservice's browser cookies. Can be any string.
-    | oidc.cookie_name_prefix |  Optional   | The unique identifier of the authservice's browser cookies. Can be any string. Only needed when multiple apps in the same domain are each protected by their own authservice, to avoid cookie name conflicts.
+    | Field                       | Optionality | Description
+    |-----------------------------|-------------|-----------------------------------------------------------------------------------
+    | listen_address              |  Optional   | The ip address the authservice will listen on. Defaults to 127.0.0.1. 
+    | listen_port                 |  Optional   | The port the authservice will listen on. Defaults to 10003
+    | log_level                   |  Optional   | Log verbosity. Must be one of trace, debug, info, error, critical. Defaults to trace.
+    | oidc.authorization          |  Required   | The Authorization Endpoint of your OIDC provider.
+    | oidc.token                  |  Required   | The Token Endpoint of your OIDC provider
+    | oidc.jwks_uri               |  Ignored    | *This is currently ignored.* In a future version it will be the URL of your OIDC provider’s public key set to validate signature of the JWT. See [OpenID Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata). This should match the `jwksUri` value of [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/).
+    | oidc.jwks                   |  Required   | The JSON JWKS response from your OIDC provider’s `jwks_uri` URI which can be found in your OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
+    | oidc.callback               |  Required   | This value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request. You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider. See [OIDC spec](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). You must also prepare your [Istio VirtualService](https://istio.io/docs/reference/config/networking/v1alpha3/virtual-service/) to ensure that this URL will get routed to `productpage`.
+    | oidc.client_id              |  Required   | The Client ID of your OIDC Client.
+    | oidc.client_secret          |  Required   | The Client Secret of your OIDC Client.
+    | oidc.scopes                 |  Optional   | A list of scopes to request when the authservice obtains a token. In addition to this list, the `openid` scope will always be requested. This value will be used as the `scope` param of the Authorization Code Grant Authentication Request.
+    | oidc.landing_page           |  Required   | After the user logs in, they will be redirected back to this URL. This should be the homepage URL of `productpage`.
+    | oidc.cryptor_secret         |  Required   | The secret to be used to encrypt and decrypt the authservice's browser cookies. Can be any string.
+    | oidc.cookie_name_prefix     |  Optional   | The unique identifier of the authservice's browser cookies. Can be any string. Only needed when multiple apps in the same domain are each protected by their own authservice, to avoid cookie name conflicts.
+    | oidc.id_token.preamble      |  Required   | The authentication scheme of the token. E.g. when the `preamble` is `Bearer` and `oidc.id_token.header` is `Authorization`, this header will be added to the request to the app: `Authorization: Bearer ID_TOKEN_VALUE`. Note that this value **MUST** be `Bearer`, case-sensitive, when `oidc.id_token.header` is `Authorization`. 
+    | oidc.id_token.header        |  Required   | The name of the header that `authservice` adds to the request. This header will contain the ID Token. This value is case-insensitive. Note that this value **MUST** be `Authorization` for [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) to work.
 
    Once the values have been substituted, apply the ConfigMap.
    
