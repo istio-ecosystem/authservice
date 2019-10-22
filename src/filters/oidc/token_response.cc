@@ -1,12 +1,16 @@
 #include "token_response.h"
 #include "google/protobuf/struct.pb.h"
 #include "google/protobuf/util/json_util.h"
+#include "jwt_verify_lib/struct_utils.h"
 #include "jwt_verify_lib/verify.h"
 #include "spdlog/spdlog.h"
 
 namespace transparent_auth {
 namespace filters {
 namespace oidc {
+namespace {
+    const char *nonce_field = "nonce";
+} // namespace
 TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
     : id_token_(id_token) {}
 
@@ -19,7 +23,7 @@ TokenResponseParserImpl::TokenResponseParserImpl(
     : keys_(std::move(keys)) {}
 
 absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
-    absl::string_view nonce, absl::string_view raw) const {
+    const std::string &client_id, const std::string &nonce, const std::string &raw) const {
   ::google::protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = true;
   options.case_insensitive_enum_parsing = false;
@@ -62,14 +66,24 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
                  google::jwt_verify::getStatusString(jwt_status));
     return absl::nullopt;
   }
-  // TODO: verify the audiences
-  jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_);
+  // Verify our client_id is set as an entry in the token's `aud` field.
+  std::vector<std::string> audiences = {client_id};
+  jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::info("{}: failed to verify `id_token` signature: {}", __func__,
-                 google::jwt_verify::getStatusString(jwt_status));
+    spdlog::info("{}: `id_token` verification failed: {}", __func__, google::jwt_verify::getStatusString(jwt_status));
     return absl::nullopt;
   }
-  // TODO: verify given nonce.
+  // Verify the token contains a `nonce` claim and that it matches our expected value.
+  std::string extracted_nonce;
+  google::jwt_verify::StructUtils getter(id_token.payload_pb_);
+  if (getter.GetString(nonce_field, &extracted_nonce) != google::jwt_verify::StructUtils::OK) {
+    spdlog::info("{}: failed to retrieve `nonce` from id_token", __func__);
+    return absl::nullopt;
+  }
+  if (nonce != extracted_nonce) {
+    spdlog::info("{}: invlaid `nonce` field in id_token", __func__);
+    return absl::nullopt;
+  }
   return absl::make_optional<TokenResponse>(id_token);
 }
 

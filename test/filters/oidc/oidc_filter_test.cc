@@ -251,7 +251,7 @@ TEST_F(OidcFilterTest, RetrieveToken) {
   google::jwt_verify::Jwt jwt = {};
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*parser_mock, Parse(::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(absl::make_optional<TokenResponse>(jwt)));
   common::http::http_mock *mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
@@ -576,7 +576,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
 TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*parser_mock, Parse(::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(absl::nullopt));
   common::http::http_mock *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t(

@@ -314,8 +314,9 @@ google::rpc::Code OidcFilter::RetrieveToken(
     ::grpc::Status error(::grpc::StatusCode::UNKNOWN, "IdP connection error");
     return google::rpc::Code::UNKNOWN;
   } else {
-    // TODO: fill in nonce from state and validate JWT.
-    auto token = parser_->Parse("", retrieve_token_response->body());
+    auto token = parser_->Parse(idp_config_.client_id(),
+        std::string(state_and_nonce->second.data(), state_and_nonce->second.size()),
+        retrieve_token_response->body());
     if (!token.has_value()) {
       spdlog::info("{}: Invalid token response", __func__);
       ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
