@@ -1,4 +1,5 @@
 #include "token_response.h"
+#include "absl/strings/match.h"
 #include "google/protobuf/struct.pb.h"
 #include "google/protobuf/util/json_util.h"
 #include "jwt_verify_lib/verify.h"
@@ -9,7 +10,7 @@ namespace filters {
 namespace oidc {
 namespace {
 const char *token_type_field = "token_type";
-const char *bearer_token_type = "Bearer";
+const char *bearer_token_type = "bearer";
 const char *id_token_field = "id_token";
 const char *access_token_field = "access_token";
 }  // namespace
@@ -49,7 +50,9 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   // token_type must be Bearer
   auto token_type = fields.find(token_type_field);
   if (token_type == fields.end() ||
-      !(token_type->second.string_value() == bearer_token_type)) {
+      !(absl::EqualsIgnoreCase(
+          token_type->second.string_value(),
+          bearer_token_type))) {  // case insensitive comparison.
     spdlog::info("{}: missing or incorrect `token_type` in token response",
                  __func__);
     return absl::nullopt;

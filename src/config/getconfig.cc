@@ -1,11 +1,11 @@
 
 #include "getconfig.h"
-#include "config/config.pb.validate.h"
 #include <google/protobuf/util/json_util.h>
 #include <boost/algorithm/string/join.hpp>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include "config/config.pb.validate.h"
 
 using namespace std;
 using namespace google::protobuf::util;

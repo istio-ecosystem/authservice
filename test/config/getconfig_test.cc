@@ -46,12 +46,15 @@ TEST(GetConfigTest, ReturnsTheConfig) {
 }
 
 TEST(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
-  ASSERT_THROW(GetConfig("test/fixtures/invalid-config.json"), std::runtime_error);
+  ASSERT_THROW(GetConfig("test/fixtures/invalid-config.json"),
+               std::runtime_error);
 }
 
 TEST(GetConfigTest,
-       ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
-  ASSERT_THROW(GetConfig("test/fixtures/invalid-config-with-intermediate-nodes.json"), std::runtime_error);
+     ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
+  ASSERT_THROW(
+      GetConfig("test/fixtures/invalid-config-with-intermediate-nodes.json"),
+      std::runtime_error);
 }
 
 }  // namespace config
