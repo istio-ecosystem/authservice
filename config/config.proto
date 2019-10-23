@@ -3,16 +3,18 @@ syntax = "proto3";
 package authservice.config;
 
 import "config/oidc/config.proto";
+import "validate/validate.proto";
 
 message Filter {
     oneof type {
+        option (validate.required) = true;
         oidc.OIDCConfig oidc = 1;
     }
 }
 
 message Config {
-    repeated Filter filters = 1;
-    string listen_address = 2;
-    string listen_port = 3;
-    string log_level = 4;
+    repeated Filter filters = 1 [(validate.rules).repeated.min_items = 1];
+    string listen_address = 2 [(validate.rules).string.ip = true];
+    int32 listen_port = 3 [(validate.rules).int32.lt = 65536];
+    string log_level = 4 [(validate.rules).string = {in: ["trace", "debug", "info", "error", "critical"]}];
 }

@@ -22,10 +22,7 @@ struct {
   const char *raw;
   const std::multimap<absl::string_view, absl::string_view> encoded;
 } query_test_case = {.raw = R"RAW(cde=456%207&state=abc%20123)RAW",
-                     .encoded = {
-                         {"cde", "456 7"},
-                         {"state", "abc 123"}
-                     }};
+                     .encoded = {{"cde", "456 7"}, {"state", "abc 123"}}};
 
 struct {
   const char *raw;

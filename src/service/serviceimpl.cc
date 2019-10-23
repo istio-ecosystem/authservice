@@ -9,26 +9,28 @@
 namespace transparent_auth {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(std::shared_ptr<authservice::config::Config> config) {
+AuthServiceImpl::AuthServiceImpl(
+    std::shared_ptr<authservice::config::Config> config) {
   root_.reset(new filters::Pipe);
   for (const auto &filter : config->filters()) {
     // TODO: implement filter specific construction.
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");
     }
-    transparent_auth::config::ValidateOidcConfig(filter.oidc());
-
-    auto token_request_parser = std::make_shared<filters::oidc::TokenResponseParserImpl>(
-        google::jwt_verify::Jwks::createFrom(filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
+    auto token_request_parser =
+        std::make_shared<filters::oidc::TokenResponseParserImpl>(
+            google::jwt_verify::Jwks::createFrom(
+                filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
 
     auto token_encryptor = common::session::TokenEncryptor::Create(
-        filter.oidc().cryptor_secret(), common::session::EncryptionAlg::AES256GCM,
+        filter.oidc().cryptor_secret(),
+        common::session::EncryptionAlg::AES256GCM,
         common::session::HKDFHash::SHA512);
 
     auto http = common::http::ptr_t(new common::http::http_impl);
 
-    root_->AddFilter(filters::FilterPtr(
-        new filters::oidc::OidcFilter(http, filter.oidc(), token_request_parser, token_encryptor)));
+    root_->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
+        http, filter.oidc(), token_request_parser, token_encryptor)));
   }
 }
 

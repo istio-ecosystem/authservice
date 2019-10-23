@@ -1,12 +1,22 @@
+load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_proto_library(
+pgv_cc_proto_library(
     name = "config_cc",
-    deps = ["//config:config_proto"],
+    cc_deps = ["//config/oidc:config_cc"],
+    linkstatic = True,
+    visibility = ["//visibility:public"],
+    deps = [
+        "//config:config_proto",
+    ],
 )
 
 proto_library(
     name = "config_proto",
     srcs = ["config.proto"],
-    deps = ["//config/oidc:config_proto"],
+    deps = [
+        "//config/oidc:config_proto",
+        "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+    ],
 )
