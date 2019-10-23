@@ -1,16 +1,16 @@
 
-#ifndef TRANSPARENT_AUTH_SRC_CONFIG_GETCONFIG_H
-#define TRANSPARENT_AUTH_SRC_CONFIG_GETCONFIG_H
+#ifndef AUTHSERVICE_SRC_CONFIG_GETCONFIG_H
+#define AUTHSERVICE_SRC_CONFIG_GETCONFIG_H
 
 #include "config/config.pb.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace config {
 
 std::shared_ptr<authservice::config::Config> GetConfig(
     const std::string& configFile);
 
 }  // namespace config
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SRC_CONFIG_GETCONFIG_H
+#endif  // AUTHSERVICE_SRC_CONFIG_GETCONFIG_H

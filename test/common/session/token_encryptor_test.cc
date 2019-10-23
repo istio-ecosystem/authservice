@@ -3,7 +3,7 @@
 
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -25,4 +25,4 @@ TEST(TokenEncryptorTest, SealAndOpen) {
 }
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

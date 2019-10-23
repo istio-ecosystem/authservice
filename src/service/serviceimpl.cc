@@ -6,7 +6,7 @@
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/pipe.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace service {
 
 AuthServiceImpl::AuthServiceImpl(
@@ -71,4 +71,4 @@ AuthServiceImpl::AuthServiceImpl(
   return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
 }
 }  // namespace service
-}  // namespace transparent_auth
+}  // namespace authservice

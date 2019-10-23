@@ -1,12 +1,12 @@
-#ifndef TRANSPARENT_AUTH_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_
-#define TRANSPARENT_AUTH_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_
+#ifndef AUTHSERVICE_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_
+#define AUTHSERVICE_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_
 #include <memory>
 #include <vector>
 
 #include "absl/types/optional.h"
 #include "openssl/aead.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -54,5 +54,5 @@ class GcmEncryptor {
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_COMMON_SESSION_GCM_ENCRYPTOR_H_

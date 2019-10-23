@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 #include "openssl/rand.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace utilities {
 
@@ -26,4 +26,4 @@ TEST(Random, Rand) {
 
 }  // namespace utilities
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

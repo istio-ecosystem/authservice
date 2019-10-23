@@ -2,7 +2,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 namespace {
@@ -111,4 +111,4 @@ TEST(TokenResponseParser, Parse) {
 }
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

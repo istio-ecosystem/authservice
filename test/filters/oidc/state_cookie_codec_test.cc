@@ -2,7 +2,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 TEST(StateCookieCodecTest, Encode) {
@@ -27,4 +27,4 @@ TEST(StateCookieCodecTest, Decode) {
 }
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

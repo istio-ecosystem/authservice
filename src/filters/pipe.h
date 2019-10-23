@@ -1,12 +1,12 @@
-#ifndef TRANSPARENT_AUTH_SRC_FILTERS_PIPE_H_
-#define TRANSPARENT_AUTH_SRC_FILTERS_PIPE_H_
+#ifndef AUTHSERVICE_SRC_FILTERS_PIPE_H_
+#define AUTHSERVICE_SRC_FILTERS_PIPE_H_
 #include <memory>
 #include <mutex>
 #include <vector>
 
 #include "src/filters/filter.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 
 typedef std::unique_ptr<Filter> FilterPtr;
@@ -28,6 +28,6 @@ class Pipe final : public Filter {
 };
 
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SRC_FILTERS_PIPE_TEST_H_
+#endif  // AUTHSERVICE_SRC_FILTERS_PIPE_TEST_H_

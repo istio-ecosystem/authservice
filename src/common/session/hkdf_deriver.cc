@@ -4,7 +4,7 @@
 #include "openssl/digest.h"
 #include "openssl/hkdf.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -58,4 +58,4 @@ HkdfDeriverPtr HkdfDeriver::Create(const std::vector<unsigned char>& secret,
 }
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice
