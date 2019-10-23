@@ -1,4 +1,5 @@
 #include "oidc_filter.h"
+#include <sstream>
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
@@ -229,15 +230,18 @@ google::rpc::Code OidcFilter::Process(
 
   // Set standard headers
   SetStandardResponseHeaders(response);
-  spdlog::trace("{}: checking handler for {}://{}-{}", __func__,
+  spdlog::trace("{}: checking handler for {}://{}{}", __func__,
                 request->attributes().request().http().scheme(),
                 request->attributes().request().http().host(),
                 request->attributes().request().http().path());
 
-  auto callback_host = idp_config_.callback().hostname();
+  std::stringstream callback_host;
+  callback_host << idp_config_.callback().hostname() << ':' << idp_config_.callback().port();
+
   auto path_parts = common::http::http::DecodePath(
       request->attributes().request().http().path());
-  if (request->attributes().request().http().host() == callback_host &&
+
+  if (request->attributes().request().http().host() == callback_host.str() &&
       path_parts[0] == idp_config_.callback().path()) {
     return RetrieveToken(request, response, path_parts[1]);
   }
