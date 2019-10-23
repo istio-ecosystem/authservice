@@ -8,6 +8,12 @@ to the Istio mesh. `authservice` is compatible with any standard OIDC Provider a
 including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
 Together, they allow developers to protect their APIs and web apps without any application code required.
 
+## Using the `authservice` docker image
+The `authservice` images are hosted on [authservice's GitHub Package Registry](https://github.com/istio-ecosystem/authservice/packages).
+NOTE: The Github Package Registry currently does **NOT** work with Kubernetes. [This issue](https://github.com/kubernetes-sigs/kind/issues/870) 
+is expected to be fixed and released soon. For the time being, you need to manually `docker pull` the image from the Github Package Registry
+and `docker push` it to your own image registry (e.g. Docker Hub) in order to use it with Kubernetes.
+
 ## Example
 Please refer to the [bookinfo-example](./bookinfo-example) directory for an example integration. 
 

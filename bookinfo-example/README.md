@@ -58,10 +58,12 @@ See the following table for the description of each field:
    
    `kubectl apply -f config/authservice-configmap-template.yaml`
 
-1. Deploy the `bookinfo` and the `authservice` apps. The `authservice` should be in the same Pod as `productpage`.
-Wait for the pods to be in `Running` state.
+1. Deploy the `bookinfo` and the `authservice` apps. Note that the `authservice` should be in the same Pod as `productpage`. 
+Also note that, for the time being, there are some manual steps associated with specifying the `authservice` image (see comment in the yaml file). 
 
     `kubectl apply -f config/bookinfo-with-authservice.yaml`
+    
+    Wait for the pods to be in `Running` state.
 
 1. Set up the Istio gateway and routing rules for the `bookinfo` app. Note that a `match` entry is required to include
    your Authentication Request callback URL (a.k.a the authservice ConfigMap's `oidc.callback` field mentioned above) in 
