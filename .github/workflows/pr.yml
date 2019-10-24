@@ -12,7 +12,5 @@ jobs:
       image: swaggoner/authservice-build-env:2019-10-24
     steps:
     - uses: actions/checkout@v1
-    - name: make clean
-      run: make clean
     - name: make test
       run: make test
