@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: docker.pkg.github.com/istio-ecosystem/authservice/authservice-build-env:2019-10-23
+      image: gcr.io/cf-identity-service-oak/authservice-build-env:2019-10-23
     steps:
     - uses: actions/checkout@v1
     - name: make clean
