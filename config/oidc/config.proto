@@ -29,4 +29,6 @@ message OIDCConfig {
     string cookie_name_prefix = 11;
     TokenConfig id_token = 12 [(validate.rules).message.required = true];
     TokenConfig access_token = 13;
+    // the timeout in seconds for performing an authentication with an IdP.
+    uint32 timeout = 14 [(validate.rules).uint32.gte = 30];
 }

@@ -43,7 +43,8 @@
         },
         "access_token": {
           "header": "x-access-token"
-        }
+        },
+        "timeout": 300
       }
     }
   ]

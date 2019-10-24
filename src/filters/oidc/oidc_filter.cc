@@ -24,8 +24,6 @@ namespace oidc {
 namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
-const std::string bearer_prefix_ = "Bearer";
-const int64_t five_minutes_as_seconds = 5 * 60;
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl,
@@ -109,7 +107,6 @@ void OidcFilter::SetStateCookie(
     ::google::protobuf::RepeatedPtrField<
         ::envoy::api::v2::core::HeaderValueOption> *headers,
     absl::string_view value, int64_t timeout) {
-  // TODO: make state cookie timeout configurable.
   auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
   std::set<absl::string_view> token_set_cookie_header_directives =
       {common::http::headers::SetCookieDirectives::HttpOnly,
@@ -171,7 +168,7 @@ google::rpc::Code OidcFilter::RedirectToIdP(
   auto state_token = codec.Encode(state, nonce);
   auto encrypted_state_token = cryptor_->Encrypt(state_token);
   SetStateCookie(response->mutable_denied_response()->mutable_headers(),
-                 encrypted_state_token, five_minutes_as_seconds);
+                 encrypted_state_token, idp_config_.timeout());
   return google::rpc::Code::UNAUTHENTICATED;
 }
 

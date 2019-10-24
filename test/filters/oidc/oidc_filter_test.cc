@@ -42,6 +42,7 @@ class OidcFilterTest : public ::testing::Test {
     config_.set_cookie_name_prefix("cookie-prefix");
     config_.mutable_id_token()->set_header("authorization");
     config_.mutable_id_token()->set_preamble("Bearer");
+    config_.set_timeout(300);
   }
 };
 
