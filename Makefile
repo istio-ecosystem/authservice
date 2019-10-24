@@ -39,7 +39,7 @@ format:
 	clang-format -i -style=Google -sort-includes $(SRCS) $(HDRS)
 
 clean:
-	bazel clean --expunge
+	bazel clean --expunge --async
 
 dep-graph.dot:
 	bazel query --nohost_deps --noimplicit_deps "deps($(TARGET))" --output graph > $@
