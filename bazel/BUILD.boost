@@ -1,0 +1,91 @@
+cc_library(
+    name = "all",
+    hdrs = glob(
+        ["boost/**/*"],
+        exclude = ["boost/**/*.cpp"],
+    ),
+    include_prefix = "boost",
+    includes = ["boost"],
+    strip_include_prefix = "boost",
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+cc_library(
+    name = "thread",
+    srcs = ["libboost_thread.a"],
+    hdrs = glob(
+        [
+            "boost/thread.hpp",
+            "boost/thread/**/*.h",
+            "boost/thread/**/*.hpp",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":all",
+    ],
+)
+
+genrule(
+    name = "build_boost_thread",
+    srcs = glob(
+        [
+            "Jamroot",
+            "**/Jamfile*",
+            "**/*.jam",
+            "**/*.cpp",
+            "**/*.c",
+            "**/*.S",
+            "**/*.hpp",
+            "project-config.jam",
+        ],
+        exclude = [
+            "bazel-*",
+            "libs/wave/test/**/*",
+        ],
+    ) + [
+        "project-config.jam",
+    ],
+    outs = [
+        "libboost_thread.a",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location Jamroot))
+        cp $(location project-config.jam) $$ROOT
+        pushd $$ROOT
+            ../../$(location b2) libboost_thread.a
+        popd
+
+        cp $$ROOT/stage/lib/libboost_thread.a $(location libboost_thread.a)
+    """,
+    tools = ["b2"],
+)
+
+genrule(
+    name = "bootstrap_boost",
+    srcs = glob(
+        [
+            "**/*.sh",
+            "**/*.c",
+            "**/*.y",
+            "**/*.yy",
+            "**/*.h",
+            "**/*.jam",
+        ],
+        exclude = ["bazel-*"],
+    ),
+    outs = [
+        "b2",
+        "project-config.jam",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location bootstrap.sh))
+        pushd $$ROOT
+            ./bootstrap.sh || cat bootstrap.log
+        popd
+
+        cp $$ROOT/b2 $(location b2)
+        cp $$ROOT/project-config.jam $(location project-config.jam)
+    """,
+)

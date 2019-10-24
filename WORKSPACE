@@ -104,28 +104,14 @@ switched_rules_by_language(
     cc = True,
 )
 
-_BOOST_WORKSPACE = """"""
-
-_BOOST_BUILD = """
-cc_library(
-    name = "all",
-    hdrs = glob(["boost/**/*"], exclude = ["boost/**/*.cpp"]),
-    includes = ["boost"],
-    include_prefix = "boost",
-    strip_include_prefix = "boost",
-    visibility = ["//visibility:public"],
-    deps = [],
-)
-"""
-
 http_archive(
     name = "boost",
-    build_file_content = _BOOST_BUILD,
+    build_file = "//bazel:BUILD.boost",
     strip_prefix = "boost_1_70_0",
     urls = [
         "https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.gz",
     ],
-    workspace_file_content = _BOOST_WORKSPACE,
+    sha256 = "882b48708d211a5f48e60b0124cf5863c1534cd544ecd0664bb534a4b5d506e9",
 )
 
 git_repository(
