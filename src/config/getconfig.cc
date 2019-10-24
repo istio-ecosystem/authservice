@@ -11,7 +11,6 @@ using namespace std;
 using namespace google::protobuf::util;
 using namespace authservice::config;
 
-// TODO: s/namespace authservice/namespace authservice/g
 namespace authservice {
 namespace config {
 
