@@ -43,7 +43,7 @@ data:
             "scopes": [],
             "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
             "cryptor_secret": "xxx_CHANGE_ME",
-            "cookie_name_prefix": "productpage"
+            "cookie_name_prefix": "productpage",
             "id_token": {
               "preamble": "Bearer",
               "header": "Authorization"
