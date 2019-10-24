@@ -1,12 +1,16 @@
 #include "oidc_filter.h"
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
+#include "absl/time/time.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
 #include "src/common/utilities/random.h"
 #include "state_cookie_codec.h"
+#include "absl/time/clock.h"
+#include <limits>
+#include <algorithm>
 
 namespace beast = boost::beast;    // from <boost/beast.hpp>
 namespace http = beast::http;      // from <boost/beast/http.hpp>
@@ -21,6 +25,7 @@ namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
 const std::string bearer_prefix_ = "Bearer";
+const int64_t five_minutes_as_seconds = 5 * 60;
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl,
@@ -68,6 +73,10 @@ void OidcFilter::SetRedirectHeaders(
             common::http::headers::Location, redirect_url.data());
 }
 
+std::string OidcFilter::EncodeCookieTimeoutDirective(int64_t timeout) {
+  return std::string(common::http::headers::SetCookieDirectives::MaxAge) + "=" + std::to_string(timeout);
+}
+
 std::string OidcFilter::GetStateCookieName() {
   const auto base_state_cookie_name = "authservice-state-cookie";
   auto prefix = idp_config_.cookie_name_prefix();
@@ -89,12 +98,14 @@ std::string OidcFilter::GetIdTokenCookieName() {
 void OidcFilter::SetStateCookie(
     ::google::protobuf::RepeatedPtrField<
         ::envoy::api::v2::core::HeaderValueOption> *headers,
-    absl::string_view value) {
-  // TODO: Add a time out
-  static const std::set<absl::string_view> token_set_cookie_header_directives =
+    absl::string_view value, int64_t timeout) {
+  // TODO: make state cookie timeout configurable.
+  auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
+  std::set<absl::string_view> token_set_cookie_header_directives =
       {common::http::headers::SetCookieDirectives::HttpOnly,
        common::http::headers::SetCookieDirectives::SameSiteLax,
-       common::http::headers::SetCookieDirectives::Secure, "Path=/"};
+       common::http::headers::SetCookieDirectives::Secure, "Path=/",
+       timeout_directive};
   auto state_cookie_header = common::http::http::EncodeSetCookie(
       GetStateCookieName(), value, token_set_cookie_header_directives);
   SetHeader(headers, common::http::headers::SetCookie, state_cookie_header);
@@ -150,7 +161,7 @@ google::rpc::Code OidcFilter::RedirectToIdP(
   auto state_token = codec.Encode(state, nonce);
   auto encrypted_state_token = cryptor_->Encrypt(state_token);
   SetStateCookie(response->mutable_denied_response()->mutable_headers(),
-                 encrypted_state_token);
+                 encrypted_state_token, five_minutes_as_seconds);
   return google::rpc::Code::UNAUTHENTICATED;
 }
 
@@ -230,7 +241,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   // Best effort at deleting state cookie for all cases.
   SetStateCookie(response->mutable_denied_response()->mutable_headers(),
-                 "deleted");
+                 "deleted", 0);
 
   // Extract state and nonce from encrypted cookie.
   auto encrypted_state_cookie = CookieFromHeaders(
@@ -265,7 +276,6 @@ google::rpc::Code OidcFilter::RetrieveToken(
                          "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
-  // TODO: constant-time state and nonce comparisons.
   const auto state = query_data->find("state");
   const auto code = query_data->find("code");
   if (state == query_data->end() || code == query_data->end()) {
@@ -324,11 +334,18 @@ google::rpc::Code OidcFilter::RetrieveToken(
       return google::rpc::Code::INVALID_ARGUMENT;
     }
     SetRedirectHeaders(idp_config_.landing_page(), response);
-    // TODO: secure cookies, set timeout etc
+    // Calculate the Max-Age attribute of our cookie based on the id_token expiry.
+    // TODO: Calculate timeout based on minimum of access_token expiry and id_token expiry.
+    auto timeout = std::numeric_limits<int64_t>::max();
+    if (token->IDToken().exp_) {
+      timeout = std::max(static_cast<int64_t>(token->IDToken().exp_) - absl::ToUnixSeconds(absl::Now()), int64_t(0));
+    }
+    auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
     std::set<absl::string_view> token_set_cookie_header_directives = {
         common::http::headers::SetCookieDirectives::HttpOnly,
         common::http::headers::SetCookieDirectives::SameSiteLax,
-        common::http::headers::SetCookieDirectives::Secure, "Path=/"};
+        common::http::headers::SetCookieDirectives::Secure, "Path=/",
+        timeout_directive};
     auto cookie_value = cryptor_->Encrypt(token->IDToken().jwt_);
     auto token_set_cookie_header = common::http::http::EncodeSetCookie(
         GetIdTokenCookieName(), cookie_value, token_set_cookie_header_directives);

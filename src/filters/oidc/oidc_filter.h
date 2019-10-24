@@ -52,15 +52,23 @@ class OidcFilter final : public filters::Filter {
       absl::string_view redirect_url,
       ::envoy::service::auth::v2::CheckResponse *response);
 
+  /** @brief Encode the given timeout as a cookie Max-Age directive.
+   *
+   * @param timeout the time out in seconds.
+   * @return the encoded cookie directive.
+   */
+  static std::string EncodeCookieTimeoutDirective(int64_t timeout);
+
   /** @brief Set state cookie.
    *
    * @param headers The headers to add to.
    * @param value The value of the state cookie.
+   * @param timeout The number of second the cookie is valid for
    */
   void SetStateCookie(
       ::google::protobuf::RepeatedPtrField<
           ::envoy::api::v2::core::HeaderValueOption> *headers,
-      absl::string_view value);
+      absl::string_view value, int64_t timeout);
 
   /** @brief Extract the requested cookie from the given headers
    *

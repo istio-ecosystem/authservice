@@ -132,7 +132,7 @@ TEST_F(OidcFilterTest, NoAuthorization) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Max-Age=300; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -171,7 +171,7 @@ TEST_F(OidcFilterTest, InvalidCookies) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Max-Age=300; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -214,7 +214,7 @@ TEST_F(OidcFilterTest, InvalidSessionToken) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=encrypted; HttpOnly; Max-Age=300; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -291,11 +291,11 @@ TEST_F(OidcFilterTest, RetrieveToken) {
       ASSERT_EQ(iter.header().value(),
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_TRUE((iter.header().value() == "cookie-prefix-authservice-id-token-session-"
-                                            "cookie=encryptedtoken; HttpOnly; "
-                                            "Path=/; SameSite=Lax; Secure") ||
-                  (iter.header().value() == "cookie-prefix-authservice-state-cookie=deleted; "
-                                            "HttpOnly; Path=/; SameSite=Lax; "
+      auto val = iter.header().value();
+      std::regex id_token_regex("cookie-prefix-authservice-id-token-session-cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; Path=/; SameSite=Lax; Secure");
+      ASSERT_TRUE(std::regex_match(val, id_token_regex) ||
+                  (val == "cookie-prefix-authservice-state-cookie=deleted; "
+                                            "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
                                             "Secure"));
     } else {
       FAIL();  // Unexpected header!
@@ -331,7 +331,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -371,7 +371,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -412,7 +412,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -448,7 +448,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -484,7 +484,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -520,7 +520,7 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -565,7 +565,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
@@ -613,7 +613,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
                 common::http::headers::PragmaDirectives::NoCache);
     } else if (iter.header().key() == common::http::headers::SetCookie) {
       ASSERT_EQ(iter.header().value(),
-                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Path=/; "
+                "cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; "
                 "SameSite=Lax; Secure");
     } else {
       FAIL();  // Unexpected header!
