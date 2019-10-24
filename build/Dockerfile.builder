@@ -13,9 +13,9 @@ RUN make bazel-bin/src/main/auth-server
 FROM debian:buster
 RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
 
-COPY --from=auth-builder /src/bazel-bin/src/main/auth-server /app/auth-server
-RUN chgrp auth-server-grp /app/auth-server && chown auth-server-usr /app/auth-server && chmod u+x /app/auth-server
+COPY --from=auth-builder /src/bazel-bin/src/main/auth_server /app/auth_server
+RUN chgrp auth-server-grp /app/auth_server && chown auth-server-usr /app/auth_server && chmod u+x /app/auth_server
 
 USER auth-server-usr
 WORKDIR /app
-ENTRYPOINT ["/app/auth-server"]
+ENTRYPOINT ["/app/auth_server"]

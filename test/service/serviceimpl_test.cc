@@ -1,6 +1,6 @@
-#include "src/service/serviceimpl.h"
-#include "gtest/gtest.h"
+#include "src/service/service_impl.h"
 #include "src/config/getconfig.h"
+#include "gtest/gtest.h"
 
 namespace authservice {
 namespace service {

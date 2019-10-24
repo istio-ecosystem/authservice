@@ -2,8 +2,12 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "serviceimpl",
-    srcs = ["serviceimpl.cc"],
-    hdrs = ["serviceimpl.h"],
+    srcs = [
+        "service_impl.cc",
+    ],
+    hdrs = [
+        "service_impl.h",
+    ],
     deps = [
         "//config:config_cc",
         "//src/config",

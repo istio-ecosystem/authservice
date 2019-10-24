@@ -2,6 +2,7 @@
 #include <grpcpp/server_builder.h>
 #include <cassert>
 #include <cstdio>
+#include <boost/asio.hpp>
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
@@ -13,7 +14,7 @@
 #include "spdlog/sinks/stdout_sinks.h"
 #include "spdlog/spdlog.h"
 #include "src/config/getconfig.h"
-#include "src/service/serviceimpl.h"
+#include "src/service/service_impl.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -58,14 +59,33 @@ std::string GetConfiguredAddress(
 }
 
 void RunServer(const std::shared_ptr<authservice::config::Config>& config) {
+  auto io_service = std::make_shared<boost::asio::io_service>();
+  auto work = std::make_shared<boost::asio::io_service::work>(*io_service);
+
+  envoy::service::auth::v2::Authorization::AsyncService service;
+
   auto address = GetConfiguredAddress(config);
-  AuthServiceImpl auth_service(config);
   ServerBuilder builder;
   builder.AddListeningPort(address, grpc::InsecureServerCredentials());
-  builder.RegisterService(&auth_service);
-  std::unique_ptr<Server> server(builder.BuildAndStart());
+  builder.RegisterService(&service);
+  auto cq = builder.AddCompletionQueue();
+  auto server = builder.BuildAndStart();
   spdlog::info("{}: Server listening on {}", __func__, address);
-  server->Wait();
+
+  void* tag;
+  bool ok;
+  while (true) {
+    // Block waiting to read the next event from the completion queue. The
+    // event is uniquely identified by its tag, which in this case is the
+    // memory address of a CallData instance.
+    // The return value of Next should always be checked. This return value
+    // tells us whether there is any kind of event or cq_ is shutting down.
+    GPR_ASSERT(cq->Next(&tag, &ok));
+    GPR_ASSERT(ok);
+
+//    service.RequestCheck(&ctx_, &request_, &responder_, cq_, cq_,
+//                              this);
+  }
 }
 
 }  // namespace service
