@@ -2,7 +2,8 @@
 #include <sstream>
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
-#include "external/com_google_googleapis/google/rpc/code.pb.h"
+#include "absl/time/time.h"
+#include "google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"

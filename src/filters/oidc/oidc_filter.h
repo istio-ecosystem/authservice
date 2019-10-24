@@ -1,7 +1,7 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
 #define AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
 #include "config/oidc/config.pb.h"
-#include "external/com_google_googleapis/google/rpc/code.pb.h"
+#include "google/rpc/code.pb.h"
 #include "src/common/http/http.h"
 #include "src/common/session/token_encryptor.h"
 #include "src/filters/filter.h"
