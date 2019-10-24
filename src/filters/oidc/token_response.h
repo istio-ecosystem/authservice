@@ -1,6 +1,7 @@
 #ifndef TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
 #define TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
 #include "absl/types/optional.h"
+#include "absl/strings/string_view.h"
 #include "jwt_verify_lib/jwks.h"
 #include "jwt_verify_lib/jwt.h"
 
@@ -16,10 +17,13 @@ namespace oidc {
 class TokenResponse {
  private:
   google::jwt_verify::Jwt id_token_;
+  std::string access_token_;
 
  public:
   TokenResponse(const google::jwt_verify::Jwt &id_token);
+  void SetAccessToken(absl::string_view access_token);
   const google::jwt_verify::Jwt &IDToken() const;
+  const std::string &AccessToken() const;
 };
 
 class TokenResponseParser;

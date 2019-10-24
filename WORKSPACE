@@ -27,6 +27,14 @@ load("@envoy//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
 
+# Protobuf generator dependencies
+http_archive(
+    name = "com_envoyproxy_protoc_gen_validate",
+    urls = [
+        "https://github.com/envoyproxy/protoc-gen-validate/archive/v0.1.0.tar.gz",
+    ],
+)
+
 #  gRPC dependencies
 http_archive(
     name = "com_github_grpc_grpc",
