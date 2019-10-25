@@ -2,7 +2,7 @@
 #include "google/rpc/code.pb.h"
 #include "grpcpp/support/status.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace {
 const char *filter_name_ = "pipe";
@@ -44,4 +44,4 @@ google::rpc::Code Pipe::Process(
 
 absl::string_view Pipe::Name() const { return filter_name_; }
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

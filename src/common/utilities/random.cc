@@ -5,7 +5,7 @@
 #include "openssl/crypto.h"
 #include "openssl/rand.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace utilities {
 
@@ -58,4 +58,4 @@ Random RandomGenerator::Generate(size_t sz) {
 }
 }  // namespace utilities
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

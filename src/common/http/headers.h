@@ -1,8 +1,8 @@
-#ifndef TRANSPARENT_AUTH_HEADERS_H
-#define TRANSPARENT_AUTH_HEADERS_H
+#ifndef AUTHSERVICE_HEADERS_H
+#define AUTHSERVICE_HEADERS_H
 #include <string>
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace http {
 // Standard HTTP headers
@@ -39,6 +39,6 @@ static const char *MaxAge = "Max-Age";
 }  // namespace headers
 }  // namespace http
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_HEADERS_H
+#endif  // AUTHSERVICE_HEADERS_H

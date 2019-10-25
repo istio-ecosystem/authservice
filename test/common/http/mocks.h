@@ -1,8 +1,8 @@
-#ifndef TRANSPARENT_AUTH_TEST_COMMON_HTTP_MOCKS_H_
-#define TRANSPARENT_AUTH_TEST_COMMON_HTTP_MOCKS_H_
+#ifndef AUTHSERVICE_TEST_COMMON_HTTP_MOCKS_H_
+#define AUTHSERVICE_TEST_COMMON_HTTP_MOCKS_H_
 #include "gmock/gmock.h"
 #include "src/common/http/http.h"
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace http {
 class http_mock : public http {
@@ -15,5 +15,5 @@ class http_mock : public http {
 };
 }  // namespace http
 }  // namespace common
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_TEST_COMMON_HTTP_MOCKS_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_TEST_COMMON_HTTP_MOCKS_H_

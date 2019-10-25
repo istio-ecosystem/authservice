@@ -1,12 +1,12 @@
-#ifndef TRANSPARENT_AUTH_SRC_FILTERS_FILTER_H_
-#define TRANSPARENT_AUTH_SRC_FILTERS_FILTER_H_
+#ifndef AUTHSERVICE_SRC_FILTERS_FILTER_H_
+#define AUTHSERVICE_SRC_FILTERS_FILTER_H_
 #include "absl/strings/string_view.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "google/rpc/code.pb.h"
 
 using namespace envoy::service::auth::v2;
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 /** @brief Filter defines an abstract class for processing requests.
  *
@@ -49,6 +49,6 @@ class Filter {
   virtual absl::string_view Name() const = 0;
 };
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SRC_FILTERS_FILTER_H_
+#endif  // AUTHSERVICE_SRC_FILTERS_FILTER_H_

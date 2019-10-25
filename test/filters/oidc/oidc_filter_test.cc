@@ -9,7 +9,7 @@
 #include "test/common/session/mocks.h"
 #include "test/filters/oidc/mocks.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 
@@ -927,4 +927,4 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

@@ -3,7 +3,7 @@
 #include "src/common/session/gcm_encryptor.h"
 #include "src/common/utilities/random.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -119,4 +119,4 @@ TokenEncryptorPtr TokenEncryptor::Create(const std::string& secret,
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

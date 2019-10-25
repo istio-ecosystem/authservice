@@ -1,5 +1,5 @@
-#ifndef TRANSPARENT_AUTH_SERVICEIMPL_H
-#define TRANSPARENT_AUTH_SERVICEIMPL_H
+#ifndef AUTHSERVICE_SERVICEIMPL_H
+#define AUTHSERVICE_SERVICEIMPL_H
 #include "config/config.pb.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "src/filters/oidc/token_response.h"
@@ -7,7 +7,7 @@
 
 using namespace envoy::service::auth::v2;
 
-namespace transparent_auth {
+namespace authservice {
 namespace service {
 
 class AuthServiceImpl final : public Authorization::Service {
@@ -22,6 +22,6 @@ class AuthServiceImpl final : public Authorization::Service {
       ::envoy::service::auth::v2::CheckResponse* response) override;
 };
 }  // namespace service
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SERVICEIMPL_H
+#endif  // AUTHSERVICE_SERVICEIMPL_H

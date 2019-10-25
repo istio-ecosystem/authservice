@@ -1,8 +1,8 @@
-#ifndef TRANSPARENT_AUTH_TEST_FILTERS_OIDC_MOCKS_H_
-#define TRANSPARENT_AUTH_TEST_FILTERS_OIDC_MOCKS_H_
+#ifndef AUTHSERVICE_TEST_FILTERS_OIDC_MOCKS_H_
+#define AUTHSERVICE_TEST_FILTERS_OIDC_MOCKS_H_
 #include "gmock/gmock.h"
 #include "src/filters/oidc/token_response.h"
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 class TokenResponseParserMock final : public TokenResponseParser {
@@ -14,5 +14,5 @@ class TokenResponseParserMock final : public TokenResponseParser {
 };
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_TEST_FILTERS_OIDC_MOCKS_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_TEST_FILTERS_OIDC_MOCKS_H_

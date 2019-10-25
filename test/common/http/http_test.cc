@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace http {
 namespace {
@@ -203,4 +203,4 @@ TEST(Http, DecodePath) {
 
 }  // namespace http
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

@@ -1,11 +1,11 @@
-#ifndef TRANSPARENT_AUTH_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_
-#define TRANSPARENT_AUTH_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_
+#ifndef AUTHSERVICE_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_
+#define AUTHSERVICE_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_
 #include <memory>
 #include <string>
 #include "absl/types/optional.h"
 #include "src/common/session/hkdf_deriver.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -56,5 +56,5 @@ class TokenEncryptor {
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_COMMON_SESSION_TOKEN_ENCRYPTOR_H_

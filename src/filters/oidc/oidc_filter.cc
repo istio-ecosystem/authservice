@@ -17,7 +17,7 @@ namespace http = beast::http;      // from <boost/beast/http.hpp>
 namespace net = boost::asio;       // from <boost/asio.hpp>
 using tcp = boost::asio::ip::tcp;  // from <boost/asio/ip/tcp.hpp>
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 
@@ -409,4 +409,4 @@ absl::string_view OidcFilter::Name() const { return filter_name_; }
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

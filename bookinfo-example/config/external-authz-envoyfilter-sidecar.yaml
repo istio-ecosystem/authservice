@@ -35,7 +35,7 @@ spec:
       value:
         name: ext_authz
         connect_timeout: 5s # This timeout controls the initial TCP handshake timeout - not the timeout for the entire request
-        type: LOGICAL_DNS
+        type: STATIC
         lb_policy: ROUND_ROBIN
         http2_protocol_options: {}
         load_assignment:

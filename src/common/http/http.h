@@ -1,5 +1,5 @@
-#ifndef TRANSPARENT_AUTH_SRC_COMMON_HTTP_HTTP_H_
-#define TRANSPARENT_AUTH_SRC_COMMON_HTTP_HTTP_H_
+#ifndef AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
+#define AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
 #include <array>
 #include <boost/beast.hpp>
 #include <map>
@@ -12,7 +12,7 @@
 #include "config/common/config.pb.h"
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace http {
 
@@ -144,6 +144,6 @@ class http_impl : public http {
 
 }  // namespace http
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SRC_COMMON_HTTP_HTTP_H_
+#endif  // AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_

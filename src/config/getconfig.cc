@@ -11,8 +11,7 @@ using namespace std;
 using namespace google::protobuf::util;
 using namespace authservice::config;
 
-// TODO: s/namespace transparent_auth/namespace authservice/g
-namespace transparent_auth {
+namespace authservice {
 namespace config {
 
 shared_ptr<authservice::config::Config> GetConfig(
@@ -37,4 +36,4 @@ shared_ptr<authservice::config::Config> GetConfig(
   return config;
 }
 }  // namespace config
-}  // namespace transparent_auth
+}  // namespace authservice

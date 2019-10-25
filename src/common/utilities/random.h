@@ -1,12 +1,12 @@
-#ifndef TRANSPARENT_AUTH_SRC_COMMON_UTILITIES_RANDOM_H_
-#define TRANSPARENT_AUTH_SRC_COMMON_UTILITIES_RANDOM_H_
+#ifndef AUTHSERVICE_SRC_COMMON_UTILITIES_RANDOM_H_
+#define AUTHSERVICE_SRC_COMMON_UTILITIES_RANDOM_H_
 #include <memory>
 #include <string>
 #include <vector>
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace utilities {
 class Random {
@@ -74,5 +74,5 @@ class RandomGenerator {
 
 }  // namespace utilities
 }  // namespace common
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_COMMON_UTILITIES_RANDOM_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_COMMON_UTILITIES_RANDOM_H_

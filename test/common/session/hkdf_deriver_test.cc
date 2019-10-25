@@ -1,7 +1,7 @@
 #include "src/common/session/hkdf_deriver.h"
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -38,4 +38,4 @@ TEST(HkdfDeriverTest, DeriveKey) {
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice
