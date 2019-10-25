@@ -5,7 +5,7 @@
 #include "jwt_verify_lib/verify.h"
 #include "spdlog/spdlog.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 namespace {
@@ -94,4 +94,4 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

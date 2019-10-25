@@ -18,7 +18,7 @@ namespace net = boost::asio;       // from <boost/asio.hpp>
 namespace ssl = boost::asio::ssl;  // from <boost/asio/ssl.hpp>
 using tcp = boost::asio::ip::tcp;  // from <boost/asio/ip/tcp.hpp>
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace http {
 namespace {
@@ -351,4 +351,4 @@ response_t http_impl::Post(
 
 }  // namespace http
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

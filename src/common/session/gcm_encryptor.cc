@@ -3,7 +3,7 @@
 
 #include "openssl/rand.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -123,4 +123,4 @@ GcmEncryptorPtr GcmEncryptor::Create(const std::vector<unsigned char>& key,
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice

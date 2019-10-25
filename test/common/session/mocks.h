@@ -1,9 +1,9 @@
-#ifndef TRANSPARENT_AUTH_TEST_COMMON_SESSION_MOCKS_H_
-#define TRANSPARENT_AUTH_TEST_COMMON_SESSION_MOCKS_H_
+#ifndef AUTHSERVICE_TEST_COMMON_SESSION_MOCKS_H_
+#define AUTHSERVICE_TEST_COMMON_SESSION_MOCKS_H_
 #include "gmock/gmock.h"
 #include "src/common/session/token_encryptor.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 class TokenEncryptorMock final : public TokenEncryptor {
@@ -14,6 +14,6 @@ class TokenEncryptorMock final : public TokenEncryptor {
 };
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_TEST_COMMON_SESSION_MOCKS_H_
+#endif  // AUTHSERVICE_TEST_COMMON_SESSION_MOCKS_H_

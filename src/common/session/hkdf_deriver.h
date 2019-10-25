@@ -1,9 +1,9 @@
-#ifndef TRANSPARENT_AUTH_SRC_COMMON_SESSION_HKDF_DERIVER_H_
-#define TRANSPARENT_AUTH_SRC_COMMON_SESSION_HKDF_DERIVER_H_
+#ifndef AUTHSERVICE_SRC_COMMON_SESSION_HKDF_DERIVER_H_
+#define AUTHSERVICE_SRC_COMMON_SESSION_HKDF_DERIVER_H_
 #include <memory>
 #include <vector>
 
-namespace transparent_auth {
+namespace authservice {
 namespace common {
 namespace session {
 
@@ -34,5 +34,5 @@ class HkdfDeriver {
 
 }  // namespace session
 }  // namespace common
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_COMMON_SESSION_HKDF_DERIVER_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_COMMON_SESSION_HKDF_DERIVER_H_

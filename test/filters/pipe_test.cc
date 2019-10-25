@@ -1,7 +1,7 @@
 #include "src/filters/pipe.h"
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 TEST(PipeTest, Name) {
   Pipe pipe;
@@ -9,4 +9,4 @@ TEST(PipeTest, Name) {
 }
 
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

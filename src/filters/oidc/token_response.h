@@ -1,11 +1,11 @@
-#ifndef TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
-#define TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
+#ifndef AUTHSERVICE_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
+#define AUTHSERVICE_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "jwt_verify_lib/jwks.h"
 #include "jwt_verify_lib/jwt.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 
@@ -62,5 +62,5 @@ class TokenResponseParserImpl final : public TokenResponseParser {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_

@@ -18,7 +18,7 @@
 using grpc::Server;
 using grpc::ServerBuilder;
 
-namespace transparent_auth {
+namespace authservice {
 namespace service {
 
 spdlog::level::level_enum GetConfiguredLogLevel(
@@ -69,7 +69,7 @@ void RunServer(const std::shared_ptr<authservice::config::Config>& config) {
 }
 
 }  // namespace service
-}  // namespace transparent_auth
+}  // namespace authservice
 
 ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json",
           "path to filter config");
@@ -83,10 +83,10 @@ int main(int argc, char** argv) {
 
   try {
     auto config =
-        transparent_auth::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
+        authservice::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
     console->set_level(
-        transparent_auth::service::GetConfiguredLogLevel(config));
-    transparent_auth::service::RunServer(config);
+        authservice::service::GetConfiguredLogLevel(config));
+    authservice::service::RunServer(config);
   } catch (const std::exception& e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;

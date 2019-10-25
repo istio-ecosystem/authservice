@@ -1,5 +1,5 @@
-#ifndef TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_
-#define TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_
+#ifndef AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
+#define AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
 #include "config/oidc/config.pb.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "src/common/http/http.h"
@@ -7,7 +7,7 @@
 #include "src/filters/filter.h"
 #include "src/filters/oidc/token_response.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 
@@ -123,6 +123,6 @@ class OidcFilter final : public filters::Filter {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice
 
-#endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_OIDC_FILTER_H_
+#endif  // AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_

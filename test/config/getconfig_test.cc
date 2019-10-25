@@ -1,7 +1,7 @@
 #include "src/config/getconfig.h"
 #include "gtest/gtest.h"
 
-namespace transparent_auth {
+namespace authservice {
 namespace config {
 
 TEST(GetConfigTest, ReturnsTheConfig) {
@@ -58,4 +58,4 @@ TEST(GetConfigTest,
 }
 
 }  // namespace config
-}  // namespace transparent_auth
+}  // namespace authservice

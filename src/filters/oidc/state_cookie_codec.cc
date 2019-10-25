@@ -2,7 +2,7 @@
 #include <sstream>
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 namespace {
@@ -24,4 +24,4 @@ StateCookieCodec::Decode(absl::string_view value) {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
+}  // namespace authservice

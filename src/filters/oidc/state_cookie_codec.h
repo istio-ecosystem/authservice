@@ -1,10 +1,10 @@
-#ifndef TRANSPARENT_AUTH_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
-#define TRANSPARENT_AUTH_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
+#ifndef AUTHSERVICE_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
+#define AUTHSERVICE_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
 
 #include <map>
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-namespace transparent_auth {
+namespace authservice {
 namespace filters {
 namespace oidc {
 /**
@@ -30,5 +30,5 @@ class StateCookieCodec {
 
 }  // namespace oidc
 }  // namespace filters
-}  // namespace transparent_auth
-#endif  // TRANSPARENT_AUTH_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
+}  // namespace authservice
+#endif  // AUTHSERVICE_SRC_FILTERS_OIDC_STATE_COOKIE_CODEC_H_
