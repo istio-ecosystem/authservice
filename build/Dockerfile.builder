@@ -7,7 +7,7 @@ RUN chmod +x /build/install-bazel.sh && /build/install-bazel.sh
 FROM bazel-builder as auth-builder
 COPY . /src
 WORKDIR /src
-RUN bazel build //...
+RUN make bazel-bin/src/main/auth-server
 
 # Create our final auth-server container image.
 FROM debian:buster
