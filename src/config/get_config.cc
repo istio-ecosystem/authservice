@@ -38,17 +38,6 @@ shared_ptr<authservice::config::Config> GetConfig(
   return config;
 }
 
-void ValidateConfig(const authservice::config::Config &config) {
-  vector<string> errors;
-
-  if (config.threads() == 0) { errors.emplace_back("threads"); }
-
-  if (!errors.empty()) {
-    auto error_string = boost::algorithm::join(errors, ", ");
-    throw runtime_error("Missing required configuration: " + error_string);
-  }
-}
-
 spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Config& config) {
   auto log_level_string = config.log_level();
   spdlog::level::level_enum level;

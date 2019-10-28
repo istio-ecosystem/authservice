@@ -21,5 +21,5 @@ message Config {
     // Threads in the thread pool to use for processing
     // The main thread will be used for accepting connections, before sending them to the thread-pool
     // for processing, so the total amount of running threads, including the main thread, will be N+1
-    uint32 threads = 5;
+    uint32 threads = 5 [(validate.rules).uint32.gte = 1];
 }

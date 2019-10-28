@@ -35,7 +35,6 @@ public:
           : service_(service), cq_(cq), responder_(&ctx_), io_context_(io_context), config_(std::move(config)),
             impl_(*config_) {
     spdlog::trace("Creating processor state");
-    authservice::config::ValidateConfig(*config_);
     service.RequestCheck(&ctx_, &request_, &responder_, &cq_, &cq_, this);
   }
 
