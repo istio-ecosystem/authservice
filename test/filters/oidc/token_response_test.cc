@@ -119,13 +119,14 @@ TEST(TokenResponseParser, Parse) {
 
   auto result = parser.Parse(client_id, nonce, valid_token_response_Bearer);
   ASSERT_TRUE(result.has_value());
-  auto access_token = result->AccessToken();
-  ASSERT_EQ(access_token, std::string());
+  auto access_token1 = result->AccessToken();
+  ASSERT_FALSE(access_token1.has_value());
 
   result = parser.Parse(client_id, nonce, valid_token_response_bearer);
   ASSERT_TRUE(result.has_value());
-  access_token = result->AccessToken();
-  ASSERT_EQ(access_token, "expected");
+  auto access_token2 = result->AccessToken();
+  ASSERT_TRUE(access_token2.has_value());
+  ASSERT_EQ(*access_token2, "expected");
 }
 }  // namespace oidc
 }  // namespace filters

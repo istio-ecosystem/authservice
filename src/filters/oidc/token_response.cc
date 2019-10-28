@@ -1,5 +1,6 @@
 #include "token_response.h"
 #include "absl/strings/match.h"
+#include "absl/time/clock.h"
 #include "google/protobuf/struct.pb.h"
 #include "google/protobuf/util/json_util.h"
 #include "jwt_verify_lib/struct_utils.h"
@@ -15,6 +16,7 @@ const char *token_type_field = "token_type";
 const char *bearer_token_type = "bearer";
 const char *id_token_field = "id_token";
 const char *access_token_field = "access_token";
+const char *expires_in_field = "expires_in";
 }  // namespace
 TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
     : id_token_(id_token) {}
@@ -23,11 +25,27 @@ void TokenResponse::SetAccessToken(absl::string_view access_token) {
   access_token_ = std::string(access_token.data(), access_token.size());
 }
 
+void TokenResponse::SetExpiry(int64_t expiry) {
+  expiry_ = expiry;
+}
+
 const google::jwt_verify::Jwt &TokenResponse::IDToken() const {
   return id_token_;
 }
 
-const std::string &TokenResponse::AccessToken() const { return access_token_; }
+absl::optional<const std::string> TokenResponse::AccessToken() const {
+  if (!access_token_.empty()) {
+    return access_token_;
+  }
+  return absl::nullopt;
+}
+
+absl::optional<int64_t> TokenResponse::Expiry() const {
+  if (expiry_) {
+    return expiry_;
+  }
+  return absl::nullopt;
+}
 
 TokenResponseParserImpl::TokenResponseParserImpl(
     google::jwt_verify::JwksPtr keys)
@@ -92,7 +110,7 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
     return absl::nullopt;
   }
   if (nonce != extracted_nonce) {
-    spdlog::info("{}: invlaid `nonce` field in id_token", __func__);
+    spdlog::info("{}: invalid `nonce` field in id_token", __func__);
     return absl::nullopt;
   }
   auto result = absl::make_optional<TokenResponse>(id_token);
@@ -101,6 +119,19 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   if (access_token_iter != fields.end()) {
     result->SetAccessToken(access_token_iter->second.string_value());
   }
+  // expires_in field takes precedence over JWT timeout.
+  auto expiry = static_cast<int64_t>(id_token.exp_);
+  auto expires_in_iter = fields.find(expires_in_field);
+  if (expires_in_iter != fields.end()) {
+    auto expires_in = int64_t(access_token_iter->second.number_value());
+    if (expires_in <= 0) {
+      spdlog::info("{}: invalid `expired_in` token response field", __func__);
+      return absl::nullopt;
+    }
+    // Knock 5 seconds off the expiry time to take into account the time it may have taken to retrieve the token.
+    expiry = absl::ToUnixSeconds(absl::Now()) + expires_in - 5;
+  }
+  result->SetExpiry(expiry);
   return result;
 }
 

@@ -364,12 +364,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
                            "Invalid token response");
       return google::rpc::Code::INVALID_ARGUMENT;
     }
-    // Calculate the Max-Age attribute of our cookie based on the id_token expiry.
-    // TODO: Calculate timeout based on minimum of access_token expiry and id_token expiry.
-    auto timeout = std::numeric_limits<int64_t>::max();
-    if (token->IDToken().exp_) {
-      timeout = std::max(static_cast<int64_t>(token->IDToken().exp_) - absl::ToUnixSeconds(absl::Now()), int64_t(0));
-    }
+    auto expiry = token->Expiry();
+    auto timeout = expiry.has_value() ? *expiry : std::numeric_limits<int64_t>::max();
     auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
     std::set<absl::string_view> token_set_cookie_header_directives = {
         common::http::headers::SetCookieDirectives::HttpOnly,
@@ -379,13 +375,14 @@ google::rpc::Code OidcFilter::RetrieveToken(
     // Check whether access_token forwarding is configured and if it is we have
     // an access token in our token response.
     if (idp_config_.has_access_token()) {
-      if (token->AccessToken() == "") {
+      auto access_token = token->AccessToken();
+      if (!access_token.has_value()) {
         spdlog::info("{}: Missing expected access_token", __func__);
         ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
                              "Missing expected access_token");
         return google::rpc::Code::INVALID_ARGUMENT;
       }
-      auto cookie_value = cryptor_->Encrypt(token->AccessToken());
+      auto cookie_value = cryptor_->Encrypt(*access_token);
       auto token_set_cookie_header = common::http::http::EncodeSetCookie(
           GetAccessTokenCookieName(), cookie_value,
           token_set_cookie_header_directives);
@@ -399,8 +396,6 @@ google::rpc::Code OidcFilter::RetrieveToken(
         token_set_cookie_header_directives);
     SetHeader(response->mutable_denied_response()->mutable_headers(),
               common::http::headers::SetCookie, token_set_cookie_header);
-    ::grpc::Status error(::grpc::StatusCode::UNAUTHENTICATED,
-                         "Session established");
     return google::rpc::Code::UNAUTHENTICATED;
   }
 }
