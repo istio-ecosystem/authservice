@@ -11,8 +11,8 @@ compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
 	docker-compose up --build
 
-docker:
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.builder -t authservice:$(USER) .
+docker: build
+	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.runner -t authservice:$(USER) .
 
 docker-from-scratch:
 	docker build -f build/Dockerfile.builder -t authservice:$(USER) .

@@ -1,5 +1,5 @@
 .idea
 .clwb
 /bazel-*
-/build-release
 .DS_Store
+/build_release

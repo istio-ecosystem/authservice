@@ -1,0 +1,10 @@
+# Creates final auth-server container image from an already built binary
+FROM ubuntu:19.10
+RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
+
+COPY build_release/bazel-bin/src/main/auth_server /app/auth_server
+RUN chgrp auth-server-grp /app/auth_server && chown auth-server-usr /app/auth_server && chmod u+x /app/auth_server
+
+USER auth-server-usr
+WORKDIR /app
+ENTRYPOINT ["/app/auth_server"]
