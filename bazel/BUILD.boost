@@ -12,6 +12,110 @@ cc_library(
 )
 
 cc_library(
+    name = "context",
+    srcs = ["libboost_context.a"],
+    hdrs = glob(
+        [
+            "boost/context.hpp",
+            "boost/context/**/*.h",
+            "boost/context/**/*.hpp",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":all",
+    ],
+)
+
+genrule(
+    name = "build_boost_context",
+    srcs = glob(
+        [
+            "Jamroot",
+            "**/Jamfile*",
+            "**/*.jam",
+            "**/*.cpp",
+            "**/*.c",
+            "**/*.S",
+            "**/*.hpp",
+            "project-config.jam",
+        ],
+        exclude = [
+            "bazel-*",
+            "libs/wave/test/**/*",
+        ],
+    ) + [
+        "project-config.jam",
+    ],
+    outs = [
+        "libboost_context.a",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location Jamroot))
+        cp $(location project-config.jam) $$ROOT
+        pushd $$ROOT
+            ../../$(location b2) libboost_context.a
+        popd
+
+        cp $$ROOT/stage/lib/libboost_context.a $(location libboost_context.a)
+    """,
+    tools = ["b2"],
+)
+
+cc_library(
+    name = "coroutine",
+    srcs = ["libboost_coroutine.a"],
+    hdrs = glob(
+        [
+            "boost/coroutine.hpp",
+            "boost/coroutine/**/*.h",
+            "boost/coroutine/**/*.hpp",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":all",
+        ":context",
+        ":thread",
+    ],
+)
+
+genrule(
+    name = "build_boost_coroutine",
+    srcs = glob(
+        [
+            "Jamroot",
+            "**/Jamfile*",
+            "**/*.jam",
+            "**/*.cpp",
+            "**/*.c",
+            "**/*.S",
+            "**/*.hpp",
+            "project-config.jam",
+        ],
+        exclude = [
+            "bazel-*",
+            "libs/wave/test/**/*",
+        ],
+    ) + [
+        "project-config.jam",
+    ],
+    outs = [
+        "libboost_coroutine.a",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location Jamroot))
+        cp $(location project-config.jam) $$ROOT
+        pushd $$ROOT
+            ../../$(location b2) libboost_coroutine.a
+        popd
+
+        cp $$ROOT/stage/lib/libboost_coroutine.a $(location libboost_coroutine.a)
+    """,
+    tools = ["b2"],
+)
+
+cc_library(
     name = "thread",
     srcs = ["libboost_thread.a"],
     hdrs = glob(
