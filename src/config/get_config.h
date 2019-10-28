@@ -11,6 +11,8 @@ namespace config {
 std::shared_ptr<authservice::config::Config> GetConfig(
     const std::string& configFile);
 
+void ValidateConfig(const authservice::config::Config &config);
+
 spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Config& config);
 std::string GetConfiguredAddress(const authservice::config::Config& config);
 

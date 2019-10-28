@@ -1,7 +1,7 @@
 #include "src/filters/oidc/oidc_filter.h"
 #include <regex>
 #include "absl/strings/str_join.h"
-#include "external/com_google_googleapis/google/rpc/code.pb.h"
+#include "google/rpc/code.pb.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"

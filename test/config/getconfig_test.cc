@@ -1,4 +1,4 @@
-#include "src/config/getconfig.h"
+#include "src/config/get_config.h"
 #include "gtest/gtest.h"
 
 namespace authservice {

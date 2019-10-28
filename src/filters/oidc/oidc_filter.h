@@ -32,7 +32,7 @@ class OidcFilter final : public filters::Filter {
    * @param value the header value
    */
   static void SetHeader(::google::protobuf::RepeatedPtrField<
-                            ::envoy::api::v2::core::HeaderValueOption> *headers,
+                        ::envoy::api::v2::core::HeaderValueOption> *headers,
                         absl::string_view name, absl::string_view value);
 
   /** @brief Set standard reply headers.
@@ -100,7 +100,9 @@ class OidcFilter final : public filters::Filter {
   google::rpc::Code RetrieveToken(
       const ::envoy::service::auth::v2::CheckRequest *request,
       ::envoy::service::auth::v2::CheckResponse *response,
-      absl::string_view query);
+      absl::string_view query,
+      boost::asio::io_context& ioc,
+      boost::asio::yield_context yield);
 
   /** @brief Get a cookie name. */
   std::string GetCookieName(const std::string &cookie) const;
@@ -150,8 +152,14 @@ public:
              common::session::TokenEncryptorPtr cryptor);
 
   google::rpc::Code Process(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response) override;
+          const ::envoy::service::auth::v2::CheckRequest *request,
+          ::envoy::service::auth::v2::CheckResponse *response,
+          boost::asio::io_context& ioc,
+          boost::asio::yield_context yield) override;
+
+  // Required to inherit the 2-argument version of Process from the base class
+  using filters::Filter::Process;
+
   absl::string_view Name() const override;
 
   /** @brief Get state cookie name. */

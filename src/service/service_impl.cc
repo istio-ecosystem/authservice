@@ -2,17 +2,16 @@
 #include <grpcpp/grpcpp.h>
 #include <memory>
 #include "spdlog/spdlog.h"
-#include "src/config/getconfig.h"
+#include "src/config/get_config.h"
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/pipe.h"
 
 namespace authservice {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(
-    std::shared_ptr<authservice::config::Config> config) {
+AuthServiceImpl::AuthServiceImpl(const authservice::config::Config& config) {
   root_.reset(new filters::Pipe);
-  for (const auto &filter : config->filters()) {
+  for (const auto &filter : config.filters()) {
     // TODO: implement filter specific construction.
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");

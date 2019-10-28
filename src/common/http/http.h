@@ -2,6 +2,7 @@
 #define AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
 #include <array>
 #include <boost/beast.hpp>
+#include <boost/asio/spawn.hpp>
 #include <map>
 #include <memory>
 #include <set>
@@ -114,10 +115,12 @@ class http {
    */
   static std::string ToUrl(
       const authservice::config::common::Endpoint &endpoint);
+
   /**
    * Virtual destructor
    */
   virtual ~http() = default;
+
   /** @brief Send a Post http message.
    *
    * @param endpoint the endpoint to call
@@ -128,8 +131,21 @@ class http {
   virtual response_t Post(
       const authservice::config::common::Endpoint &endpoint,
       const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body)
-      const = 0;  // TODO: use string_view instead of const char *
+      absl::string_view body) const = 0;
+
+  /** @brief ASynchronously send a Post http message. To be used inside a Boost co-routine.
+   *
+   * @param endpoint the endpoint to call
+   * @param headers the http headers
+   *  @param body the http request body
+   * @return http response.
+   */
+  virtual response_t Post(
+          const authservice::config::common::Endpoint &endpoint,
+          const std::map<absl::string_view, absl::string_view> &headers,
+          absl::string_view body,
+          boost::asio::io_context& ioc,
+          boost::asio::yield_context yield) const = 0;
 };
 
 /**
@@ -140,6 +156,13 @@ class http_impl : public http {
   response_t Post(const authservice::config::common::Endpoint &Endpoint,
                   const std::map<absl::string_view, absl::string_view> &headers,
                   absl::string_view body) const override;
+
+  response_t Post(
+          const authservice::config::common::Endpoint &endpoint,
+          const std::map<absl::string_view, absl::string_view> &headers,
+          absl::string_view body,
+          boost::asio::io_context& ioc,
+          boost::asio::yield_context yield) const override;
 };
 
 }  // namespace http

@@ -3,6 +3,8 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <boost/asio/spawn.hpp>
+#include <boost/asio.hpp>
 
 #include "src/filters/filter.h"
 
@@ -22,8 +24,14 @@ class Pipe final : public Filter {
   Pipe *Remove(const std::string &filter);
 
   google::rpc::Code Process(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response) override;
+          const ::envoy::service::auth::v2::CheckRequest *request,
+          ::envoy::service::auth::v2::CheckResponse *response,
+          boost::asio::io_context& ioc,
+          boost::asio::yield_context yield) override;
+
+  // Required to inherit the 2-argument version of Process from the base class
+  using filters::Filter::Process;
+
   absl::string_view Name() const override;
 };
 

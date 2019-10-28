@@ -15,7 +15,7 @@ class AuthServiceImpl final : public Authorization::Service {
   std::unique_ptr<filters::Pipe> root_;
 
  public:
-  AuthServiceImpl(std::shared_ptr<authservice::config::Config> config);
+  AuthServiceImpl(const authservice::config::Config& config);
   ::grpc::Status Check(
       ::grpc::ServerContext* context,
       const ::envoy::service::auth::v2::CheckRequest* request,

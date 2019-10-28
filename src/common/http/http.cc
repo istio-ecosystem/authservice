@@ -2,6 +2,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
+#include <boost/asio/spawn.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <iomanip>
@@ -337,6 +338,71 @@ response_t http_impl::Post(
     stream.shutdown(ec);
     // not_connected happens sometimes
     // so don't bother reporting it.
+    if (ec && ec != beast::errc::not_connected) {
+      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+      return response_t();
+    }
+    return res;
+    // If we get here then the connection is closed gracefully
+  } catch (std::exception const &e) {
+    spdlog::info("{}: unexpected exception: {}", __func__, e.what());
+    return response_t();
+  }
+}
+
+response_t http_impl::Post(
+        const authservice::config::common::Endpoint &endpoint,
+        const std::map<absl::string_view, absl::string_view> &headers,
+        absl::string_view body,
+        boost::asio::io_context& ioc,
+        boost::asio::yield_context yield) const {
+  spdlog::trace("{}", __func__);
+  try {
+    int version = 11;
+
+    ssl::context ctx(ssl::context::tlsv12_client);
+    // TODO: verify_peer should be used but is not currently working.
+    ctx.set_verify_mode(ssl::verify_none);
+    ctx.set_default_verify_paths();
+
+    tcp::resolver resolver(ioc);
+    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+    if (!SSL_set_tlsext_host_name(stream.native_handle(),
+                                  endpoint.hostname().c_str())) {
+      throw boost::system::error_code{static_cast<int>(::ERR_get_error()),
+                                      boost::asio::error::get_ssl_category()};
+    }
+    const auto results =
+            resolver.async_resolve(endpoint.hostname(), std::to_string(endpoint.port()), yield);
+    beast::get_lowest_layer(stream).async_connect(results, yield);
+    stream.async_handshake(ssl::stream_base::client, yield);
+    // Set up an HTTP POST request message
+    beast::http::request<beast::http::string_body> req{
+            beast::http::verb::post, endpoint.path(), version};
+    req.set(beast::http::field::host, endpoint.hostname());
+    for (auto header : headers) {
+      req.set(boost::beast::string_view(header.first.data()),
+              boost::beast::string_view(header.second.data()));
+    }
+    auto &req_body = req.body();
+    req_body.reserve(body.size());
+    req_body.append(body.begin(), body.end());
+    req.prepare_payload();
+    // Send the HTTP request to the remote host
+    beast::http::async_write(stream, req, yield);
+
+    // Read response
+    beast::flat_buffer buffer;
+    response_t res(new beast::http::response<beast::http::string_body>);
+    beast::http::async_read(stream, buffer, *res, yield);
+
+    // Gracefully close the socket.
+    // Receive an error code instead of throwing an exception if this fails, so we can ignore some
+    // expected not_connected errors.
+    boost::system::error_code ec;
+    stream.async_shutdown(yield[ec]);
+
+    // not_connected happens sometimes so don't bother reporting it.
     if (ec && ec != beast::errc::not_connected) {
       spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
       return response_t();

@@ -1,12 +1,12 @@
 #include "src/service/service_impl.h"
-#include "src/config/getconfig.h"
+#include "src/config/get_config.h"
 #include "gtest/gtest.h"
 
 namespace authservice {
 namespace service {
 TEST(ServiceImplTest, Check) {
   AuthServiceImpl service(
-      authservice::config::GetConfig("test/fixtures/valid-config.json"));
+          *authservice::config::GetConfig("test/fixtures/valid-config.json"));
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
 

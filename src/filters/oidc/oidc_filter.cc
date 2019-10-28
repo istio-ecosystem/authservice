@@ -183,7 +183,9 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
 google::rpc::Code OidcFilter::Process(
     const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response) {
+    ::envoy::service::auth::v2::CheckResponse *response,
+    boost::asio::io_context& ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
   spdlog::debug(
       "Call from {}@{} to {}@{}", request->attributes().source().principal(),
@@ -237,14 +239,14 @@ google::rpc::Code OidcFilter::Process(
                 request->attributes().request().http().path());
 
   std::stringstream callback_host;
-  callback_host << idp_config_.callback().hostname() << ':' << idp_config_.callback().port();
+  callback_host << idp_config_.callback().hostname() << ':' << std::dec << idp_config_.callback().port();
 
   auto path_parts = common::http::http::DecodePath(
       request->attributes().request().http().path());
 
   if (request->attributes().request().http().host() == callback_host.str() &&
       path_parts[0] == idp_config_.callback().path()) {
-    return RetrieveToken(request, response, path_parts[1]);
+    return RetrieveToken(request, response, path_parts[1], ioc, yield);
   }
   return RedirectToIdP(response);
 }
@@ -282,7 +284,9 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
 google::rpc::Code OidcFilter::RetrieveToken(
     const ::envoy::service::auth::v2::CheckRequest *request,
     ::envoy::service::auth::v2::CheckResponse *response,
-    absl::string_view query) {
+    absl::string_view query,
+    boost::asio::io_context& ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
   // Best effort at deleting state cookie for all cases.
@@ -357,7 +361,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   auto retrieve_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::http::EncodeFormData(params));
+      idp_config_.token(), headers, common::http::http::EncodeFormData(params), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");

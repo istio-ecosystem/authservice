@@ -29,11 +29,24 @@ shared_ptr<authservice::config::Config> GetConfig(
   if (!status.ok()) {
     throw runtime_error(status.error_message());
   }
+
   std::string error;
   if (!Validate(*(config.get()), &error)) {
     throw runtime_error(error);
   }
+
   return config;
+}
+
+void ValidateConfig(const authservice::config::Config &config) {
+  vector<string> errors;
+
+  if (config.threads() == 0) { errors.emplace_back("threads"); }
+
+  if (!errors.empty()) {
+    auto error_string = boost::algorithm::join(errors, ", ");
+    throw runtime_error("Missing required configuration: " + error_string);
+  }
 }
 
 spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Config& config) {
@@ -61,17 +74,9 @@ spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Confi
 
 std::string GetConfiguredAddress(const authservice::config::Config& config) {
   std::stringstream address_string_builder;
-  auto configured_address = config.listen_address();
-  auto configured_port = config.listen_port();
 
-  if (configured_address.empty()) {
-    configured_address = "127.0.0.1";
-  }
-  if (configured_port.empty()) {
-    configured_port = "10003";
-  }
-
-  address_string_builder << configured_address << ":" << std::dec << configured_port;
+  address_string_builder << config.listen_address() << ":" << std::dec
+                         << config.listen_port();
   auto address = address_string_builder.str();
   return address;
 }
