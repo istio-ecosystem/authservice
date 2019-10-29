@@ -123,7 +123,7 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   auto expiry = static_cast<int64_t>(id_token.exp_);
   auto expires_in_iter = fields.find(expires_in_field);
   if (expires_in_iter != fields.end()) {
-    auto expires_in = int64_t(access_token_iter->second.number_value());
+    auto expires_in = int64_t(expires_in_iter->second.number_value());
     if (expires_in <= 0) {
       spdlog::info("{}: invalid `expired_in` token response field", __func__);
       return absl::nullopt;

@@ -26,7 +26,9 @@ const char *nonce = "random";
 const char *valid_token_response_Bearer =
     R"({"token_type":"Bearer","id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg"})";
 const char *valid_token_response_bearer =
-    R"({"token_type":"bearer","access_token":"expected","id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg"})";
+    R"({"token_type":"bearer","access_token":"expected","expires_in":3600,"id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg"})";
+    const char *invalid_expires_in_token_response =
+        R"({"token_type":"bearer","access_token":"expected","expires_in":-1,"id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg"})";
 };  // namespace
 
 TEST(TokenResponseParser, ParseInvalidJSON) {
@@ -111,6 +113,16 @@ TEST(TokenResponseParser, ParseInvalidNonce) {
   ASSERT_FALSE(result.has_value());
 }
 
+TEST(TokenResponseParser, InvalidExpiresInFieldValue) {
+  auto jwks = google::jwt_verify::Jwks::createFrom(
+      valid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
+  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
+  TokenResponseParserImpl parser(std::move(jwks));
+
+  auto result = parser.Parse(client_id, nonce, invalid_expires_in_token_response);
+  ASSERT_FALSE(result.has_value());
+}
+
 TEST(TokenResponseParser, Parse) {
   auto jwks = google::jwt_verify::Jwks::createFrom(
       valid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
@@ -121,12 +133,16 @@ TEST(TokenResponseParser, Parse) {
   ASSERT_TRUE(result.has_value());
   auto access_token1 = result->AccessToken();
   ASSERT_FALSE(access_token1.has_value());
+  auto expiry1 = result->Expiry();
+  ASSERT_FALSE(expiry1.has_value());
 
   result = parser.Parse(client_id, nonce, valid_token_response_bearer);
   ASSERT_TRUE(result.has_value());
   auto access_token2 = result->AccessToken();
   ASSERT_TRUE(access_token2.has_value());
-  ASSERT_EQ(*access_token2, "expected");
+      ASSERT_EQ(*access_token2, "expected");
+  auto expiry2 = result->Expiry();
+  ASSERT_TRUE(expiry2.has_value());
 }
 }  // namespace oidc
 }  // namespace filters
