@@ -1,5 +1,6 @@
 #include "src/filters/filter_chain.h"
 #include "gtest/gtest.h"
+#include "src/filters/pipe.h"
 
 namespace authservice {
 namespace filters {
@@ -42,6 +43,17 @@ TEST(FilterChainTest, MatchesEquality) {
   headers2->insert({"x-equality-header", "exact-value"});
   FilterChainImpl chain2(configuration);
   ASSERT_TRUE(chain2.Matches(&request2));
+}
+
+TEST(FilterChainTest, New) {
+      auto configuration = std::shared_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+      auto filter_config = configuration->mutable_filters()->Add();
+      filter_config->mutable_oidc()->set_jwks("some-value");
+      filter_config->mutable_oidc()->set_cryptor_secret("some-secret");
+
+      FilterChainImpl chain(configuration);
+      auto instance = chain.New();
+      ASSERT_TRUE(dynamic_cast<Pipe*>(instance.get()) != nullptr);
 }
 
 }  // namespace filters

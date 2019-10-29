@@ -9,7 +9,7 @@ import "validate/validate.proto";
 message Match {
     // header specifies the http header used to match against.
     string header = 1 [(validate.rules).string.min_len = 1];
-    oneof value {
+    oneof criteria {
         option (validate.required) = true;
         // prefix specifies the prefix of the header value upon which to match against.
         string prefix = 2 [(validate.rules).string.min_len = 1];

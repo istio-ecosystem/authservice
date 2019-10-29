@@ -33,6 +33,8 @@ xx_library(
     deps = [
         "//config:config_cc",
         "//src/filters:filter",
+        "//src/filters:pipe",
+        "//src/filters/oidc:oidc_filter",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
