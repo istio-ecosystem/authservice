@@ -33,6 +33,7 @@ static const char *Secure = "Secure";
 static const char *HttpOnly = "HttpOnly";
 static const char *SameSiteStrict = "SameSite=Strict";
 static const char *SameSiteLax = "SameSite=Lax";
+static const char *MaxAge = "Max-Age";
 }  // namespace SetCookieDirectives
 
 }  // namespace headers

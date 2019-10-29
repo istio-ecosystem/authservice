@@ -7,9 +7,10 @@ namespace filters {
 namespace oidc {
 class TokenResponseParserMock final : public TokenResponseParser {
  public:
-  MOCK_CONST_METHOD2(Parse,
-                     absl::optional<TokenResponse>(absl::string_view nonce,
-                                                   absl::string_view raw));
+  MOCK_CONST_METHOD3(Parse,
+                     absl::optional<TokenResponse>(const std::string &client_id,
+                         const std::string &nonce,
+                         const std::string &raw));
 };
 }  // namespace oidc
 }  // namespace filters

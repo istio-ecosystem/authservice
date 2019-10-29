@@ -38,6 +38,7 @@ xx_library(
         "//src/filters/oidc:state_cookie_codec",
         "//src/filters/oidc:token_response",
         "@boost//:all",
+        "@com_github_abseil-cpp//absl/time:time",
         "@com_github_gabime_spdlog//:spdlog",
     ],
 )

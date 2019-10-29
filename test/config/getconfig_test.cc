@@ -27,8 +27,6 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.jwks_uri().path(), "/path1");
   ASSERT_EQ(oidc.jwks_uri().port(), 443);
 
-  ASSERT_EQ(oidc.jwks(), "some-jwks");
-
   ASSERT_EQ(oidc.callback().scheme(), "https");
   ASSERT_EQ(oidc.callback().hostname(), "google4");
   ASSERT_EQ(oidc.callback().path(), "/path4");
@@ -43,6 +41,7 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.landing_page(), "page");
   ASSERT_EQ(oidc.cryptor_secret(), "some-secret");
   ASSERT_EQ(oidc.cookie_name_prefix(), "my-app");
+  ASSERT_EQ(oidc.timeout(), 300);
 }
 
 TEST(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
