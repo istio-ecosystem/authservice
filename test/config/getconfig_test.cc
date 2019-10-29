@@ -27,8 +27,6 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.jwks_uri().path(), "/path1");
   ASSERT_EQ(oidc.jwks_uri().port(), 443);
 
-  ASSERT_EQ(oidc.jwks(), "some-jwks");
-
   ASSERT_EQ(oidc.callback().scheme(), "https");
   ASSERT_EQ(oidc.callback().hostname(), "google4");
   ASSERT_EQ(oidc.callback().path(), "/path4");
