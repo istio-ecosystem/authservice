@@ -13,7 +13,10 @@ cc_library(
 
 cc_library(
     name = "context",
-    srcs = ["libboost_context.a"],
+    srcs = [
+        "libboost_context.a",
+        "libboost_context.so.1.70.0",
+    ],
     hdrs = glob(
         [
             "boost/context.hpp",
@@ -49,22 +52,27 @@ genrule(
     ],
     outs = [
         "libboost_context.a",
+        "libboost_context.so.1.70.0",
     ],
     cmd = """
         ROOT=$$(dirname $(location Jamroot))
         cp $(location project-config.jam) $$ROOT
         pushd $$ROOT
-            ../../$(location b2) libboost_context.a
+            ../../$(location b2) libboost_context.a libboost_context.so.1.70.0
         popd
 
         cp $$ROOT/stage/lib/libboost_context.a $(location libboost_context.a)
+        cp $$ROOT/stage/lib/libboost_context.so.1.70.0 $(location libboost_context.so.1.70.0)
     """,
     tools = ["b2"],
 )
 
 cc_library(
     name = "coroutine",
-    srcs = ["libboost_coroutine.a"],
+    srcs = [
+        "libboost_coroutine.a",
+        "libboost_coroutine.so.1.70.0",
+    ],
     hdrs = glob(
         [
             "boost/coroutine.hpp",
@@ -102,22 +110,27 @@ genrule(
     ],
     outs = [
         "libboost_coroutine.a",
+        "libboost_coroutine.so.1.70.0",
     ],
     cmd = """
         ROOT=$$(dirname $(location Jamroot))
         cp $(location project-config.jam) $$ROOT
         pushd $$ROOT
-            ../../$(location b2) libboost_coroutine.a
+            ../../$(location b2) libboost_coroutine.a libboost_coroutine.so.1.70.0
         popd
 
         cp $$ROOT/stage/lib/libboost_coroutine.a $(location libboost_coroutine.a)
+        cp $$ROOT/stage/lib/libboost_coroutine.so.1.70.0 $(location libboost_coroutine.so.1.70.0)
     """,
     tools = ["b2"],
 )
 
 cc_library(
     name = "thread",
-    srcs = ["libboost_thread.a"],
+    srcs = [
+        "libboost_thread.a",
+        "libboost_thread.so.1.70.0",
+    ],
     hdrs = glob(
         [
             "boost/thread.hpp",
@@ -128,6 +141,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":all",
+        ":chrono",
     ],
 )
 
@@ -153,15 +167,73 @@ genrule(
     ],
     outs = [
         "libboost_thread.a",
+        "libboost_thread.so.1.70.0",
     ],
     cmd = """
         ROOT=$$(dirname $(location Jamroot))
         cp $(location project-config.jam) $$ROOT
         pushd $$ROOT
-            ../../$(location b2) libboost_thread.a
+            ../../$(location b2) libboost_thread.a libboost_thread.so.1.70.0
         popd
 
         cp $$ROOT/stage/lib/libboost_thread.a $(location libboost_thread.a)
+        cp $$ROOT/stage/lib/libboost_thread.so.1.70.0 $(location libboost_thread.so.1.70.0)
+    """,
+    tools = ["b2"],
+)
+
+cc_library(
+    name = "chrono",
+    srcs = [
+        "libboost_chrono.a",
+        "libboost_chrono.so.1.70.0",
+    ],
+    hdrs = glob(
+        [
+            "boost/chrono.hpp",
+            "boost/chrono/**/*.h",
+            "boost/chrono/**/*.hpp",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":all",
+    ],
+)
+
+genrule(
+    name = "build_boost_chrono",
+    srcs = glob(
+        [
+            "Jamroot",
+            "**/Jamfile*",
+            "**/*.jam",
+            "**/*.cpp",
+            "**/*.c",
+            "**/*.S",
+            "**/*.hpp",
+            "project-config.jam",
+        ],
+        exclude = [
+            "bazel-*",
+            "libs/wave/test/**/*",
+        ],
+    ) + [
+        "project-config.jam",
+    ],
+    outs = [
+        "libboost_chrono.a",
+        "libboost_chrono.so.1.70.0",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location Jamroot))
+        cp $(location project-config.jam) $$ROOT
+        pushd $$ROOT
+            ../../$(location b2) libboost_chrono.a libboost_chrono.so.1.70.0
+        popd
+
+        cp $$ROOT/stage/lib/libboost_chrono.a $(location libboost_chrono.a)
+        cp $$ROOT/stage/lib/libboost_chrono.so.1.70.0 $(location libboost_chrono.so.1.70.0)
     """,
     tools = ["b2"],
 )
