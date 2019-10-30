@@ -13,6 +13,14 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
+using ::testing::Eq;
+using ::testing::AnyOf;
+using ::testing::AllOf;
+using ::testing::Property;
+using ::testing::StartsWith;
+using ::testing::MatchesRegex;
+using ::testing::UnorderedElementsAre;
+
 class OidcFilterTest : public ::testing::Test {
  protected:
   authservice::config::oidc::OIDCConfig config_;
@@ -412,7 +420,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_))
+  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
                     cryptor_mock);
@@ -437,31 +445,34 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 5);
-
-  for (auto iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(config_.landing_page()), 0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      auto val = iter.header().value();
-      std::regex re("^__Host-cookie-prefix-authservice-id-token-"
-                    "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                    "Path=/; SameSite=Lax; Secure$");
-      ASSERT_TRUE(std::regex_match(val, re)  ||
-                  (val ==
-                   "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                   "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
-                   "Secure"));
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    UnorderedElementsAre(
+      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+        Property(&envoy::api::v2::core::HeaderValue::key, Eq(common::http::headers::Location)),
+        Property(&envoy::api::v2::core::HeaderValue::value, StartsWith(config_.landing_page()))
+      )),
+      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+        Property(&envoy::api::v2::core::HeaderValue::key, Eq(common::http::headers::CacheControl)),
+        Property(&envoy::api::v2::core::HeaderValue::value, Eq(common::http::headers::CacheControlDirectives::NoCache))
+      )),
+      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+        Property(&envoy::api::v2::core::HeaderValue::key, Eq(common::http::headers::Pragma)),
+        Property(&envoy::api::v2::core::HeaderValue::value, StartsWith(common::http::headers::PragmaDirectives::NoCache))
+      )),
+      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+        Property(&envoy::api::v2::core::HeaderValue::key, Eq(common::http::headers::SetCookie)),
+        Property(&envoy::api::v2::core::HeaderValue::value, AnyOf(
+          MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
+                       "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
+                       "Path=/; SameSite=Lax; Secure$"),
+          Eq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+             "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
+             "Secure")
+        ))
+      ))
+    )
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
@@ -477,7 +488,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_))
+  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
                     cryptor_mock);
@@ -544,7 +555,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_))
+  EXPECT_CALL(*mocked_http, Post(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
                     cryptor_mock);
@@ -831,7 +842,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   common::http::http_mock *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t();
-  EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_))
+  EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
                     cryptor_mock);
@@ -882,7 +893,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   common::http::http_mock *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
-  EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_))
+  EXPECT_CALL(*http_mock, Post(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(::testing::ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
                     cryptor_mock);
