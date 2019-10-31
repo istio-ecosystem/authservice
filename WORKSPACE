@@ -130,7 +130,7 @@ http_archive(
 
 git_repository(
     name = "com_github_google_jwt_verify_lib",
-    commit = "0f14d43f20381cfae0469cb2309b2e220c0f0ea3",
+    commit = "945805866007edb9d2760915abaa672ed8b7da86",
     remote = "https://github.com/google/jwt_verify_lib",
 )
 

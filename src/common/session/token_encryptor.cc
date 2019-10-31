@@ -69,7 +69,6 @@ std::vector<unsigned char> TokenEncryptorImpl::EncryptInternal(
 }
 
 std::string TokenEncryptorImpl::Encrypt(const std::string& token) {
-  // TODO add a token expiry.
   auto nonce = generator_.Generate(NONCE_SIZE);
   std::vector<unsigned char> nonce_vec(nonce.Begin(), nonce.End());
   auto derivedKey = deriver_->Derive(KeySize(), nonce_vec);
@@ -87,7 +86,6 @@ std::string TokenEncryptorImpl::Encrypt(const std::string& token) {
 }
 
 absl::optional<std::string> TokenEncryptorImpl::Decrypt(
-    // TODO add a token expiry.
     const std::string& ciphertext) {
   // UrlBase64 decode the token
   std::string decoded;

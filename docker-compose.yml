@@ -8,7 +8,9 @@ services:
     volumes:
       - ./run/envoy:/etc/envoy:ro
   auth:
-    image: authservice:nickrmc83
+    build:
+      dockerfile: build/Dockerfile.builder
+      context: ./
     command: ["-filter_config", "/etc/authservice/config.json"]
     ports:
       - "10004:10004"

@@ -30,7 +30,6 @@
               "path": "/path1",
               "port": 443
             },
-            "jwks": "some-jwks",
             "callback": {
               "scheme": "https",
               "hostname": "google4",
@@ -51,7 +50,8 @@
             },
             "access_token": {
               "header": "x-access-token"
-            }
+            },
+            "timeout": 300
           }
         }
       ]
