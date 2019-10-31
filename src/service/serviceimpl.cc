@@ -2,35 +2,14 @@
 #include <grpcpp/grpcpp.h>
 #include <memory>
 #include "spdlog/spdlog.h"
-#include "src/config/getconfig.h"
-#include "src/filters/oidc/oidc_filter.h"
-#include "src/filters/pipe.h"
 
 namespace authservice {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(
-    std::shared_ptr<authservice::config::Config> config) {
-  root_.reset(new filters::Pipe);
-  for (const auto &filter : config->filters()) {
-    // TODO: implement filter specific construction.
-    if (!filter.has_oidc()) {
-      throw std::runtime_error("unsupported filter type");
-    }
-    auto token_request_parser =
-        std::make_shared<filters::oidc::TokenResponseParserImpl>(
-            google::jwt_verify::Jwks::createFrom(
-                filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
-
-    auto token_encryptor = common::session::TokenEncryptor::Create(
-        filter.oidc().cryptor_secret(),
-        common::session::EncryptionAlg::AES256GCM,
-        common::session::HKDFHash::SHA512);
-
-    auto http = common::http::ptr_t(new common::http::http_impl);
-
-    root_->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
-        http, filter.oidc(), token_request_parser, token_encryptor)));
+AuthServiceImpl::AuthServiceImpl(const config::Config *config) {
+  for (const auto &chain_config : config->chains()) {
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
+    chains_.push_back(std::move(chain));
   }
 }
 
@@ -40,29 +19,40 @@ AuthServiceImpl::AuthServiceImpl(
     ::envoy::service::auth::v2::CheckResponse *response) {
   spdlog::trace("{}", __func__);
   try {
-    auto status = root_->Process(request, response);
-    // See src/filters/filter.h:filter::Process for a description of how status
-    // codes should be handled
-    switch (status) {
-      case google::rpc::Code::OK:               // The request was successful
-      case google::rpc::Code::UNAUTHENTICATED:  // A filter indicated the
-                                                // request had no authentication
-                                                // but was processed correctly.
-      case google::rpc::Code::PERMISSION_DENIED:  // A filter indicated
-                                                  // insufficient permissions
-                                                  // for the authenticated
-                                                  // requester but was processed
-                                                  // correctly.
-        return ::grpc::Status::OK;
-      case google::rpc::Code::INVALID_ARGUMENT:  // The request was not well
-                                                 // formed. Indicate a
-                                                 // processing error to the
-                                                 // caller.
-        return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
-                              "invalid request");
-      default:  // All other errors are treated as internal processing failures.
-        return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
+    // Find a configured processing chain.
+    for (auto &chain : chains_) {
+      if (chain->Matches(request)) {
+        spdlog::debug("{}: processing request {}://{}{} with filter chain {}", __func__, request->attributes().request().http().scheme(), request->attributes().request().http().host(), request->attributes().request().http().path(), chain->Name());
+        // Create a new instance of a processor.
+        auto processor = chain->New();
+        auto status = processor->Process(request, response);
+        // See src/filters/filter.h:filter::Process for a description of how status
+        // codes should be handled
+        switch (status) {
+          case google::rpc::Code::OK:               // The request was successful
+          case google::rpc::Code::UNAUTHENTICATED:  // A filter indicated the
+            // request had no authentication
+            // but was processed correctly.
+          case google::rpc::Code::PERMISSION_DENIED:  // A filter indicated
+            // insufficient permissions
+            // for the authenticated
+            // requester but was processed
+            // correctly.
+            return ::grpc::Status::OK;
+          case google::rpc::Code::INVALID_ARGUMENT:  // The request was not well
+            // formed. Indicate a
+            // processing error to the
+            // caller.
+            return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                                  "invalid request");
+          default:  // All other errors are treated as internal processing failures.
+            return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
+        }
+      }
     }
+    // No matching filter chain found. Allow request to continue,
+    spdlog::debug("{}: no matching filter chain for request to {}://{}{} ", __func__, request->attributes().request().http().scheme(), request->attributes().request().http().host(), request->attributes().request().http().path());
+    return ::grpc::Status::OK;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());
   } catch (...) {

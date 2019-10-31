@@ -28,10 +28,12 @@ message Filter {
 
 // FilterChain represents a chain of 1 or more filters that will sequentially process an HTTP request.
 message FilterChain {
+    // name is a user-defined identifier for the processing chain used in logging messages.
+    string name = 1 [(validate.rules).string.min_len = 1];
     // match describes a rule to determine whether an HTTP request should be processed.
-    Match match = 1 [(validate.rules).message.required = true];
+    Match match = 2 [(validate.rules).message.required = true];
     // filter describes the configuration of one of more filters in the filter chain.
-    repeated Filter filters = 2 [(validate.rules).repeated.min_items = 1];
+    repeated Filter filters = 3 [(validate.rules).repeated.min_items = 1];
 }
 
 message Config {

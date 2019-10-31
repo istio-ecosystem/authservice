@@ -18,6 +18,11 @@ class FilterChain {
 public:
     virtual ~FilterChain() = default;
     /**
+     * Name returns a name given to the filter chain for use in debugging anf logging.
+     * @return the name of the filter chain.
+     */
+    virtual const std::string &Name() const = 0;
+    /**
      * Matches can be used to identify whether a chain should be used to process a request.
      * @param request the request to match against.
      * @return true if that chain should process a request else false.
@@ -32,9 +37,10 @@ public:
 
 class FilterChainImpl : public FilterChain {
 private:
-    std::shared_ptr<authservice::config::FilterChain> config_;
+    authservice::config::FilterChain config_;
 public:
-    explicit FilterChainImpl(std::shared_ptr<authservice::config::FilterChain> config);
+    explicit FilterChainImpl(const authservice::config::FilterChain &config);
+    const std::string &Name() const override;
     bool Matches(const ::envoy::service::auth::v2::CheckRequest* request) const override;
     std::unique_ptr<Filter> New() override;
 };

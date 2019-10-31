@@ -6,18 +6,22 @@
 
 namespace authservice {
 namespace filters {
-    FilterChainImpl::FilterChainImpl(std::shared_ptr<authservice::config::FilterChain> config): config_(config) {
+    FilterChainImpl::FilterChainImpl(const authservice::config::FilterChain &config): config_(config) {
+    }
+
+    const std::string &FilterChainImpl::Name() const {
+      return config_.name();
     }
 
     bool FilterChainImpl::Matches(const ::envoy::service::auth::v2::CheckRequest* request) const {
       spdlog::trace("{}", __func__);
-      auto matched = request->attributes().request().http().headers().find(config_->match().header());
+      auto matched = request->attributes().request().http().headers().find(config_.match().header());
       if (matched != request->attributes().request().http().headers().cend()) {
-        switch (config_->match().criteria_case()) {
+        switch (config_.match().criteria_case()) {
           case authservice::config::Match::kPrefix:
-            return absl::StartsWith(matched->second, config_->match().prefix());
+            return absl::StartsWith(matched->second, config_.match().prefix());
           case authservice::config::Match::kEquality:
-            return matched->second == config_->match().equality();
+            return matched->second == config_.match().equality();
           default:
             throw std::runtime_error("invalid FilterChain match type"); // This should never happen.
         }
@@ -28,7 +32,7 @@ namespace filters {
     std::unique_ptr<Filter> FilterChainImpl::New() {
       spdlog::trace("{}", __func__);
       std::unique_ptr<Pipe> result(new Pipe);
-      for (const auto &filter : config_->filters()) {
+      for (const auto &filter : config_.filters()) {
         // TODO: implement filter specific construction.
         if (!filter.has_oidc()) {
           throw std::runtime_error("unsupported filter type");

@@ -2,49 +2,59 @@
   "listen_address": "127.0.0.1",
   "listen_port": "10003",
   "log_level": "trace",
-  "filters": [
+  "chains": [
     {
-      "oidc":
-      {
-        "authorization": {
-          "scheme": "https",
-          "hostname": "google3",
-          "path": "/path3",
-          "port": 443
-        },
-        "token": {
-          "scheme": "https",
-          "hostname": "google2",
-          "path": "/path2",
-          "port": 443
-        },
-        "jwks_uri": {
-          "scheme": "https",
-          "hostname": "google1",
-          "path": "/path1",
-          "port": 443
-        },
-        "jwks": "some-jwks",
-        "callback": {
-          "scheme": "https",
-          "hostname": "google4",
-          "path": "/path4",
-          "port": 443
-        },
-        "client_id": "foo",
-        "client_secret": "bar",
-        "scopes": ["scope"],
-        "landing_page": "page",
-        "cryptor_secret": "some-secret",
-        "cookie_name_prefix": "my-app",
-        "id_token": {
-          "preamble": "Bearer",
-          "header": "authorization"
-        },
-        "access_token": {
-          "header": "x-access-token"
+      "name": "test-chain",
+      "match": {
+        "header": "x-tenant-identifier",
+        "equality": "tenant1"
+      },
+      "filters": [
+        {
+          "oidc": {
+            "authorization": {
+              "scheme": "https",
+              "hostname": "google3",
+              "path": "/path3",
+              "port": 443
+            },
+            "token": {
+              "scheme": "https",
+              "hostname": "google2",
+              "path": "/path2",
+              "port": 443
+            },
+            "jwks_uri": {
+              "scheme": "https",
+              "hostname": "google1",
+              "path": "/path1",
+              "port": 443
+            },
+            "jwks": "some-jwks",
+            "callback": {
+              "scheme": "https",
+              "hostname": "google4",
+              "path": "/path4",
+              "port": 443
+            },
+            "client_id": "foo",
+            "client_secret": "bar",
+            "scopes": [
+              "scope"
+            ],
+            "landing_page": "page",
+            "cryptor_secret": "some-secret",
+            "cookie_name_prefix": "my-app",
+            "id_token": {
+              "preamble": "Bearer",
+              "header": "authorization"
+            },
+            "access_token": {
+              "header": "x-access-token"
+            }
+          }
         }
-      }
+      ]
     }
   ]
 }

@@ -3,7 +3,9 @@ cc_test(
     srcs = ["serviceimpl_test.cc"],
     data = ["//test/fixtures:valid-config.json"],
     deps = [
+        "//src/config",
         "//src/service:serviceimpl",
+        "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],
 )

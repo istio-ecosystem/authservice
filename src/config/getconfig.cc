@@ -14,7 +14,7 @@ using namespace authservice::config;
 namespace authservice {
 namespace config {
 
-shared_ptr<authservice::config::Config> GetConfig(
+unique_ptr<authservice::config::Config> GetConfig(
     const string &configFileName) {
   ifstream configFile(configFileName);
   if (!configFile) {
@@ -24,7 +24,7 @@ shared_ptr<authservice::config::Config> GetConfig(
   buf << configFile.rdbuf();
   configFile.close();
 
-  shared_ptr<Config> config = make_shared<Config>();
+  unique_ptr<Config> config(new Config);
   auto status = JsonStringToMessage(buf.str(), config.get());
   if (!status.ok()) {
     throw runtime_error(status.error_message());
