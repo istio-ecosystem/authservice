@@ -1,5 +1,5 @@
 approvers:
-	-BrenoDeMedeiros
-	-liminw
-	-sawlanipradeep
-	-icygalz # prow
+  - BrenoDeMedeiros
+  - liminw
+  - sawlanipradeep
+  - icygalz # prow
