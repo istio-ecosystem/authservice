@@ -1,0 +1,16 @@
+name: Master Commit
+
+on:
+  push:
+    branches: 
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: swaggoner/authservice-build-env:2019-10-24
+    steps:
+    - uses: actions/checkout@v1
+    - name: make test
+      run: make test
