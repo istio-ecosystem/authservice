@@ -8,8 +8,8 @@ services:
     volumes:
       - ./run/envoy:/etc/envoy:ro
   auth:
-    image: authservice
-    command: ["-log_level", "trace", "-address", "0.0.0.0", "-port", "10004", "-filter_config", "/etc/authservice/config.json"]
+    image: authservice:nickrmc83
+    command: ["-filter_config", "/etc/authservice/config.json"]
     ports:
       - "10004:10004"
     volumes:
