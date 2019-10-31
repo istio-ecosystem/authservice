@@ -11,7 +11,7 @@ google::rpc::Code Filter::Process(
   google::rpc::Code code;
 
   // Spawn a co-routine to run the filter.
-  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield){
+  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
     code = this->Process(request, response, ioc, yield);
   });
 

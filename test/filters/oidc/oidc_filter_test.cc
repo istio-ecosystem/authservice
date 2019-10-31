@@ -14,6 +14,7 @@ namespace api {
 namespace v2 {
 namespace core {
 
+// Used for printing header information on test failures
 void PrintTo(const ::envoy::api::v2::core::HeaderValueOption &header, ::std::ostream *os) {
   std::string json;
   google::protobuf::util::MessageToJsonString(header, &json);
@@ -41,6 +42,20 @@ using ::testing::Property;
 using ::testing::StartsWith;
 using ::testing::MatchesRegex;
 using ::testing::UnorderedElementsAre;
+
+::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::string>>> headers) {
+  std::vector<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> matchers;
+
+  for(const auto& header : headers) {
+    matchers.push_back(
+      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+        Property(&envoy::api::v2::core::HeaderValue::key, StrEq(header.first)),
+        Property(&envoy::api::v2::core::HeaderValue::value, header.second)
+      )));
+  }
+
+  return ::testing::UnorderedElementsAreArray(matchers);
+}
 
 class OidcFilterTest : public ::testing::Test {
  protected:
@@ -468,30 +483,20 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
 
   ASSERT_THAT(
     response.denied_response().headers(),
-    UnorderedElementsAre(
-      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
-        Property(&envoy::api::v2::core::HeaderValue::key, StrEq(common::http::headers::Location)),
-        Property(&envoy::api::v2::core::HeaderValue::value, StartsWith(config_.landing_page()))
-      )),
-      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
-        Property(&envoy::api::v2::core::HeaderValue::key, StrEq(common::http::headers::CacheControl)),
-        Property(&envoy::api::v2::core::HeaderValue::value, StrEq(common::http::headers::CacheControlDirectives::NoCache))
-      )),
-      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
-        Property(&envoy::api::v2::core::HeaderValue::key, StrEq(common::http::headers::Pragma)),
-        Property(&envoy::api::v2::core::HeaderValue::value, StrEq(common::http::headers::PragmaDirectives::NoCache))
-      )),
-      Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
-        Property(&envoy::api::v2::core::HeaderValue::key, StrEq(common::http::headers::SetCookie)),
-        Property(&envoy::api::v2::core::HeaderValue::value, AnyOf(
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(config_.landing_page())},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {common::http::headers::SetCookie,
+        AnyOf(
           MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
                        "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
                        "Path=/; SameSite=Lax; Secure$"),
           StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
                 "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
                 "Secure")
-        ))
-      ))
+        )
+      }}
     )
   );
 }
