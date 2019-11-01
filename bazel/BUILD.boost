@@ -40,7 +40,9 @@ genrule(
             "**/*.cpp",
             "**/*.c",
             "**/*.S",
+            "**/*.h",
             "**/*.hpp",
+            "**/*.ipp",
             "project-config.jam",
         ],
         exclude = [
@@ -98,7 +100,9 @@ genrule(
             "**/*.cpp",
             "**/*.c",
             "**/*.S",
+            "**/*.h",
             "**/*.hpp",
+            "**/*.ipp",
             "project-config.jam",
         ],
         exclude = [
@@ -155,7 +159,9 @@ genrule(
             "**/*.cpp",
             "**/*.c",
             "**/*.S",
+            "**/*.h",
             "**/*.hpp",
+            "**/*.ipp",
             "project-config.jam",
         ],
         exclude = [
@@ -211,7 +217,9 @@ genrule(
             "**/*.cpp",
             "**/*.c",
             "**/*.S",
+            "**/*.h",
             "**/*.hpp",
+            "**/*.ipp",
             "project-config.jam",
         ],
         exclude = [
