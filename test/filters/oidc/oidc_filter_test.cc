@@ -193,31 +193,28 @@ TEST_F(OidcFilterTest, NoAuthorization) {
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response.denied_response().status().code(),
             ::envoy::type::StatusCode::Found);
-  ASSERT_EQ(response.denied_response().headers().size(), 4);
 
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      std::regex re(
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {
+        common::http::headers::Location,
+        MatchesRegex(
           "^https://acme-idp\\.tld/"
           "authorization\\?client_id=example-app&nonce=[A-Za-z0-9_-]{43}&"
           "redirect_uri=https%3A%2F%2Fme\\.tld%2Fcallback&response_type=code&"
-          "scope=openid&state=[A-Za-z0-9_-]{43}$");
-      ASSERT_TRUE(std::regex_match(iter.header().value(), re));
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                "HttpOnly; Max-Age=300; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+          "scope=openid&state=[A-Za-z0-9_-]{43}$")
+      },
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+       common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+              "HttpOnly; Max-Age=300; Path=/; "
+              "SameSite=Lax; Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, InvalidCookies) {
@@ -236,28 +233,21 @@ TEST_F(OidcFilterTest, InvalidCookies) {
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response.denied_response().headers().size(), 4);
 
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(
-                    common::http::http::ToUrl(config_.authorization())),
-                0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                "HttpOnly; Max-Age=300; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+              "HttpOnly; Max-Age=300; Path=/; "
+              "SameSite=Lax; Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, InvalidIdToken) {
@@ -280,28 +270,21 @@ TEST_F(OidcFilterTest, InvalidIdToken) {
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response.denied_response().headers().size(), 4);
 
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(
-                    common::http::http::ToUrl(config_.authorization())),
-                0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                "HttpOnly; Max-Age=300; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+              "HttpOnly; Max-Age=300; Path=/; "
+              "SameSite=Lax; Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, ValidIdToken) {
@@ -321,11 +304,13 @@ TEST_F(OidcFilterTest, ValidIdToken) {
 
   auto status = filter.Process(&request, &response);
   ASSERT_EQ(status, google::rpc::Code::OK);
-  ASSERT_EQ(response.ok_response().headers().size(), 1);
-  ASSERT_STREQ(common::http::headers::Authorization,
-               response.ok_response().headers()[0].header().key().c_str());
-  ASSERT_STREQ("Bearer secret",
-               response.ok_response().headers()[0].header().value().c_str());
+
+  ASSERT_THAT(
+    response.ok_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Authorization, StrEq("Bearer secret")},
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, MissingAccessToken) {
@@ -349,28 +334,21 @@ TEST_F(OidcFilterTest, MissingAccessToken) {
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response.denied_response().headers().size(), 4);
 
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(
-                    common::http::http::ToUrl(config_.authorization())),
-                0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                "HttpOnly; Max-Age=300; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+              "HttpOnly; Max-Age=300; Path=/; "
+              "SameSite=Lax; Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, InvalidAccessToken) {
@@ -397,28 +375,21 @@ TEST_F(OidcFilterTest, InvalidAccessToken) {
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response.denied_response().headers().size(), 4);
 
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(
-                    common::http::http::ToUrl(config_.authorization())),
-                0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                "HttpOnly; Max-Age=300; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+              "HttpOnly; Max-Age=300; Path=/; "
+              "SameSite=Lax; Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
@@ -443,15 +414,14 @@ TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
 
   auto status = filter.Process(&request, &response);
   ASSERT_EQ(status, google::rpc::Code::OK);
-  ASSERT_EQ(response.ok_response().headers().size(), 2);
-  ASSERT_STREQ(common::http::headers::Authorization,
-               response.ok_response().headers()[0].header().key().c_str());
-  ASSERT_STREQ("Bearer id_secret",
-               response.ok_response().headers()[0].header().value().c_str());
-  ASSERT_STREQ("access_token",
-               response.ok_response().headers()[1].header().key().c_str());
-  ASSERT_STREQ("access_secret",
-               response.ok_response().headers()[1].header().value().c_str());
+
+  ASSERT_THAT(
+    response.ok_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Authorization, StrEq("Bearer id_secret")},
+      {"access_token", StrEq("access_secret")},
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
@@ -552,33 +522,32 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 6);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::Location) {
-      ASSERT_EQ(iter.header().value().find(config_.landing_page()), 0);
-    } else if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      std::regex id_re("^__Host-cookie-prefix-authservice-id-token-"
-                    "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                    "Path=/; SameSite=Lax; Secure$");
-      std::regex access_re("^__Host-cookie-prefix-authservice-access-token-"
-                       "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                       "Path=/; SameSite=Lax; Secure$");
-      ASSERT_TRUE(std::regex_match(iter.header().value(), id_re) || std::regex_match(iter.header().value(), access_re) ||
-                  (iter.header().value() ==
-                   "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                   "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
-                   "Secure"));
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::Location, StartsWith(config_.landing_page())},
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
+                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
+                     "Path=/; SameSite=Lax; Secure$"),
+      },
+      {
+        common::http::headers::SetCookie,
+        MatchesRegex("^__Host-cookie-prefix-authservice-access-token-"
+                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
+                     "Path=/; SameSite=Lax; Secure$")
+      },
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
+              "Secure")
+      }
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
@@ -617,26 +586,19 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      auto val = iter.header().value();
-      std::cerr << val << std::endl;
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
@@ -657,24 +619,19 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
@@ -700,24 +657,19 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
@@ -744,24 +696,19 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
@@ -781,24 +728,19 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
@@ -818,24 +760,19 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
@@ -855,24 +792,19 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
@@ -903,24 +835,19 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INTERNAL);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
@@ -954,24 +881,19 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_EQ(response.denied_response().headers().size(), 3);
-
-  for (const auto& iter : response.denied_response().headers()) {
-    if (iter.header().key() == common::http::headers::CacheControl) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::CacheControlDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::Pragma) {
-      ASSERT_EQ(iter.header().value(),
-                common::http::headers::PragmaDirectives::NoCache);
-    } else if (iter.header().key() == common::http::headers::SetCookie) {
-      ASSERT_EQ(iter.header().value(),
-                "__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; "
-                "SameSite=Lax; Secure");
-    } else {
-      FAIL();  // Unexpected header!
-    }
-  }
+  ASSERT_THAT(
+    response.denied_response().headers(),
+    ContainsHeaders({
+      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; "
+              "SameSite=Lax; Secure"),
+      },
+    })
+  );
 }
 
 }  // namespace oidc
