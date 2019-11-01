@@ -43,7 +43,10 @@ using ::testing::StartsWith;
 using ::testing::MatchesRegex;
 using ::testing::UnorderedElementsAre;
 
-::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::string>>> headers) {
+namespace {
+
+::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>>
+ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::string>>> headers) {
   std::vector<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> matchers;
 
   for(const auto& header : headers) {
@@ -57,9 +60,12 @@ using ::testing::UnorderedElementsAre;
   return ::testing::UnorderedElementsAreArray(matchers);
 }
 
+}
+
 class OidcFilterTest : public ::testing::Test {
  protected:
   authservice::config::oidc::OIDCConfig config_;
+  std::string callback_host_;
 
   void SetUp() override {
     config_.mutable_authorization()->set_scheme("https");
@@ -87,6 +93,10 @@ class OidcFilterTest : public ::testing::Test {
     config_.mutable_id_token()->set_header("authorization");
     config_.mutable_id_token()->set_preamble("Bearer");
     config_.set_timeout(300);
+
+    std::stringstream callback_host;
+    callback_host << config_.callback().hostname() << ':' << std::dec << config_.callback().port();
+    callback_host_ = callback_host.str();
   }
 };
 
@@ -466,7 +476,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme(
       "");  // Seems like it should be "https", but in practice is empty
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=valid"});
@@ -487,17 +497,19 @@ TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
       {common::http::headers::Location, StartsWith(config_.landing_page())},
       {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
       {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
-      {common::http::headers::SetCookie,
-        AnyOf(
-          MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
-                       "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                       "Path=/; SameSite=Lax; Secure$"),
-          StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
-                "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
-                "Secure")
-        )
-      }}
-    )
+      {
+        common::http::headers::SetCookie,
+        MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
+                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
+                     "Path=/; SameSite=Lax; Secure$"),
+      },
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
+              "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
+              "Secure")
+      }
+    })
   );
 }
 
@@ -524,7 +536,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme(
       "");  // Seems like it should be "https", but in practice is empty
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=valid"});
@@ -591,7 +603,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme(
       "");  // Seems like it should be "https", but in practice is empty
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=valid"});
@@ -638,7 +650,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
@@ -676,7 +688,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=invalid"});
@@ -719,7 +731,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=valid"});
@@ -761,7 +773,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "key=value&state=expectedstate"};
@@ -798,7 +810,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value"};
@@ -835,7 +847,7 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=unexpectedstate"};
@@ -877,7 +889,7 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
@@ -928,7 +940,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
-  httpRequest->set_host(config_.callback().hostname());
+  httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
