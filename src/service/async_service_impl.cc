@@ -100,7 +100,16 @@ void AsyncAuthServiceImpl::Run() {
   // Config validation should have already ensured that the number of threads is > 0
   boost::thread_group threadpool;
   for (unsigned int i = 0; i < config_->threads(); ++i) {
-    threadpool.create_thread(boost::bind(&boost::asio::io_context::run, io_context_));
+    threadpool.create_thread([this](){
+      while(true) {
+        try {
+          this->io_context_->run();
+          break;
+        } catch(std::exception & e) {
+          spdlog::error("Unexpected error in worker thread: {}", e.what());
+        }
+      }
+    });
   }
 
   spdlog::info("{}: Server listening on {}", __func__, config::GetConfiguredAddress(*config_));
