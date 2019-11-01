@@ -1,1 +1,7 @@
-exports_files(["valid-config.json", "invalid-config.json", "invalid-config-with-intermediate-nodes.json"])
+filegroup(
+    name = "fixtures",
+    srcs = glob([
+        "*.json",
+    ]),
+    visibility = ["//test:__subpackages__"],
+)
