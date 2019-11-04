@@ -125,7 +125,7 @@ class http {
    *
    * @param endpoint the endpoint to call
    * @param headers the http headers
-   *  @param body the http request body
+   * @param body the http request body
    * @return http response.
    */
   virtual response_t Post(
@@ -133,11 +133,11 @@ class http {
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body) const = 0;
 
-  /** @brief ASynchronously send a Post http message. To be used inside a Boost co-routine.
+  /** @brief Asynchronously send a Post http message. To be used inside a Boost co-routine.
    *
    * @param endpoint the endpoint to call
    * @param headers the http headers
-   *  @param body the http request body
+   * @param body the http request body
    * @return http response.
    */
   virtual response_t Post(
