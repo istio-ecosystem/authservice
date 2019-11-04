@@ -1,7 +1,3 @@
-//
-// Created by nickrmc83 on 10/29/19.
-//
-
 #ifndef AUTHSERVICE_FILTER_CHAIN_H
 #define AUTHSERVICE_FILTER_CHAIN_H
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
