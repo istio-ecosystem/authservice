@@ -15,11 +15,14 @@ RUN make bazel-bin/src/main/auth_server
 FROM debian:buster
 RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
 
-COPY --from=auth-builder /src/bazel-bin/src/main/auth_server /app/auth_server
-COPY --from=auth-builder /src/bazel-bin/external/boost/libboost_chrono.so.1.70.0 /app/
-COPY --from=auth-builder /src/bazel-bin/external/boost/libboost_context.so.1.70.0 /app/
-COPY --from=auth-builder /src/bazel-bin/external/boost/libboost_coroutine.so.1.70.0 /app/
-COPY --from=auth-builder /src/bazel-bin/external/boost/libboost_thread.so.1.70.0 /app/
+COPY --from=auth-builder \
+     /src/bazel-bin/src/main/auth_server \
+     /src/bazel-bin/external/boost/libboost_chrono.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_context.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_coroutine.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_thread.so.1.70.0 \
+     /app/
+
 ENV LD_LIBRARY_PATH=.
 RUN chgrp auth-server-grp /app/* && chown auth-server-usr /app/* && chmod u+x /app/*
 
