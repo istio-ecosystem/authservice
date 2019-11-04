@@ -1,0 +1,7 @@
+# Ignore files that aren't needed inside Docker to build
+.*
+bazel-*
+bookinfo-example
+build_release
+run
+

@@ -1,0 +1,3 @@
+# Ignore files that aren't needed inside Docker to build
+Dockerfile.*
+
