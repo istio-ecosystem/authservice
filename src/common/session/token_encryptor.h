@@ -4,6 +4,7 @@
 #include <string>
 #include "absl/types/optional.h"
 #include "src/common/session/hkdf_deriver.h"
+#include "absl/strings/string_view.h"
 
 namespace authservice {
 namespace common {
@@ -28,7 +29,7 @@ class TokenEncryptor {
    * @param nonce the nonce to use during encryption
    * @return base64 string representing the encrypted/authenticated data
    */
-  virtual std::string Encrypt(const std::string& token) = 0;
+  virtual std::string Encrypt(const absl::string_view token) = 0;
 
   /**
    * Decrypt the given token.

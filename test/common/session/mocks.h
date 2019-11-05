@@ -8,7 +8,7 @@ namespace common {
 namespace session {
 class TokenEncryptorMock final : public TokenEncryptor {
  public:
-  MOCK_METHOD1(Encrypt, std::string(const std::string& token));
+  MOCK_METHOD1(Encrypt, std::string(const absl::string_view token));
   MOCK_METHOD1(Decrypt,
                absl::optional<std::string>(const std::string& ciphertext));
 };

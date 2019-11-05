@@ -472,7 +472,7 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
   );
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
   google::jwt_verify::Jwt jwt = {};
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();

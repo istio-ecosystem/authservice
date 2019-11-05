@@ -17,7 +17,7 @@ class TokenEncryptorImpl : public TokenEncryptor {
   TokenEncryptorImpl(const std::string& secret, EncryptionAlg enc_alg,
                      HKDFHash hash_alg);
 
-  std::string Encrypt(const std::string& token) override;
+  std::string Encrypt(const absl::string_view token) override;
   absl::optional<std::string> Decrypt(const std::string& ciphertext) override;
 
  private:
@@ -28,7 +28,7 @@ class TokenEncryptorImpl : public TokenEncryptor {
   size_t KeySize() const;
 
   std::vector<unsigned char> EncryptInternal(
-      const std::string& token, const std::vector<unsigned char>& key) const;
+      const absl::string_view token, const std::vector<unsigned char>& key) const;
 };
 
 TokenEncryptorImpl::TokenEncryptorImpl(const std::string& secret,
@@ -52,7 +52,7 @@ size_t TokenEncryptorImpl::KeySize() const {
 }
 
 std::vector<unsigned char> TokenEncryptorImpl::EncryptInternal(
-    const std::string& token, const std::vector<unsigned char>& key) const {
+    const absl::string_view token, const std::vector<unsigned char>& key) const {
   switch (enc_alg_) {
     case EncryptionAlg::AES128GCM:
     case EncryptionAlg::AES256GCM: {
@@ -68,7 +68,7 @@ std::vector<unsigned char> TokenEncryptorImpl::EncryptInternal(
   }
 }
 
-std::string TokenEncryptorImpl::Encrypt(const std::string& token) {
+std::string TokenEncryptorImpl::Encrypt(const absl::string_view token) {
   auto nonce = generator_.Generate(NONCE_SIZE);
   std::vector<unsigned char> nonce_vec(nonce.Begin(), nonce.End());
   auto derivedKey = deriver_->Derive(KeySize(), nonce_vec);

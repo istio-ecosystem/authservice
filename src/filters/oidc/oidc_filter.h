@@ -69,6 +69,17 @@ class OidcFilter final : public filters::Filter {
   void SetCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
                  const std::string &cookie_name, absl::string_view value, int64_t timeout);
 
+  /** @brief Set cookie.
+   *
+   * @param responseHeaders The headers to add to.
+   * @param cookie_name The key name of the cookie to be set.
+   * @param value_to_be_encrypted The value of the cookie, which will be encrypted in the cookie.
+   * @param timeout The lifetime in seconds the cookie is valid for before browsers should not honor this cookie.
+   */
+  void SetEncryptedCookie(
+      ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+      const std::string &cookie_name, absl::string_view value_to_be_encrypted, int64_t timeout);
+
   /** @brief Extract the requested cookie from the given headers
    *
    * @param headers the headers to extract the cookies from

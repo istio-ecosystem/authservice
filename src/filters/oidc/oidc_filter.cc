@@ -113,6 +113,15 @@ void OidcFilter::SetCookie(
   SetHeader(responseHeaders, common::http::headers::SetCookie, cookie_header);
 }
 
+void OidcFilter::SetEncryptedCookie(
+    ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+    const std::string &cookie_name,
+    absl::string_view value_to_be_encrypted,
+    int64_t timeout
+) {
+  SetCookie(responseHeaders, cookie_name, cryptor_->Encrypt(value_to_be_encrypted), timeout);
+}
+
 void OidcFilter::DeleteCookie(
     ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
     const std::string &cookieName
@@ -180,10 +189,8 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
   // Create a secure state cookie that contains the state and nonce.
   StateCookieCodec codec;
-  auto state_token = codec.Encode(state, nonce);
-  auto encrypted_state_token = cryptor_->Encrypt(state_token);
-  SetCookie(response->mutable_denied_response()->mutable_headers(), GetStateCookieName(),
-            encrypted_state_token, idp_config_.timeout());
+  SetEncryptedCookie(response->mutable_denied_response()->mutable_headers(), GetStateCookieName(),
+                     codec.Encode(state, nonce), idp_config_.timeout());
   return google::rpc::Code::UNAUTHENTICATED;
 }
 
@@ -408,10 +415,10 @@ google::rpc::Code OidcFilter::RetrieveToken(
                              "Missing expected access_token");
         return google::rpc::Code::INVALID_ARGUMENT;
       }
-      SetCookie(responseHeaders, GetAccessTokenCookieName(), cryptor_->Encrypt(*access_token), timeout);
+      SetEncryptedCookie(responseHeaders, GetAccessTokenCookieName(), access_token.value(), timeout);
     }
     SetRedirectHeaders(idp_config_.landing_page(), response);
-    SetCookie(responseHeaders, GetIdTokenCookieName(), cryptor_->Encrypt(token->IDToken().jwt_), timeout);
+    SetEncryptedCookie(responseHeaders, GetIdTokenCookieName(), token->IDToken().jwt_, timeout);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 }
