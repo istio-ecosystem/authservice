@@ -1,14 +1,12 @@
 #include "oidc_filter.h"
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
-#include "absl/time/time.h"
 #include "external/com_google_googleapis/google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
 #include "src/common/utilities/random.h"
 #include "state_cookie_codec.h"
-#include "absl/time/clock.h"
 #include <limits>
 #include <algorithm>
 
@@ -104,18 +102,27 @@ std::string OidcFilter::EncodeHeaderValue(const std::string &preamble,
 }
 
 void OidcFilter::SetStateCookie(
-    ::google::protobuf::RepeatedPtrField<
-        ::envoy::api::v2::core::HeaderValueOption> *headers,
-    absl::string_view value, int64_t timeout) {
-  auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
-  std::set<absl::string_view> token_set_cookie_header_directives =
-      {common::http::headers::SetCookieDirectives::HttpOnly,
-       common::http::headers::SetCookieDirectives::SameSiteLax,
-       common::http::headers::SetCookieDirectives::Secure, "Path=/",
-       timeout_directive};
+    ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *headers,
+    absl::string_view value,
+    int64_t timeout) {
+  std::set<std::string> cookie_directives = GetCookieDirectives(timeout);
+  std::set<absl::string_view> cookie_directives_string_view(cookie_directives.begin(), cookie_directives.end());
   auto state_cookie_header = common::http::http::EncodeSetCookie(
-      GetStateCookieName(), value, token_set_cookie_header_directives);
+      GetStateCookieName(), value, cookie_directives_string_view);
   SetHeader(headers, common::http::headers::SetCookie, state_cookie_header);
+}
+
+std::set<std::string> OidcFilter::GetCookieDirectives(int64_t timeout) {
+  std::string timeoutDirective = EncodeCookieTimeoutDirective(timeout);
+  std::set<std::string> token_set_cookie_header_directives =
+      {
+          common::http::headers::SetCookieDirectives::HttpOnly,
+          common::http::headers::SetCookieDirectives::SameSiteLax,
+          common::http::headers::SetCookieDirectives::Secure,
+          "Path=/",
+          timeoutDirective
+      };
+  return token_set_cookie_header_directives;
 }
 
 absl::optional<std::string> OidcFilter::CookieFromHeaders(
@@ -210,42 +217,16 @@ google::rpc::Code OidcFilter::Process(
 
   // Check if we have a valid id_token cookie and optionally an access token
   // cookie, If not go through authentication redirection dance.
-  auto id_token_cookie = CookieFromHeaders(headers, GetIdTokenCookieName());
-  if (id_token_cookie.has_value()) {
-    auto id_token = cryptor_->Decrypt(*id_token_cookie);
-    if (id_token.has_value()) {
-      auto value = EncodeHeaderValue(idp_config_.id_token().preamble(),
-                                     id_token.value());
-      // We have a valid token. Append to headers and let processing continue.
-      SetHeader(response->mutable_ok_response()->mutable_headers(),
-                idp_config_.id_token().header(), value);
-      // If it exists, extract the access token cookie and forward
-      if (idp_config_.has_access_token()) {
-        auto access_token_cookie =
-            CookieFromHeaders(headers, GetAccessTokenCookieName());
-        if (access_token_cookie.has_value()) {
-          auto access_token = cryptor_->Decrypt(*access_token_cookie);
-          if (access_token.has_value()) {
-            auto value = EncodeHeaderValue(
-                idp_config_.access_token().preamble(), access_token.value());
-            // We have a valid token. Append to headers and let processing
-            // continue.
-            SetHeader(response->mutable_ok_response()->mutable_headers(),
-                      idp_config_.access_token().header(), value);
-            return google::rpc::Code::OK;
-          } else {
-            spdlog::info("{}: access token cookie decryption failed", __func__);
-          }
-        } else {
-          spdlog::info("{}: access token cookie missing", __func__);
-        }
-      } else {
-        return google::rpc::Code::OK;
-      }
-    } else {
-      spdlog::info("{}: id token cookie decryption failed", __func__);
+  auto id_token = GetTokenFromCookie(headers, GetIdTokenCookieName());
+  auto access_token = GetTokenFromCookie(headers, GetAccessTokenCookieName());
+  if (id_token.has_value() && (!idp_config_.has_access_token() || access_token.has_value())) {
+    SetIdTokenHeader(response, id_token.value());
+    if (access_token.has_value()) {
+      SetAccessTokenHeader(response, access_token.value());
     }
+    return google::rpc::Code::OK;
   }
+
   // Set standard headers
   SetStandardResponseHeaders(response);
   spdlog::trace("{}: checking handler for {}://{}-{}", __func__,
@@ -261,6 +242,35 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, path_parts[1]);
   }
   return RedirectToIdP(response);
+}
+
+absl::optional<std::string> OidcFilter::GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
+    ::std::string> &headers, const std::string &cookie_name) {
+  auto token_cookie = CookieFromHeaders(headers, cookie_name);
+  if (token_cookie.has_value()) {
+    auto token = cryptor_->Decrypt(*token_cookie);
+    if (!token.has_value()) {
+      spdlog::info("{}: {} token cookie decryption failed", __func__, cookie_name);
+      return absl::nullopt;
+    } else {
+      return token.value();
+    }
+  } else {
+    spdlog::info("{}: {} token cookie missing", __func__, cookie_name);
+    return absl::nullopt;
+  }
+}
+
+void OidcFilter::SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
+    const std::string &access_token) {
+  auto value = EncodeHeaderValue(idp_config_.access_token().preamble(), access_token);
+  SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.access_token().header(), value);
+}
+
+void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
+    const std::string& id_token) {
+  auto value = EncodeHeaderValue(idp_config_.id_token().preamble(), id_token);
+  SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
 }
 
 // Performs an HTTP POST and prints the response
@@ -366,12 +376,9 @@ google::rpc::Code OidcFilter::RetrieveToken(
     }
     auto expiry = token->Expiry();
     auto timeout = expiry.has_value() ? *expiry : std::numeric_limits<int64_t>::max();
-    auto timeout_directive = EncodeCookieTimeoutDirective(timeout);
-    std::set<absl::string_view> token_set_cookie_header_directives = {
-        common::http::headers::SetCookieDirectives::HttpOnly,
-        common::http::headers::SetCookieDirectives::SameSiteLax,
-        common::http::headers::SetCookieDirectives::Secure, "Path=/",
-        timeout_directive};
+    std::set<std::string> cookie_directives = GetCookieDirectives(timeout);
+    std::set<absl::string_view> cookie_directives_string_view(cookie_directives.begin(), cookie_directives.end());
+
     // Check whether access_token forwarding is configured and if it is we have
     // an access token in our token response.
     if (idp_config_.has_access_token()) {
@@ -384,16 +391,14 @@ google::rpc::Code OidcFilter::RetrieveToken(
       }
       auto cookie_value = cryptor_->Encrypt(*access_token);
       auto token_set_cookie_header = common::http::http::EncodeSetCookie(
-          GetAccessTokenCookieName(), cookie_value,
-          token_set_cookie_header_directives);
+          GetAccessTokenCookieName(), cookie_value, cookie_directives_string_view);
       SetHeader(response->mutable_denied_response()->mutable_headers(),
                 common::http::headers::SetCookie, token_set_cookie_header);
     }
     SetRedirectHeaders(idp_config_.landing_page(), response);
     auto cookie_value = cryptor_->Encrypt(token->IDToken().jwt_);
     auto token_set_cookie_header = common::http::http::EncodeSetCookie(
-        GetIdTokenCookieName(), cookie_value,
-        token_set_cookie_header_directives);
+        GetIdTokenCookieName(), cookie_value, cookie_directives_string_view);
     SetHeader(response->mutable_denied_response()->mutable_headers(),
               common::http::headers::SetCookie, token_set_cookie_header);
     return google::rpc::Code::UNAUTHENTICATED;

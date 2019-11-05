@@ -31,7 +31,7 @@ provider will be needed to configure `authservice`.
 
 #### Configuring and Integrating `authservice` with `bookinfo`
 
-1. Setup a `ConfigMap` for `authservice`. Fill in [`config/authservice-configmap-template.yaml`](config/authservice-configmap-template.yaml) 
+1. Setup a `ConfigMap` for `authservice`. Fill in [`config/authservice-configmap-template.yaml`](config/authservice-configmap-template.yaml)
 to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md)
 for the description of each field. Once the values have been substituted, apply the ConfigMap.
    

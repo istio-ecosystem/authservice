@@ -27,7 +27,7 @@ class OidcFilter final : public filters::Filter {
 
   /**
    * Set HTTP header helper in a response.
-   * @param response the response to add the header to
+   * @param headers the response headers in which to add the header
    * @param name the name of the header
    * @param value the header value
    */
@@ -109,7 +109,41 @@ class OidcFilter final : public filters::Filter {
   std::string EncodeHeaderValue(const std::string &premable,
                                 const std::string &value);
 
- public:
+  /**
+   * @brief Given an ID token, put it in a request header for the application to consume
+   *
+   * @param response the outgoing response
+   * @param id_token the ID token
+   */
+  void SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *response, const std::string &id_token);
+
+  /**
+   * @brief Given an access token, put it in a request header for the application to consume
+   *
+   * @param response the outgoing response
+   * @param access_token the access token
+   */
+  void SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response, const std::string &access_token);
+
+  /**
+   * @brief Retrieve and decrypt the token from the specified cookie
+   *
+   * @param headers The request headers to read the cookie from
+   * @param cookie_name The name of the cookie to read the token from
+   * @return
+   */
+  absl::optional<std::string> GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
+      ::std::string> &headers, const std::string &cookie_name);
+
+  /**
+   * @brief Get the directives that should be used when setting a cookie
+   *
+   * @param timeout The value of the Max-Age for the cookie
+   * @return The set of directives as strings, e.g. a set of strings like "Max-Age=42"
+   */
+  std::set<std::string> GetCookieDirectives(int64_t timeout);
+
+public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
              TokenResponseParserPtr parser,
@@ -128,6 +162,7 @@ class OidcFilter final : public filters::Filter {
 
   /** @brief Get access token cookie name. */
   std::string GetAccessTokenCookieName() const;
+
 };
 
 }  // namespace oidc

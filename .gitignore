@@ -2,3 +2,4 @@
 .clwb
 /bazel-*
 /build-release
+.DS_Store
