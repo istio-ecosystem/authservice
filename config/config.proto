@@ -22,6 +22,7 @@ message Match {
 message Filter {
     oneof type {
         option (validate.required) = true;
+        // oidc the OpenID Connect filter configuration.
         oidc.OIDCConfig oidc = 1;
     }
 }
@@ -30,8 +31,9 @@ message Filter {
 message FilterChain {
     // name is a user-defined identifier for the processing chain used in logging messages.
     string name = 1 [(validate.rules).string.min_len = 1];
-    // match describes a rule to determine whether an HTTP request should be processed.
-    Match match = 2 [(validate.rules).message.required = true];
+    // match describes a rule to determine whether an HTTP request should be processed by the filter chain. If not defined
+    // the FilterChain will always be selected to process a request.
+    Match match = 2;
     // filter describes the configuration of one of more filters in the filter chain.
     repeated Filter filters = 3 [(validate.rules).repeated.min_items = 1];
 }

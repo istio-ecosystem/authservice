@@ -15,18 +15,21 @@ namespace filters {
 
     bool FilterChainImpl::Matches(const ::envoy::service::auth::v2::CheckRequest* request) const {
       spdlog::trace("{}", __func__);
-      auto matched = request->attributes().request().http().headers().find(config_.match().header());
-      if (matched != request->attributes().request().http().headers().cend()) {
-        switch (config_.match().criteria_case()) {
-          case authservice::config::Match::kPrefix:
-            return absl::StartsWith(matched->second, config_.match().prefix());
-          case authservice::config::Match::kEquality:
-            return matched->second == config_.match().equality();
-          default:
-            throw std::runtime_error("invalid FilterChain match type"); // This should never happen.
+      if (config_.has_match()) {
+        auto matched = request->attributes().request().http().headers().find(config_.match().header());
+        if (matched != request->attributes().request().http().headers().cend()) {
+          switch (config_.match().criteria_case()) {
+            case authservice::config::Match::kPrefix:
+              return absl::StartsWith(matched->second, config_.match().prefix());
+            case authservice::config::Match::kEquality:
+              return matched->second == config_.match().equality();
+            default:
+              throw std::runtime_error("invalid FilterChain match type"); // This should never happen.
+          }
         }
+        return false;
       }
-      return false;
+      return true;
     }
 
     std::unique_ptr<Filter> FilterChainImpl::New() {

@@ -12,6 +12,13 @@ TEST(FilterChainTest, Name) {
       ASSERT_EQ(chain1.Name(), "expected");
 }
 
+    TEST(FilterChainTest, MatchesWithoutMatchField) {
+      auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+      ::envoy::service::auth::v2::CheckRequest request1;
+      FilterChainImpl chain1(*configuration);
+      ASSERT_TRUE(chain1.Matches(&request1));
+    }
+
 TEST(FilterChainTest, MatchesPrefix) {
     auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
     configuration->mutable_match()->set_header("x-prefix-header");

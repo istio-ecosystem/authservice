@@ -6,30 +6,53 @@ import "config/common/config.proto";
 import "validate/validate.proto";
 
 // TokenConfig defines how an access token obtained through an OIDC flow is forwarded to downstream services as
-// well as the cookie name it is included in when returned to a browser
+// well as the cookie name it is included in when returned to a browser.
+//
+//  # Forward as a standard Authorization Bearer token.
+//  header: Authorization
+//  premable: Bearer
 message TokenConfig {
-    // the name of the http header in which to insert a token when forwarding to internal mesh services.
+    // the name of the http header in which to insert a token when forwarding to internal mesh services. For example `Authorization`.
     string header = 1 [(validate.rules).string.min_len = 1];
     // any preamble to include in the header when forwarding a token. For example "Bearer"
     string preamble = 2;
 }
 
+// OIDCConfig defines the configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
+// via the standard Code Grant flow from an IdP. Retrieved tokens are encrypted and placed in cookies for use in identifying
+// callers in subsequent requests.
 message OIDCConfig {
+    // the IdP's authorization endpoint.
     common.Endpoint authorization = 1 [(validate.rules).message.required = true];
+    // the IdP's token endpoint.
     common.Endpoint token = 2 [(validate.rules).message.required = true];
+    // the IdP's JWKS configuration.
     oneof jwks_config {
         option (validate.required) = true;
         common.Endpoint jwks_uri = 3;
         string jwks = 4;
     }
+    // this value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request.
+    // You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider. See OIDC spec.
+    // You must also prepare your Istio VirtualService to ensure that this URL will get routed to product page.
     common.Endpoint callback = 5 [(validate.rules).message.required = true];
+    // the OIDC client ID assigned to the filter.
     string client_id = 6 [(validate.rules).string.min_len = 1];
+    // the OIDC client secret assigned to the filter.
     string client_secret = 7 [(validate.rules).string.min_len = 1];
+    // optional additional scopes passed to the IdP during authenticating a user. The `openid` scope is always sent to the
+    // IdP so does not need to be specified.
     repeated string scopes = 8;
+    // the URL a browser is redirected to after successful authentication and token acquisition.
     string landing_page = 9 [(validate.rules).string.min_len = 1]; // TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++.
+    // a secret used to derive cryptographic material for protecting cookies and other data.
     string cryptor_secret = 10 [(validate.rules).string.min_len = 1];
+    // a unique identifier of the authservice's browser cookies. Can be any string.
+    // Only needed when multiple apps in the same domain are each protected by their own authservice, to avoid cookie name conflicts.
     string cookie_name_prefix = 11;
+    // the configuration for forwarding `id_token`s to the mesh.
     TokenConfig id_token = 12 [(validate.rules).message.required = true];
+    // the optional configuration for forwarding `access_token`s to the mesh.
     TokenConfig access_token = 13;
     // the timeout in seconds for performing an authentication with an IdP.
     uint32 timeout = 14 [(validate.rules).uint32.gte = 30];
