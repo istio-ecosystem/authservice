@@ -152,7 +152,9 @@ void AsyncAuthServiceImpl::Run() {
   try {
     void *tag;
     bool ok;
-    while (cq_->Next(&tag, &ok)) {}
+    while (cq_->Next(&tag, &ok)) {
+      delete static_cast<ServiceState *>(tag);
+    }
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
   }
