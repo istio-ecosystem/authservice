@@ -59,16 +59,15 @@ class OidcFilter final : public filters::Filter {
    */
   static std::string EncodeCookieTimeoutDirective(int64_t timeout);
 
-  /** @brief Set state cookie.
+  /** @brief Set cookie.
    *
-   * @param headers The headers to add to.
-   * @param value The value of the state cookie.
-   * @param timeout The number of second the cookie is valid for
+   * @param responseHeaders The headers to add to.
+   * @param cookie_name The key name of the cookie to be set.
+   * @param value The value of the cookie.
+   * @param timeout The lifetime in seconds the cookie is valid for before browsers should not honor this cookie.
    */
-  void SetStateCookie(
-      ::google::protobuf::RepeatedPtrField<
-          ::envoy::api::v2::core::HeaderValueOption> *headers,
-      absl::string_view value, int64_t timeout);
+  void SetCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+                 const std::string &cookie_name, absl::string_view value, int64_t timeout);
 
   /** @brief Extract the requested cookie from the given headers
    *
@@ -163,6 +162,8 @@ public:
   /** @brief Get access token cookie name. */
   std::string GetAccessTokenCookieName() const;
 
+  void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+                    const std::string &cookieName);
 };
 
 }  // namespace oidc

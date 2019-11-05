@@ -32,6 +32,9 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.callback().path(), "/path4");
   ASSERT_EQ(oidc.callback().port(), 443);
 
+  ASSERT_EQ(oidc.logout().path(), "/logout");
+  ASSERT_EQ(oidc.logout().redirect_to_uri(), "https://logout-redirect");
+
   ASSERT_EQ(oidc.client_id(), "foo");
   ASSERT_EQ(oidc.client_secret(), "bar");
 

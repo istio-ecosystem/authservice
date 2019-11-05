@@ -13,6 +13,37 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
+using ::testing::_;
+using ::testing::Eq;
+using ::testing::StrEq;
+using ::testing::AnyOf;
+using ::testing::AllOf;
+using ::testing::Return;
+using ::testing::ByMove;
+using ::testing::Property;
+using ::testing::StartsWith;
+using ::testing::MatchesRegex;
+using ::testing::UnorderedElementsAre;
+
+namespace {
+
+::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>>
+ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::string>>> headers) {
+  std::vector<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> matchers;
+
+  for(const auto& header : headers) {
+    matchers.push_back(
+        Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
+            Property(&envoy::api::v2::core::HeaderValue::key, StrEq(header.first)),
+            Property(&envoy::api::v2::core::HeaderValue::value, header.second)
+        )));
+  }
+
+  return ::testing::UnorderedElementsAreArray(matchers);
+}
+
+}
+
 class OidcFilterTest : public ::testing::Test {
  protected:
   authservice::config::oidc::OIDCConfig config_;
@@ -398,6 +429,47 @@ TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
                response.ok_response().headers()[1].header().key().c_str());
   ASSERT_STREQ("access_secret",
                response.ok_response().headers()[1].header().value().c_str());
+}
+
+TEST_F(OidcFilterTest, LogoutWithCookies) {
+  config_.mutable_logout()->set_path("/logout");
+  config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
+  auto parser_mock = std::make_shared<TokenResponseParserMock>();
+  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest =
+      request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-id-token-cookie=identity; "
+       "__Host-cookie-prefix-authservice-access-token-cookie=access; "
+       "__Host-cookie-prefix-authservice-state-cookie=state"
+      });
+  httpRequest->set_path("/logout");
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response.denied_response().status().code(),
+            ::envoy::type::StatusCode::Found);
+
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+        {common::http::headers::Location, StrEq("https://redirect-uri")},
+        {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+        {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+        {common::http::headers::SetCookie, StrEq(
+            "__Host-cookie-prefix-authservice-id-token-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
+        {common::http::headers::SetCookie, StrEq(
+            "__Host-cookie-prefix-authservice-access-token-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
+        {common::http::headers::SetCookie, StrEq(
+            "__Host-cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")}
+    })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenWithOutAccessToken) {

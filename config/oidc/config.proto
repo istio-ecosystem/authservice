@@ -14,6 +14,11 @@ message TokenConfig {
     string preamble = 2;
 }
 
+message LogoutConfig {
+    string path = 1 [(validate.rules).string.min_len = 1];
+    string redirect_to_uri = 2 [(validate.rules).string.min_len = 1];
+}
+
 message OIDCConfig {
     common.Endpoint authorization = 1 [(validate.rules).message.required = true];
     common.Endpoint token = 2 [(validate.rules).message.required = true];
@@ -33,4 +38,5 @@ message OIDCConfig {
     TokenConfig access_token = 13;
     // the timeout in seconds for performing an authentication with an IdP.
     uint32 timeout = 14 [(validate.rules).uint32.gte = 30];
+    LogoutConfig logout = 15;
 }
