@@ -22,26 +22,26 @@ message TokenConfig {
 // via the standard Code Grant flow from an IdP. Retrieved tokens are encrypted and placed in cookies for use in identifying
 // callers in subsequent requests.
 message OIDCConfig {
-    // the IdP's authorization endpoint.
+    // the IdP's authorization endpoint. See https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
     common.Endpoint authorization = 1 [(validate.rules).message.required = true];
-    // the IdP's token endpoint.
+    // the IdP's token endpoint. See https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint
     common.Endpoint token = 2 [(validate.rules).message.required = true];
-    // the IdP's JWKS configuration.
+    // the IdP's JWKS configuration used during `id_token` verification.
     oneof jwks_config {
         option (validate.required) = true;
         common.Endpoint jwks_uri = 3;
         string jwks = 4;
     }
-    // this value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request.
-    // You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider. See OIDC spec.
+    // this value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request as defined in https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
+    // You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider.
     // You must also prepare your Istio VirtualService to ensure that this URL will get routed to product page.
     common.Endpoint callback = 5 [(validate.rules).message.required = true];
-    // the OIDC client ID assigned to the filter.
+    // the OIDC client ID assigned to the filter. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
     string client_id = 6 [(validate.rules).string.min_len = 1];
-    // the OIDC client secret assigned to the filter.
+    // the OIDC client secret assigned to the filter. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
     string client_secret = 7 [(validate.rules).string.min_len = 1];
     // optional additional scopes passed to the IdP during authenticating a user. The `openid` scope is always sent to the
-    // IdP so does not need to be specified.
+    // IdP so does not need to be specified. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
     repeated string scopes = 8;
     // the URL a browser is redirected to after successful authentication and token acquisition.
     string landing_page = 9 [(validate.rules).string.min_len = 1]; // TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++.
