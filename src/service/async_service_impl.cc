@@ -40,6 +40,8 @@ public:
 
   void Proceed() override {
     // Spawn a new instance to serve new clients while we process this one
+    // This will later be pulled off the queue for processing and ultimately deleted in the destructor
+    // of CompleteState
     new ProcessingState(config_, service_, cq_, io_context_);
 
     spdlog::trace("Launching request processor worker");
@@ -115,21 +117,23 @@ void AsyncAuthServiceImpl::Run() {
   spdlog::info("{}: Server listening on {}", __func__, config::GetConfiguredAddress(*config_));
 
   try {
-    // Spawn a new state instance to serve new clients.
+    // Spawn a new state instance to serve new clients
+    // This will later be pulled off the queue for processing and ultimately deleted in the destructor
+    // of CompleteState
     new ProcessingState(config_, service_, *cq_, *io_context_);
 
     void *tag;
     bool ok;
-    while (true) {
+    while (cq_->Next(&tag, &ok)) {
       // Block waiting to read the next event from the completion queue. The
       // event is uniquely identified by its tag, which in this case is the
       // memory address of a CallData instance.
       // The return value of Next should always be checked. This return value
       // tells us whether there is any kind of event or cq_ is shutting down.
-      if (!cq_->Next(&tag, &ok)) {
+      if(!ok) {
+        spdlog::error("{}: Unexpected error: !ok", __func__);
         break;
       }
-      GPR_ASSERT(ok);
 
       static_cast<ServiceState *>(tag)->Proceed();
     }
@@ -143,18 +147,12 @@ void AsyncAuthServiceImpl::Run() {
   server_->Shutdown();
   cq_->Shutdown();
 
-  // Continue calling Next to process any outstanding events.
+  // The destructor of the completion queue will abort if there are any outstanding events, so we
+  // must drain the queue before we allow that to happen
   try {
     void *tag;
     bool ok;
-    while (true) {
-      if (!cq_->Next(&tag, &ok)) {
-        break;
-      }
-      GPR_ASSERT(ok);
-
-      static_cast<ServiceState *>(tag)->Proceed();
-    }
+    while (cq_->Next(&tag, &ok)) {}
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
   }
