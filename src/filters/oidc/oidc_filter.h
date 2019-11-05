@@ -135,6 +135,14 @@ class OidcFilter final : public filters::Filter {
   absl::optional<std::string> GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
       ::std::string> &headers, const std::string &cookie_name);
 
+  /**
+   * @brief Get the directives that should be used when setting a cookie
+   *
+   * @param timeout The value of the Max-Age for the cookie
+   * @return The set of directives as strings, e.g. a set of strings like "Max-Age=42"
+   */
+  std::set<std::string> GetCookieDirectives(int64_t timeout);
+
 public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
@@ -154,6 +162,7 @@ public:
 
   /** @brief Get access token cookie name. */
   std::string GetAccessTokenCookieName() const;
+
 };
 
 }  // namespace oidc
