@@ -47,7 +47,8 @@ data:
             "id_token": {
               "preamble": "Bearer",
               "header": "Authorization"
-            }
+            },
+            "timeout": 300
           }
         }
       ]
