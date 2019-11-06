@@ -1,4 +1,4 @@
-# authservice
+# authservice [![Actions Status](https://github.com/istio-ecosystem/authservice/workflows/Master%20Commit/badge.svg)](https://github.com/istio-ecosystem/authservice/actions)
 An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
 focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
 
