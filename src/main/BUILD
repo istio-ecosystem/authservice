@@ -6,6 +6,7 @@ xx_binary(
     name = "auth-server",
     srcs = ["auth-server.cc"],
     deps = [
+        "//src/config",
         "//src/service:serviceimpl",
         "@com_github_abseil-cpp//absl/flags:parse",
         "@com_github_gabime_spdlog//:spdlog",

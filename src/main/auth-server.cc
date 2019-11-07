@@ -22,7 +22,7 @@ namespace authservice {
 namespace service {
 
 spdlog::level::level_enum GetConfiguredLogLevel(
-    const std::shared_ptr<authservice::config::Config>& config) {
+    const config::Config *config) {
   auto log_level_string = config->log_level();
   spdlog::level::level_enum level;
 
@@ -48,7 +48,7 @@ spdlog::level::level_enum GetConfiguredLogLevel(
 }
 
 std::string GetConfiguredAddress(
-    const std::shared_ptr<authservice::config::Config>& config) {
+    const config::Config *config) {
   std::stringstream address_string_builder;
 
   address_string_builder << config->listen_address() << ":" << std::dec
@@ -57,7 +57,7 @@ std::string GetConfiguredAddress(
   return address;
 }
 
-void RunServer(const std::shared_ptr<authservice::config::Config>& config) {
+void RunServer(const config::Config *config) {
   auto address = GetConfiguredAddress(config);
   AuthServiceImpl auth_service(config);
   ServerBuilder builder;
@@ -85,8 +85,8 @@ int main(int argc, char** argv) {
     auto config =
         authservice::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
     console->set_level(
-        authservice::service::GetConfiguredLogLevel(config));
-    authservice::service::RunServer(config);
+        authservice::service::GetConfiguredLogLevel(config.get()));
+    authservice::service::RunServer(config.get());
   } catch (const std::exception& e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;
