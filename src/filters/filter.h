@@ -3,6 +3,8 @@
 #include "absl/strings/string_view.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "google/rpc/code.pb.h"
+#include <boost/asio/spawn.hpp>
+#include <boost/asio.hpp>
 
 using namespace envoy::service::auth::v2;
 
@@ -31,14 +33,36 @@ class Filter {
    * processing errors causing an immediate halt
    * to processing which is in turn relayed to the caller.
    *
+   * This must be run inside a Boost co-routine passing in the appropriate
+   * yield_context so requests can be processed asynchronously
+   *
+   * @param request the request process.
+   * @param response the response to augment.
+   * @param ioc The I/O context on which the filter should be executed.
+   * @param yield The yield context used to yield processing to other co-routines.
+   * @return the status of the processing. One of [OK, UNAUTHENTICATED,
+   * PERMISSION_DENIED] for indicating successful processing.
+   */
+  virtual google::rpc::Code Process(
+          const ::envoy::service::auth::v2::CheckRequest* request,
+          ::envoy::service::auth::v2::CheckResponse* response,
+          boost::asio::io_context& ioc,
+          boost::asio::yield_context yield) = 0;
+
+  /** @brief Process a request synchronously.
+   *
+   * Creates a new Boost io_context then calls the asynchronous version of this
+   * function inside a co-routine on this context.
+   * Mainly intended for use in tests.
+   *
    * @param request the request process.
    * @param response the response to augment.
    * @return the status of the processing. One of [OK, UNAUTHENTICATED,
    * PERMISSION_DENIED] for indicating successful processing.
    */
   virtual google::rpc::Code Process(
-      const ::envoy::service::auth::v2::CheckRequest* request,
-      ::envoy::service::auth::v2::CheckResponse* response) = 0;
+          const ::envoy::service::auth::v2::CheckRequest* request,
+          ::envoy::service::auth::v2::CheckResponse* response);
 
   /** @brief Name the well-known name of the filter.
    *

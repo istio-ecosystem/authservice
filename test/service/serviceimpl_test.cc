@@ -1,14 +1,14 @@
-#include "src/service/serviceimpl.h"
+#include "src/service/service_impl.h"
+#include "src/config/get_config.h"
 #include "gtest/gtest.h"
-#include "src/config/getconfig.h"
 
 namespace authservice {
 namespace service {
 TEST(ServiceImplTest, CheckUnmatchedRequest) {
-  auto config = config::GetConfig("test/fixtures/valid-config.json");
-  AuthServiceImpl service(config.get());
-  ::envoy::service::auth::v2::CheckResponse response;
+  AuthServiceImpl service(
+          *config::GetConfig("test/fixtures/valid-config.json"));
 
+  ::envoy::service::auth::v2::CheckResponse response;
   ::envoy::service::auth::v2::CheckRequest request;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(
@@ -24,10 +24,10 @@ TEST(ServiceImplTest, CheckUnmatchedRequest) {
 }
 
 TEST(ServiceImplTest, CheckMatchedRequest) {
-  auto config = config::GetConfig("test/fixtures/valid-config.json");
-  AuthServiceImpl service(config.get());
-  ::envoy::service::auth::v2::CheckResponse response;
+  AuthServiceImpl service(
+          *config::GetConfig("test/fixtures/valid-config.json"));
 
+  ::envoy::service::auth::v2::CheckResponse response;
   ::envoy::service::auth::v2::CheckRequest request;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(

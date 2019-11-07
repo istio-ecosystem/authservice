@@ -6,7 +6,7 @@
 
 namespace authservice {
 namespace filters {
-    FilterChainImpl::FilterChainImpl(const authservice::config::FilterChain &config): config_(config) {
+    FilterChainImpl::FilterChainImpl(authservice::config::FilterChain config): config_(std::move(config)) {
     }
 
     const std::string &FilterChainImpl::Name() const {

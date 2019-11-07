@@ -3,8 +3,8 @@ load("//bazel:bazel.bzl", "xx_binary")
 package(default_visibility = ["//visibility:public"])
 
 xx_binary(
-    name = "auth-server",
-    srcs = ["auth-server.cc"],
+    name = "auth_server",
+    srcs = ["auth_server.cc"],
     deps = [
         "//src/config",
         "//src/service:serviceimpl",

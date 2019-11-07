@@ -1,7 +1,7 @@
 cc_test(
     name = "serviceimpl_test",
     srcs = ["serviceimpl_test.cc"],
-    data = ["//test/fixtures:valid-config.json"],
+    data = ["//test/fixtures"],
     deps = [
         "//src/config",
         "//src/service:serviceimpl",

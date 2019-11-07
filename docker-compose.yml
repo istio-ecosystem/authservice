@@ -11,8 +11,9 @@ services:
     build:
       dockerfile: build/Dockerfile.builder
       context: ./
+    image: authservice:${USER}
     command: ["-filter_config", "/etc/authservice/config.json"]
     ports:
       - "10004:10004"
     volumes:
-      - /tmp/config/config.json:/etc/authservice/config.json:ro
+      - ./run/config:/etc/authservice:ro

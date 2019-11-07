@@ -14,7 +14,7 @@ class AuthServiceImpl final : public Authorization::Service {
   std::vector<std::unique_ptr<filters::FilterChain>> chains_;
 
  public:
-  AuthServiceImpl(const config::Config *config);
+  AuthServiceImpl(const config::Config& config);
   ::grpc::Status Check(
       ::grpc::ServerContext* context,
       const ::envoy::service::auth::v2::CheckRequest* request,

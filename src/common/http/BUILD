@@ -12,6 +12,7 @@ xx_library(
     deps = [
         "//config/common:config_cc",
         "@boost//:all",
+        "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",

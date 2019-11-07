@@ -4,8 +4,10 @@ package(default_visibility = ["//visibility:public"])
 
 xx_library(
     name = "filter",
+    srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
+        "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_google_googleapis//google/rpc:code_cc_proto",
         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",

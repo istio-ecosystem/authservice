@@ -1,4 +1,4 @@
-#include "src/config/getconfig.h"
+#include "src/config/get_config.h"
 #include "gtest/gtest.h"
 
 namespace authservice {
@@ -11,6 +11,7 @@ TEST(GetConfigTest, ReturnsTheConfig) {
 
   ASSERT_EQ(config->listen_port(), 10003);
   ASSERT_EQ(config->log_level(), "trace");
+  ASSERT_EQ(config->threads(), 8);
 
   ASSERT_EQ(oidc.authorization().scheme(), "https");
   ASSERT_EQ(oidc.authorization().hostname(), "google3");
@@ -42,6 +43,11 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.cryptor_secret(), "some-secret");
   ASSERT_EQ(oidc.cookie_name_prefix(), "my-app");
   ASSERT_EQ(oidc.timeout(), 300);
+
+  ASSERT_EQ(oidc.id_token().preamble(), "Bearer");
+  ASSERT_EQ(oidc.id_token().header(), "authorization");
+
+  ASSERT_EQ(oidc.access_token().header(), "x-access-token");
 }
 
 TEST(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {

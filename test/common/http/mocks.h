@@ -12,6 +12,14 @@ class http_mock : public http {
       response_t(const authservice::config::common::Endpoint &endpoint,
                  const std::map<absl::string_view, absl::string_view> &headers,
                  absl::string_view body));
+
+  MOCK_CONST_METHOD5(
+          Post,
+          response_t(const authservice::config::common::Endpoint &endpoint,
+                  const std::map<absl::string_view, absl::string_view> &headers,
+                  absl::string_view body,
+                  boost::asio::io_context& ioc,
+                  boost::asio::yield_context yield));
 };
 }  // namespace http
 }  // namespace common

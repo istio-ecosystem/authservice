@@ -40,5 +40,6 @@ xx_library(
         "@boost//:all",
         "@com_github_abseil-cpp//absl/time:time",
         "@com_github_gabime_spdlog//:spdlog",
+        "@com_google_googleapis//google/rpc:code_cc_proto",
     ],
 )

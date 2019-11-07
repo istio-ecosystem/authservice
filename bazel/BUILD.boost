@@ -1,0 +1,65 @@
+load("@//bazel:boost.bzl", "new_boost_library")
+
+cc_library(
+    name = "all",
+    hdrs = glob(
+        ["boost/**/*"],
+        exclude = ["boost/**/*.cpp"],
+    ),
+    include_prefix = "boost",
+    includes = ["boost"],
+    strip_include_prefix = "boost",
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+new_boost_library(
+    name = "context",
+)
+
+new_boost_library(
+    name = "coroutine",
+    deps = [
+        ":context",
+        ":thread",
+    ],
+)
+
+new_boost_library(
+    name = "thread",
+    deps = [
+        ":chrono",
+    ],
+)
+
+new_boost_library(
+    name = "chrono",
+)
+
+genrule(
+    name = "bootstrap_boost",
+    srcs = glob(
+        [
+            "**/*.sh",
+            "**/*.c",
+            "**/*.y",
+            "**/*.yy",
+            "**/*.h",
+            "**/*.jam",
+        ],
+        exclude = ["bazel-*"],
+    ),
+    outs = [
+        "b2",
+        "project-config.jam",
+    ],
+    cmd = """
+        ROOT=$$(dirname $(location bootstrap.sh))
+        pushd $$ROOT
+            ./bootstrap.sh || cat bootstrap.log
+        popd
+
+        cp $$ROOT/b2 $(location b2)
+        cp $$ROOT/project-config.jam $(location project-config.jam)
+    """,
+)

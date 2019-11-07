@@ -35,7 +35,7 @@ class FilterChainImpl : public FilterChain {
 private:
     authservice::config::FilterChain config_;
 public:
-    explicit FilterChainImpl(const authservice::config::FilterChain &config);
+    explicit FilterChainImpl(authservice::config::FilterChain config);
     const std::string &Name() const override;
     bool Matches(const ::envoy::service::auth::v2::CheckRequest* request) const override;
     std::unique_ptr<Filter> New() override;

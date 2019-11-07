@@ -1,4 +1,4 @@
-#include "serviceimpl.h"
+#include "service_impl.h"
 #include <grpcpp/grpcpp.h>
 #include <memory>
 #include "spdlog/spdlog.h"
@@ -6,8 +6,8 @@
 namespace authservice {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(const config::Config *config) {
-  for (const auto &chain_config : config->chains()) {
+AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
+  for (const auto &chain_config : config.chains()) {
     std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
     chains_.push_back(std::move(chain));
   }
