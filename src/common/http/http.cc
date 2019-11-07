@@ -298,8 +298,7 @@ response_t http_impl::Post(
     // The io_context is required for all I/O
     net::io_context ioc;
     ssl::context ctx(ssl::context::tlsv12_client);
-    // TODO: verify_peer should be used but is not currently working.
-    ctx.set_verify_mode(ssl::verify_none);
+    ctx.set_verify_mode(ssl::verify_peer);
     ctx.set_default_verify_paths();
 
     tcp::resolver resolver(ioc);
@@ -361,8 +360,7 @@ response_t http_impl::Post(
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    // TODO: verify_peer should be used but is not currently working.
-    ctx.set_verify_mode(ssl::verify_none);
+    ctx.set_verify_mode(ssl::verify_peer);
     ctx.set_default_verify_paths();
 
     tcp::resolver resolver(ioc);

@@ -2,6 +2,11 @@
 FROM ubuntu:19.10
 RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
 
+# Install dependencies
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
+    ca-certificates  \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY build_release/bazel-bin/src/main/auth_server /app/auth_server
 COPY build_release/bazel-bin/external/boost/libboost_*.so.1.70.0 /app/
 ENV LD_LIBRARY_PATH=.
