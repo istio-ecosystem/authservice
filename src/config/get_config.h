@@ -8,7 +8,7 @@
 namespace authservice {
 namespace config {
 
-std::shared_ptr<authservice::config::Config> GetConfig(
+std::unique_ptr<authservice::config::Config> GetConfig(
     const std::string& configFile);
 
 spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Config& config);

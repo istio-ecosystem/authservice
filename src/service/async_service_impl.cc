@@ -30,10 +30,9 @@ private:
 
 class ProcessingState : public ServiceState {
 public:
-  ProcessingState(std::shared_ptr<authservice::config::Config> config, Authorization::AsyncService &service,
+  ProcessingState(authservice::service::AuthServiceImpl& impl, Authorization::AsyncService &service,
                   grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context)
-          : service_(service), cq_(cq), responder_(&ctx_), io_context_(io_context), config_(std::move(config)),
-            impl_(*config_) {
+          : service_(service), cq_(cq), responder_(&ctx_), io_context_(io_context), impl_(impl) {
     spdlog::trace("Creating processor state");
     service.RequestCheck(&ctx_, &request_, &responder_, &cq_, &cq_, this);
   }
@@ -42,7 +41,7 @@ public:
     // Spawn a new instance to serve new clients while we process this one
     // This will later be pulled off the queue for processing and ultimately deleted in the destructor
     // of CompleteState
-    new ProcessingState(config_, service_, cq_, io_context_);
+    new ProcessingState(impl_, service_, cq_, io_context_);
 
     spdlog::trace("Launching request processor worker");
 
@@ -73,8 +72,7 @@ private:
   // Boost::ASIO I/O service
   boost::asio::io_context &io_context_;
 
-  std::shared_ptr<authservice::config::Config> config_;
-  authservice::service::AuthServiceImpl impl_;
+  authservice::service::AuthServiceImpl& impl_;
 };
 
 void CompleteState::Proceed() {
@@ -84,11 +82,11 @@ void CompleteState::Proceed() {
   delete this;
 }
 
-AsyncAuthServiceImpl::AsyncAuthServiceImpl(std::shared_ptr<authservice::config::Config> config)
-        : config_(std::move(config)),
+AsyncAuthServiceImpl::AsyncAuthServiceImpl(authservice::config::Config config)
+        : config_(std::move(config)), impl_(config_),
           io_context_(std::make_shared<boost::asio::io_context>()) {
   grpc::ServerBuilder builder;
-  builder.AddListeningPort(config::GetConfiguredAddress(*config_), grpc::InsecureServerCredentials());
+  builder.AddListeningPort(config::GetConfiguredAddress(config_), grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
   cq_ = builder.AddCompletionQueue();
   server_ = builder.BuildAndStart();
@@ -101,7 +99,7 @@ void AsyncAuthServiceImpl::Run() {
   // Spin up our worker threads
   // Config validation should have already ensured that the number of threads is > 0
   boost::thread_group threadpool;
-  for (unsigned int i = 0; i < config_->threads(); ++i) {
+  for (unsigned int i = 0; i < config_.threads(); ++i) {
     threadpool.create_thread([this](){
       while(true) {
         try {
@@ -114,13 +112,13 @@ void AsyncAuthServiceImpl::Run() {
     });
   }
 
-  spdlog::info("{}: Server listening on {}", __func__, config::GetConfiguredAddress(*config_));
+  spdlog::info("{}: Server listening on {}", __func__, config::GetConfiguredAddress(config_));
 
   try {
     // Spawn a new state instance to serve new clients
     // This will later be pulled off the queue for processing and ultimately deleted in the destructor
     // of CompleteState
-    new ProcessingState(config_, service_, *cq_, *io_context_);
+    new ProcessingState(impl_, service_, *cq_, *io_context_);
 
     void *tag;
     bool ok;

@@ -7,7 +7,7 @@ namespace config {
 TEST(GetConfigTest, ReturnsTheConfig) {
   auto config = GetConfig("test/fixtures/valid-config.json");
   const authservice::config::oidc::OIDCConfig &oidc =
-      config->filters().at(0).oidc();
+      config->chains().at(0).filters().at(0).oidc();
 
   ASSERT_EQ(config->listen_port(), 10003);
   ASSERT_EQ(config->log_level(), "trace");

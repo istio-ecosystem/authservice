@@ -13,8 +13,7 @@ cc_library(
     deps = [
         "//config:config_cc",
         "//src/config",
-        "//src/filters:pipe",
-        "//src/filters/oidc:oidc_filter",
+        "//src/filters:filter_chain",
         "@boost//:thread",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_grpc_grpc//:grpc++",

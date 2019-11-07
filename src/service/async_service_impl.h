@@ -13,12 +13,13 @@ namespace service {
 
 class AsyncAuthServiceImpl {
 public:
-  explicit AsyncAuthServiceImpl(std::shared_ptr<authservice::config::Config> config);
+  explicit AsyncAuthServiceImpl(authservice::config::Config config);
 
   void Run();
 
 private:
-  std::shared_ptr<authservice::config::Config> config_;
+  authservice::config::Config config_;
+  authservice::service::AuthServiceImpl impl_;
 
   envoy::service::auth::v2::Authorization::AsyncService service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;

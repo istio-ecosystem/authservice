@@ -11,7 +11,7 @@
 namespace authservice {
 namespace service {
 
-void RunServer(std::shared_ptr<authservice::config::Config> config) {
+void RunServer(const authservice::config::Config& config) {
   AsyncAuthServiceImpl service(config);
   service.Run();
 }
@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
         authservice::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
     console->set_level(
         authservice::config::GetConfiguredLogLevel(*config));
-    authservice::service::RunServer(config);
+    authservice::service::RunServer(*config);
   } catch (const std::exception& e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;

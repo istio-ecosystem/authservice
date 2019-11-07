@@ -1,11 +1,19 @@
-.PHONY: all compose docker docker-from-scratch docker-compile-env build run test coverage format clean
+.PHONY: all docs compose docker docker-from-scratch docker-compile-env build run test coverage format clean
 .DEFAULT_GOAL:=all
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
+PROTOS=$(shell find config -name '*.proto')
 TARGET:=//src/main:auth_server
 BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
 
-all: build test
+all: build test docs
+
+docs: docs/README.md
+
+
+docs/README.md: $(PROTOS)
+	# go get -v -u go.etcd.io/protodoc
+	protodoc --directories=config=message --title="Configuration Options" --output="docs/README.md"
 
 compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
