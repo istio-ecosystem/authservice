@@ -15,6 +15,11 @@ RUN make bazel-bin/src/main/auth_server
 FROM debian:buster
 RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
 
+# Install dependencies
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
+    ca-certificates  \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=auth-builder \
      /src/bazel-bin/src/main/auth_server \
      /src/bazel-bin/external/boost/libboost_chrono.so.1.70.0 \
