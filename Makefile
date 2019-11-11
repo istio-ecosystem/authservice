@@ -1,18 +1,26 @@
-.PHONY: all compose docker docker-from-scratch docker-compile-env build run test coverage format clean
+.PHONY: all docs compose docker docker-from-scratch docker-compile-env build run test coverage format clean
 .DEFAULT_GOAL:=all
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
-TARGET:=//src/main:auth-server
+PROTOS=$(shell find config -name '*.proto')
+TARGET:=//src/main:auth_server
 BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
 
-all: build test
+all: build test docs
+
+docs: docs/README.md
+
+
+docs/README.md: $(PROTOS)
+	# go get -v -u go.etcd.io/protodoc
+	protodoc --directories=config=message --title="Configuration Options" --output="docs/README.md"
 
 compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
 	docker-compose up --build
 
-docker:
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.builder -t authservice:$(USER) .
+docker: build
+	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.runner -t authservice:$(USER) .
 
 docker-from-scratch:
 	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
@@ -20,8 +28,8 @@ docker-from-scratch:
 docker-compile-env:
 	docker build -f build/Dockerfile.interactive-compile-environment -t authservice-build-env:$(USER) .
 
-bazel-bin/src/main/auth-server:
-	bazel build $(BAZEL_FLAGS) //src/main:auth-server
+bazel-bin/src/main/auth_server:
+	bazel build $(BAZEL_FLAGS) //src/main:auth_server
 
 build:
 	bazel build $(BAZEL_FLAGS) //src/...

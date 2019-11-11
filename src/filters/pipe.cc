@@ -25,11 +25,13 @@ Pipe *Pipe::Remove(const std::string &filter) {
 }
 
 google::rpc::Code Pipe::Process(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response) {
+        const ::envoy::service::auth::v2::CheckRequest *request,
+        ::envoy::service::auth::v2::CheckResponse *response,
+        boost::asio::io_context& ioc,
+        boost::asio::yield_context yield) {
   std::unique_lock<std::mutex> lock(mtx);
   for (auto &filter : filters_) {
-    auto result = filter->Process(request, response);
+    auto result = filter->Process(request, response, ioc, yield);
     if (result != google::rpc::Code::OK) {
       response->mutable_status()->set_code(result);
       response->mutable_status()->set_message(filter->Name().data(),

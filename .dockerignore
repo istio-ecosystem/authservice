@@ -1,0 +1,13 @@
+# Ignore everything by default
+*
+
+# Only include files we actually need
+!bazel
+!build/install-bazel.sh
+!build_release
+!config
+!src
+!test
+!Makefile
+!WORKSPACE
+

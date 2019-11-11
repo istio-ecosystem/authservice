@@ -1,7 +1,9 @@
 #include "oidc_filter.h"
+#include <sstream>
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
-#include "external/com_google_googleapis/google/rpc/code.pb.h"
+#include "absl/time/time.h"
+#include "google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
@@ -196,7 +198,9 @@ google::rpc::Code OidcFilter::RedirectToIdP(
 
 google::rpc::Code OidcFilter::Process(
     const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response) {
+    ::envoy::service::auth::v2::CheckResponse *response,
+    boost::asio::io_context& ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
   spdlog::debug(
       "Call from {}@{} to {}@{}", request->attributes().source().principal(),
@@ -259,15 +263,17 @@ google::rpc::Code OidcFilter::Process(
 
   // Set standard headers
   SetStandardResponseHeaders(response);
-  spdlog::trace("{}: checking handler for {}://{}-{}", __func__,
+  spdlog::trace("{}: checking handler for {}://{}{}", __func__,
                 request->attributes().request().http().scheme(),
                 request->attributes().request().http().host(),
                 request->attributes().request().http().path());
 
-  auto callback_host = idp_config_.callback().hostname();
+  std::stringstream callback_host;
+  callback_host << idp_config_.callback().hostname() << ':' << std::dec << idp_config_.callback().port();
+
   if (request->attributes().request().http().host() == callback_host &&
       path_parts[0] == idp_config_.callback().path()) {
-    return RetrieveToken(request, response, path_parts[1]);
+    return RetrieveToken(request, response, path_parts[1], ioc, yield);
   }
   return RedirectToIdP(response);
 }
@@ -305,7 +311,9 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
 google::rpc::Code OidcFilter::RetrieveToken(
     const ::envoy::service::auth::v2::CheckRequest *request,
     ::envoy::service::auth::v2::CheckResponse *response,
-    absl::string_view query) {
+    absl::string_view query,
+    boost::asio::io_context& ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
   // Best effort at deleting state cookie for all cases.
@@ -380,7 +388,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   auto retrieve_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::http::EncodeFormData(params));
+      idp_config_.token(), headers, common::http::http::EncodeFormData(params), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");

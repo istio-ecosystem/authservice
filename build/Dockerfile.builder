@@ -3,19 +3,34 @@ FROM debian:buster as bazel-builder
 COPY build/install-bazel.sh /build/
 RUN chmod +x /build/install-bazel.sh && /build/install-bazel.sh
 
-# Build auth binary.
+# Copy in only the necessary files for building.
 FROM bazel-builder as auth-builder
-COPY . /src
+COPY . /src/
+
+# Build auth binary.
 WORKDIR /src
-RUN make bazel-bin/src/main/auth-server
+RUN make bazel-bin/src/main/auth_server
 
 # Create our final auth-server container image.
 FROM debian:buster
 RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
 
-COPY --from=auth-builder /src/bazel-bin/src/main/auth-server /app/auth-server
-RUN chgrp auth-server-grp /app/auth-server && chown auth-server-usr /app/auth-server && chmod u+x /app/auth-server
+# Install dependencies
+RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
+    ca-certificates  \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=auth-builder \
+     /src/bazel-bin/src/main/auth_server \
+     /src/bazel-bin/external/boost/libboost_chrono.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_context.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_coroutine.so.1.70.0 \
+     /src/bazel-bin/external/boost/libboost_thread.so.1.70.0 \
+     /app/
+
+ENV LD_LIBRARY_PATH=.
+RUN chgrp auth-server-grp /app/* && chown auth-server-usr /app/* && chmod u+x /app/*
 
 USER auth-server-usr
 WORKDIR /app
-ENTRYPOINT ["/app/auth-server"]
+ENTRYPOINT ["/app/auth_server"]

@@ -4,12 +4,13 @@ package(default_visibility = ["//visibility:public"])
 
 xx_library(
     name = "config",
-    srcs = ["getconfig.cc"],
+    srcs = ["get_config.cc"],
     hdrs = [
-        "getconfig.h",
+        "get_config.h",
     ],
     deps = [
-        "@boost//:all",
         "//config:config_cc",
+        "@boost//:all",
+        "@com_github_gabime_spdlog//:spdlog",
     ],
 )
