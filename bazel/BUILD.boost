@@ -1,3 +1,11 @@
+config_setting(
+    name = "osx",
+    constraint_values = [
+        "@bazel_tools//platforms:osx",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 load("@//bazel:boost.bzl", "new_boost_library")
 
 cc_library(

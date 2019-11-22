@@ -14,6 +14,7 @@ cc_test(
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
 cc_test(
@@ -24,6 +25,7 @@ cc_test(
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
 cc_test(
@@ -38,4 +40,5 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )

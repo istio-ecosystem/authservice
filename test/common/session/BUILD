@@ -14,6 +14,7 @@ cc_test(
         "//src/common/session:hkdf",
         "@com_google_googletest//:gtest_main",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
 cc_test(
@@ -23,6 +24,7 @@ cc_test(
         "//src/common/session:gcm_encryptor",
         "@com_google_googletest//:gtest_main",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
 cc_test(
@@ -33,4 +35,5 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_googlesource_boringssl//:crypto",
     ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
