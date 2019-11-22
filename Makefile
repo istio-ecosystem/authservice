@@ -10,7 +10,6 @@ all: build test docs
 
 docs: docs/README.md
 
-
 docs/README.md: $(PROTOS)
 	# go get -v -u go.etcd.io/protodoc
 	protodoc --directories=config=message --title="Configuration Options" --output="docs/README.md"
