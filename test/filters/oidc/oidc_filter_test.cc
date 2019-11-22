@@ -465,13 +465,13 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
   );
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
+void RetrieveTokenWithoutAccessToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request) {
   google::jwt_verify::Jwt jwt = {};
   auto parser_mock = std::make_shared<TokenResponseParserMock>();
   auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto token_response = absl::make_optional<TokenResponse>(jwt);
   token_response->SetAccessToken("expected_access_token");
-  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock, Parse(oidcConfig.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(token_response));
   auto mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
@@ -479,7 +479,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
+  OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock,
                     cryptor_mock);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -487,7 +487,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme(
       "");  // Seems like it should be "https", but in practice is empty
-  httpRequest->set_host(callback_host_);
+  httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
        "__Host-cookie-prefix-authservice-state-cookie=valid"});
@@ -496,7 +496,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
           absl::optional<std::string>("expectedstate;expectednonce")));
   EXPECT_CALL(*cryptor_mock, Encrypt(_))
       .WillOnce(Return("encryptedtoken"));
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
+  std::vector<absl::string_view> parts = {oidcConfig.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request, &response);
@@ -505,7 +505,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
   ASSERT_THAT(
     response.denied_response().headers(),
     ContainsHeaders({
-      {common::http::headers::Location, StartsWith(config_.landing_page())},
+      {common::http::headers::Location, StartsWith(oidcConfig.landing_page())},
       {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
       {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
       {
@@ -522,6 +522,22 @@ TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
       }
     })
   );
+}
+
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
+  RetrieveTokenWithoutAccessToken(config_, callback_host_);
+}
+
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpsPort) {
+  config_.mutable_callback()->set_scheme("https");
+  config_.mutable_callback()->set_port(443);
+  RetrieveTokenWithoutAccessToken(config_, config_.callback().hostname());
+}
+
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpPort) {
+  config_.mutable_callback()->set_scheme("http");
+  config_.mutable_callback()->set_port(80);
+  RetrieveTokenWithoutAccessToken(config_, config_.callback().hostname());
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {

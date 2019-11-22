@@ -268,14 +268,31 @@ google::rpc::Code OidcFilter::Process(
                 request->attributes().request().http().host(),
                 request->attributes().request().http().path());
 
-  std::stringstream callback_host;
-  callback_host << idp_config_.callback().hostname() << ':' << std::dec << idp_config_.callback().port();
-
-  if (request->attributes().request().http().host() == callback_host &&
-      path_parts[0] == idp_config_.callback().path()) {
+  if (MatchesCallbackRequest(request->attributes().request().http().host(), path_parts)) {
     return RetrieveToken(request, response, path_parts[1], ioc, yield);
   }
   return RedirectToIdP(response);
+}
+
+bool OidcFilter::MatchesCallbackRequest(const std::string &request_host,
+                                        const std::array<std::string, 3> &request_path_parts) {
+  auto configured_port = idp_config_.callback().port();
+  auto configured_hostname = idp_config_.callback().hostname();
+  auto configured_scheme = idp_config_.callback().scheme();
+
+  std::stringstream buf;
+  buf << configured_hostname << ':' << std::dec << configured_port;
+
+  std::string configured_callback_host_with_port = buf.str();
+
+  bool path_matches = request_path_parts[0] == idp_config_.callback().path();
+
+  // TODO this should only assume 443 when the request's scheme is also https and only assume 80 when the request's scheme is also 80
+  bool host_matches = request_host == configured_callback_host_with_port ||
+                      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname) ||
+                      (configured_scheme == "http" && configured_port == 80 && request_host == configured_hostname);
+
+  return host_matches && path_matches;
 }
 
 absl::optional<std::string> OidcFilter::GetTokenFromCookie(const ::google::protobuf::Map<::std::string,

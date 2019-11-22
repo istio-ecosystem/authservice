@@ -155,6 +155,9 @@ class OidcFilter final : public filters::Filter {
    */
   std::set<std::string> GetCookieDirectives(int64_t timeout);
 
+  /** @brief Check if the request appears to be the callback request. */
+  bool MatchesCallbackRequest(const std::string &request_host, const std::array<std::string, 3> &request_path_parts);
+
 public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
