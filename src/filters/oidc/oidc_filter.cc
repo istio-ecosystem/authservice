@@ -236,8 +236,8 @@ google::rpc::Code OidcFilter::Process(
     SetStandardResponseHeaders(response);
     auto responseHeaders = response->mutable_denied_response()->mutable_headers();
     DeleteCookie(responseHeaders, GetStateCookieName());
-    DeleteCookie(responseHeaders, GetIdTokenCookieName());
     DeleteCookie(responseHeaders, GetAccessTokenCookieName());
+    DeleteCookie(responseHeaders, GetIdTokenCookieName());
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
