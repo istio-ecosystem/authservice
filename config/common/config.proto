@@ -4,14 +4,22 @@ package authservice.config.common;
 
 import "validate/validate.proto";
 
-// an `Endpoint` represents a URI definition.
+// A URI definition.
 message Endpoint {
-    // the URI scheme. Must be set to `https`.
+
+    // The scheme, which must be set to `https`.
+    // Required.
     string scheme = 1 [(validate.rules).string.const = "https"];
-    // the URL hostname.
+
+    // The hostname.
+    // Required.
     string hostname = 2 [(validate.rules).string.hostname = true];
-    // the URL port.
+
+    // The port number.
+    // Required.
     int32 port = 3 [(validate.rules).int32.lt = 65536];
-    // the URL path. Must begin with a forward slash `/`.
+
+    // The path, which must begin with a forward slash (i.e. `/`).
+    // Required.
     string path = 4 [(validate.rules).string.prefix = "/"];
 }

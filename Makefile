@@ -13,6 +13,7 @@ docs: docs/README.md
 docs/README.md: $(PROTOS)
 	# go get -v -u go.etcd.io/protodoc
 	protodoc --directories=config=message --title="Configuration Options" --output="docs/README.md"
+	grep -v '(validate.required)' docs/README.md > /tmp/README.md && mv /tmp/README.md docs/README.md
 
 compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365

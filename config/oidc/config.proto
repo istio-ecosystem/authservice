@@ -5,72 +5,147 @@ package authservice.config.oidc;
 import "config/common/config.proto";
 import "validate/validate.proto";
 
-// TokenConfig defines how an access token obtained through an OIDC flow is forwarded to downstream services as
-// well as the cookie name it is included in when returned to a browser.
-//
-//  # Forward as a standard Authorization Bearer token.
-//  header: Authorization
-//  premable: Bearer
+// Defines how a token obtained through an OIDC flow is forwarded to services.
 message TokenConfig {
-    // the name of the http header in which to insert a token when forwarding to internal mesh services. For example `Authorization`.
+
+    // The name of the header that authservice adds to the request when forwarding to services.
+    // The value of this header will contain the `preamble` and the token.
+    // This value is case-insensitive, as http header names are case-insensitive.
+    // Note that this value must be `Authorization` for the
+    // [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/)
+    // to inspect the token.
+    // Required.
     string header = 1 [(validate.rules).string.min_len = 1];
-    // any preamble to include in the header when forwarding a token. For example "Bearer"
+
+    // The authentication scheme of the token.
+    // For example, when the preamble is `Bearer` and `header` is `Authorization`, the following
+    // header will be added to the request to the service: `Authorization: Bearer ID_TOKEN_VALUE`.
+    // Note that this value must be `Bearer`, case-sensitive, when header is `Authorization`.
+    // Optional.
     string preamble = 2;
 }
 
+// When specified, the authservice will destroy the authservice session when a request is
+// made to the configured path.
 message LogoutConfig {
-    // Optional. A http request path that the authservice matches against to initiate logout. Whenever a request is made to that
-    // path, the authservice will remove the authservice-specific cookies and respond with a redirect to the configured
-    // `chains[].filters[].oidc.logout.redirect_to_uri`. Removing the cookies causes the user to be unauthenticated in future requests.
-    // If your application has its own logout controller, then you may wish to have that controller redirect to this
-    // path. If your application does not need its own logout controller, then the application's logout button/link's
-    // href can GET or POST directly to this path.
+
+    // A http request path that the authservice matches against to initiate logout.
+    // Whenever a request is made to that path, the authservice will remove the authservice-specific
+    // cookies and respond with a redirect to the configured `redirect_to_uri`. Removing the cookies
+    // causes the user to be unauthenticated in future requests.
+    // If the service application has its own logout controller, then it may be desirable to have its
+    // logout controller redirect to this path. If the service application does not need its own logout
+    // controller, then the application's logout button/link's href can GET or POST directly to this path.
+    // Required.
     string path = 1 [(validate.rules).string.min_len = 1];
-    // Optional. A URI specifying the destination to which the authservice will redirect any request made to the
-    // `chains[].filters[].oidc.logout.path`. For example, you may wish to redirect the logged out user to the
-    // homepage of your app, or to the
-    // [logout endpoint of your IDP](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout).
+
+    // A URI specifying the destination to which the authservice will redirect any request made to the
+    // logout `path`. For example, it may be desirable to redirect the logged out user to the homepage
+    // of the service application, or to the
+    // [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout).
     // As with all redirects, the user's browser will perform a GET to this URI.
+    // Required.
     string redirect_to_uri = 2 [(validate.rules).string.min_len = 1];
 }
 
-// OIDCConfig defines the configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
-// via the standard Code Grant flow from an IdP. Retrieved tokens are encrypted and placed in cookies for use in identifying
-// callers in subsequent requests.
+// The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
+// via the standard authorization code grant flow from an OIDC Provider. Retrieved tokens are encrypted and placed
+// in cookies for use in subsequent requests.
 message OIDCConfig {
-    // the IdP's authorization endpoint. See https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint
+
+    // The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint).
+    // Required.
     common.Endpoint authorization = 1 [(validate.rules).message.required = true];
-    // the IdP's token endpoint. See https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint
+
+    // The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint).
+    // Required.
     common.Endpoint token = 2 [(validate.rules).message.required = true];
-    // the IdP's JWKS configuration used during `id_token` verification.
+
+    // The OIDC Provider's JWKS configuration used during `id_token` verification.
+    // Use either `jwks_uri` or `jwks` (see below).
+    // Required.
     oneof jwks_config {
         option (validate.required) = true;
+
+        // *This is currently ignored.* In a future version it will be the URL of the OIDC provider’s
+        // public key set to validate signature of the JWT.
+        // See [OpenID Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata).
+        // This should match the `jwksUri` value of
+        // [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/).
         common.Endpoint jwks_uri = 3;
+
+        // The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in
+        // the OIDC provider's
+        // [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
+        // Note that this JSON value must be escaped when embedded in a json configmap
+        // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)).
         string jwks = 4;
     }
-    // this value will be used as the `redirect_uri` param of the Authorization Code Grant Authentication Request as defined in https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
-    // You must add this URL to the Redirection URI values for the Client pre-registered at the OIDC provider.
-    // You must also prepare your Istio VirtualService to ensure that this URL will get routed to product page.
+
+    // This value will be used as the `redirect_uri` param of the authorization code grant
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    // This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider.
+    // Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to
+    // the service so that the authservice can intercept the request and handle it
+    // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)).
+    // Required.
     common.Endpoint callback = 5 [(validate.rules).message.required = true];
-    // the OIDC client ID assigned to the filter. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
+
+    // The OIDC client ID assigned to the filter to be used in the
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    // Required.
     string client_id = 6 [(validate.rules).string.min_len = 1];
-    // the OIDC client secret assigned to the filter. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest
+
+    // The OIDC client secret assigned to the filter to be used in the
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    // Required.
     string client_secret = 7 [(validate.rules).string.min_len = 1];
-    // optional additional scopes passed to the IdP during authenticating a user. The `openid` scope is always sent to the
-    // IdP so does not need to be specified. See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
+
+    // Optional additional scopes passed to the OIDC Provider in the
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    // The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here.
+    // Required, but an empty array is allowed.
     repeated string scopes = 8;
-    // the URL a browser is redirected to after successful authentication and token acquisition.
-    string landing_page = 9 [(validate.rules).string.min_len = 1]; // TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++.
-    // a secret used to derive cryptographic material for protecting cookies and other data.
+
+    // The URL to which the user's browser is redirected after successful authentication
+    // and token acquisition.
+    // Required.
+    string landing_page = 9 [(validate.rules).string.min_len = 1]; // <!-- TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++ -->
+
+    // A secret used to derive cryptographic material for protecting cookies and other data.
+    // Can be any string.
+    // Required.
     string cryptor_secret = 10 [(validate.rules).string.min_len = 1];
-    // a unique identifier of the authservice's browser cookies. Can be any string.
-    // Only needed when multiple apps in the same domain are each protected by their own authservice, to avoid cookie name conflicts.
+
+    // A unique identifier of the authservice's browser cookies. Can be any string.
+    // Only needed when multiple services in the same domain are each protected by
+    // their own authservice, in which case each service's authservice should have
+    // a unique value to avoid cookie name conflicts.
+    // Optional.
     string cookie_name_prefix = 11;
-    // the configuration for forwarding `id_token`s to the mesh.
+
+    // The configuration for adding ID Tokens as headers to requests forwarded to a service.
+    // Required.
     TokenConfig id_token = 12 [(validate.rules).message.required = true];
-    // the optional configuration for forwarding `access_token`s to the mesh.
+
+    // The configuration for adding Access Tokens as headers to requests forwarded to a service.
+    // Optional.
     TokenConfig access_token = 13;
-    // the timeout in seconds for performing an authentication with an IdP.
+
+    // The number of seconds a user has to authenticate with the OIDC Provider before their
+    // authentication flow expires. The timer starts when an unauthenticated user visits
+    // a service protected by the authservice, keeps running while they are redirected to
+    // their OIDC Provider to log in, continues to run while they enter their
+    // username/password and potentially perform 2-factor authentication, and stops
+    // when the authservice receives the authcode from the OIDC provider's redirect.
+    // If it takes longer than the timeout for the authcode to be received, then the
+    // authcode will be rejected by the authservice causing the login to fail, even
+    // if the user successfully logged in to their OIDC Provider.
+    // Required.
     uint32 timeout = 14 [(validate.rules).uint32.gte = 30];
+
+    // When specified, the authservice will destroy the authservice session when a request is
+    // made to the configured path.
+    // Optional.
     LogoutConfig logout = 15;
 }
