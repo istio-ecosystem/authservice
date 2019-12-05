@@ -9,6 +9,7 @@ data:
       "listen_address": "127.0.0.1",
       "listen_port": "10003",
       "log_level": "trace",
+      "threads": 8,
       "chains": [
         {
           "name": "idp_filter_chain",
@@ -33,7 +34,7 @@ data:
                   "scheme": "https",
                   "hostname": "INGRESS_HOST_CHANGE_ME",
                   "path": "/productpage/oauth/callback",
-                  "port": "443",
+                  "port": "443"
                 },
                 "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
                 "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
@@ -45,7 +46,11 @@ data:
                   "preamble": "Bearer",
                   "header": "Authorization"
                 },
-                "timeout": 300
+                "timeout": 300,
+                "logout": {
+                  "path": "/authservice_logout",
+                  "redirect_to_uri": "https://<demo.example.change.me>/some/logout/path"
+                }
               }
             }
           ]

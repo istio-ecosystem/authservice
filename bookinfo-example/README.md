@@ -1,44 +1,44 @@
 # Bookinfo with Authservice example (Sidecar integration)
 
-##
-
-
-This doc shows how to integrate `authservice` into an Istio system deployed on Kubernetes.
+This doc shows how to integrate Authservice into an Istio system deployed on Kubernetes.
 
 This demo takes advantage of an Istio feature set that gives the ability to inject http filters on 
 Sidecars. This feature set was released in Istio 1.3.0.
 
 Things needed before starting:
 
-- A Kubernetes cluster that is compatible with Istio 1.3
+- A Kubernetes cluster that is compatible with Istio 1.3 or newer
 - An OIDC provider configured to support Authorization Code grant type. The urls and credentials for this 
-provider will be needed to configure `authservice`.
+provider will be needed to configure Authservice.
 
  
 #### Pre-requisites:
-1. Download Istio
+1. Download Istio 1.3 or greater. For example:
 
-   [`scripts/download-istio-1.3.sh`](scripts/download-istio-1.3.sh)
+   [`scripts/download-istio-1.4.sh`](scripts/download-istio-1.4.sh)
 
-1. Install Istio
+1. Install Istio and enable sidecar injection for the namespace where services will be deployed. For example, 
+   you could install the Istio demo like this:
 
    [`scripts/install-istio.sh`](scripts/install-istio.sh)
-
-1. If certs signed by a known CA cannot be obtained, generate self signed certs for the ingress gateway
+    
+1. If certs signed by a known CA cannot be obtained, generate self signed certs for the ingress gateway. For example:
 
    [`scripts/generate-self-signed-certs-for-ingress-gateway.sh`](scripts/generate-self-signed-certs-for-ingress-gateway.sh)
 
 
-#### Configuring and Integrating `authservice` with `bookinfo`
+#### Configuring and Integrating Authservice with `bookinfo`
 
-1. Setup a `ConfigMap` for `authservice`. Fill in [`config/authservice-configmap-template.yaml`](config/authservice-configmap-template.yaml)
+1. Setup a `ConfigMap` for Authservice. Fill in [`config/authservice-configmap-template.yaml`](config/authservice-configmap-template.yaml)
 to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md)
 for the description of each field. Once the values have been substituted, apply the ConfigMap.
    
    `kubectl apply -f config/authservice-configmap-template.yaml`
 
-1. Deploy the `bookinfo` and the `authservice` apps. Note that the `authservice` should be in the same Pod as `productpage`. 
-Also note that, for the time being, there are some manual steps associated with specifying the `authservice` image (see comment in the yaml file). 
+1. Deploy the `bookinfo` and the Authservice apps. Note that the Authservice should be in the same Pod as `productpage`.
+Edit `config/bookinfo-with-authservice.yaml` and replace the authservice image name (see comment in the yaml file). See
+"Using the authservice docker image" section in the [README.md](https://github.com/istio-ecosystem/authservice/blob/master/README.md#using-the-authservice-docker-image)
+for more information.
 
     `kubectl apply -f config/bookinfo-with-authservice.yaml`
     
