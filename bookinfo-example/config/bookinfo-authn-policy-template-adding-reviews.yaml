@@ -14,6 +14,7 @@ spec:
     # Enable authentication for the following services.
     # Note: `request.auth` only appears on the ServiceRoleBinding's or AuthorizationPolicy's for the following services
     - name: productpage
+    - name: reviews
   origins:
     - jwt:
         issuer: https://demo.example.replace.me.com/oauth/token

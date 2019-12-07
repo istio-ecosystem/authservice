@@ -1,3 +1,8 @@
+#
+# A simple example of a gateway for the bookinfo app.
+#
+
+---
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
@@ -16,6 +21,7 @@ spec:
         mode: SIMPLE
         serverCertificate: /etc/istio/ingressgateway-certs/tls.crt # pre-req: generate a k8s secret containing these cert files
         privateKey: /etc/istio/ingressgateway-certs/tls.key
+
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -29,6 +35,12 @@ spec:
   http:
     - match:
         - uri:
+            # Allow the Authentication Request Callback to get routed to productpage so it can be intercepted by the authservice
+            prefix: /productpage/oauth
+        - uri:
+            # Allow the authservice logout request to get routed to productpage so it can be intercepted by the authservice
+            exact: /authservice_logout
+        - uri:
             exact: /productpage
         - uri:
             prefix: /productpage/oauth # makes sure then Authentication Request Callback gets routed to the productpage
@@ -39,9 +51,7 @@ spec:
         - uri:
             exact: /logout
         - uri:
-            exact: /authservice_logout
-        - uri:
-            prefix: /api/v1/products
+            prefix: /api/v1/
       route:
         - destination:
             host: productpage

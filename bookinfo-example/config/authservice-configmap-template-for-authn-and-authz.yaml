@@ -1,3 +1,10 @@
+#
+# A ConfigMap which contains the configuration of the authservice.
+# In bookinfo-with-authservice-template.yaml the authservice container is created
+# with this ConfigMap volume mounted inside the container at /etc/authservice, which
+# is the location where the authservice expects the file to exist.
+#
+
 ---
 kind: ConfigMap
 apiVersion: v1
@@ -38,11 +45,15 @@ data:
                 },
                 "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
                 "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
-                "scopes": [],
+                "scopes": ["productpage.read", "reviews.read"],
                 "landing_page": "https://<INGRESS_HOST_CHANGE_ME>/productpage",
                 "cryptor_secret": "xxx_CHANGE_ME",
                 "cookie_name_prefix": "productpage",
                 "id_token": {
+                  "preamble": "Bearer",
+                  "header": "x-id-token"
+                },
+                "access_token": {
                   "preamble": "Bearer",
                   "header": "Authorization"
                 },

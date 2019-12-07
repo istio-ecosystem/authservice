@@ -266,7 +266,7 @@ spec:
         ports:
         - containerPort: 9080
       - name: authservice # authservice needs to be deployed in the sample Pod as the productpage
-        image: <AUTHSERVICE_IMAGE> # Manually docker pull the latest authservice image from https://github.com/istio-ecosystem/authservice/packages and push it to your own image registry (e.g. Docker Hub), and use it here. (The Github Package Registry does not work with k8s yet until this issue is fixed and released: https://github.com/kubernetes-sigs/kind/issues/870)
+        image: <AUTHSERVICE_IMAGE_REPLACE_ME> # Manually docker pull the latest authservice image from https://github.com/istio-ecosystem/authservice/packages and push it to your own image registry (e.g. Docker Hub), and use it here. (The Github Package Registry does not work with k8s yet until this issue is fixed and released: https://github.com/kubernetes-sigs/kind/issues/870)
         imagePullPolicy: Always
         ports:
           - containerPort: 10003

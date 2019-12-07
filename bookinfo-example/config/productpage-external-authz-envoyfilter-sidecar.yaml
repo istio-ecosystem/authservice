@@ -1,0 +1,59 @@
+#
+# Add the ext_authz filter to the productpage app's sidecar's Envoy filter chain.
+# Configure the ext_authz filter to ask the authservice about every incoming request
+# via GRPC. For every incoming request, the authservice will decide to either allow
+# the request and add tokens as headers, or will cause the response to redirect for
+# authentication.
+#
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: sidecar-token-service-filter-for-bookinfo
+  namespace: default
+spec:
+  workloadSelector:
+    labels:
+      app: productpage # target the app to which you want to apply the filter
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_INBOUND
+      listener:
+        filterChain:
+          filter:
+            name: "envoy.http_connection_manager"
+            subFilter:
+              name: "envoy.filters.http.jwt_authn"
+    patch:
+      operation: INSERT_BEFORE
+      value:
+       name: envoy.ext_authz
+       config:
+         stat_prefix: ext_authz
+         grpc_service:
+           envoy_grpc:
+             cluster_name: ext_authz
+           timeout: 10s # Timeout for the entire request (including authcode for token exchange with the IDP)
+  - applyTo: CLUSTER
+    match:
+      context: ANY
+      cluster: {} # this line is required starting in istio 1.4.0
+    patch:
+      operation: ADD
+      value:
+        name: ext_authz
+        connect_timeout: 5s # This timeout controls the initial TCP handshake timeout - not the timeout for the entire request
+        type: LOGICAL_DNS
+        lb_policy: ROUND_ROBIN
+        http2_protocol_options: {}
+        load_assignment:
+          cluster_name: ext_authz
+          endpoints:
+            - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: 127.0.0.1
+                        port_value: 10003
