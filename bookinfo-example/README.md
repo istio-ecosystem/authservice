@@ -234,7 +234,7 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
           kubectl apply -f config/bookinfo-with-authservice-template.yaml
           ```
        
-1. Add the scope `reviews.read` to another user and login. The user should be able to view the `productpage` with reviews.
+1. Log in to the `productpage` app as previously done, using a user authorized with both scopes `productpage.read` and `reviews.read`. The user will be authorized to view the `productpage` with reviews.
    
    There are three scenarios once authenticated:
    
