@@ -209,24 +209,22 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
 1. Patch `productpage` to forward authorization headers to other services.
     1. Clone https://github.com/istio/istio.
     1. Make the changes below and build the image using `/samples/bookinfo/src/productpage/Dockerfile`.
-    
-          ```diff
-           diff --git a/samples/bookinfo/src/productpage/productpage.py b/samples/bookinfo/src/productpage/productpage.py
-           index af5a411ea..722434405 100755
-           --- a/samples/bookinfo/src/productpage/productpage.py
-           +++ b/samples/bookinfo/src/productpage/productpage.py
-           @@ -182,7 +182,9 @@ def getForwardHeaders(request):
-                if 'user' in session:
-                    headers['end-user'] = session['user']
+       ```diff
+        --- a/samples/bookinfo/src/productpage/productpage.py
+        +++ b/samples/bookinfo/src/productpage/productpage.py
+        @@ -182,7 +182,9 @@ def getForwardHeaders(request):
+             if 'user' in session:
+                 headers['end-user'] = session['user']
+        
+        -    incoming_headers = ['x-request-id', 'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled']
+        +    incoming_headers = ['x-request-id',
+        +                        'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled',
+        +                        'authorization']
+        
+             # Add user-agent to headers manually
+             if 'user-agent' in request.headers:
+        ```
            
-           -    incoming_headers = ['x-request-id', 'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled']
-           +    incoming_headers = ['x-request-id',
-           +                        'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled',
-           +                        'authorization']
-           
-                # Add user-agent to headers manually
-                if 'user-agent' in request.headers:
-           ```
     1. Tag and push the image created to an accessible registry.
     1. Replace the `productpage` image in `config/bookinfo-with-authservice-template.yaml` with the image built above.
     1. Reapply the deployment file.
