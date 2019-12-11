@@ -29,7 +29,7 @@ provider will be needed to configure Authservice.
    [`scripts/generate-self-signed-certs-for-ingress-gateway.sh`](scripts/generate-self-signed-certs-for-ingress-gateway.sh)
 
 
-### Deploy Bookinfo Using the Authservice for Token Acquisition 
+## Deploy Bookinfo Using the Authservice for Token Acquisition
 
 The goal of these steps is the protect the `productpage` service with OIDC authentication provided by the mesh.
 
@@ -44,19 +44,19 @@ other services of the Bookinfo app aside from `productpage`.
 
 1. Setup a `ConfigMap` for Authservice. Fill in [`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml)
    to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md)
-   for the description of each field. Once the values have been substituted, apply the ConfigMap.
+   for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
    
    `kubectl apply -f config/authservice-configmap-template-for-authn.yaml`
-
+    ### <a name="authservice-image"></a> 
 1. The Github Package Registry does not work seamlessly with k8s until [issue #870](https://github.com/kubernetes-sigs/kind/issues/870)
    is fixed and released. As a workaround, manually `docker pull` the latest authservice image from
    [https://github.com/istio-ecosystem/authservice/packages](https://github.com/istio-ecosystem/authservice/packages)
-   and push it to your own image registry (e.g. Docker Hub).
+   and push it to an accessible image registry (e.g. Docker Hub).
    See the ["Using the authservice docker image" section in the README.md](https://github.com/istio-ecosystem/authservice/blob/master/README.md#using-the-authservice-docker-image)
    for more information.
 
 1. Edit [`config/bookinfo-with-authservice-template.yaml`](config/bookinfo-with-authservice-template.yaml)
-   and replace the authservice image name with the reference to the image in your registry from the step above.
+   and replace the authservice image name with the reference to the image in the registry from the step above.
    Then apply the file to deploy Bookinfo and Authservice.
 
     `kubectl apply -f config/bookinfo-with-authservice-template.yaml`
@@ -123,4 +123,133 @@ other services of the Bookinfo app aside from `productpage`.
    The Authservice saves its state into the user's browser cookies, so future `productpage` page loads in the browser
    will not require authentication until the OIDC tokens expire. To log out and remove the cookies immediately,
    point the browser to `https://<INGRESS_HOST>/authservice_logout` (this path is configurable in the Authservice's
-   ConfigMap).
+   `ConfigMap`).
+
+## Deploy Bookinfo Using the Authservice for Authorization 
+
+The authentication tokens acquired using the Authservice can also be used for authorization, provided that they contain 
+scopes. This section demonstrates how to leverage the Authservice to relay the authorization token to protected apps and services. 
+  
+
+1. Install Istio with a Patched Envoy Proxy
+
+    | ⚠️🚨 WARNING 🚨⚠️: A custom Istio with fixes will be installed, so a cluster without Istio currently installed is required. |
+    | --- |
+    
+    The current sidecar proxy image bundled with Istio contains [a bug which prevents setting multiple headers](https://github.com/envoyproxy/envoy/issues/8649). Unfortunately, because of this the Authservice cannot set multiple headers in a single request until a fix is released, namely id token header and access token header. A fork of the Envoy Proxy with a fix permitting multiple headers to be set per a single request is required to demonstrate the authorization features of the Authservice. Instructions on how to build and deploy a patched ingress sidecar can be found in the [wiki](https://github.com/istio-ecosystem/authservice/wiki/Installing-Istio-with-a-Custom-Envoy-Proxy).
+
+1. Configure the Authservice for authorization
+    Additionally the Authservice must be configured to provide authorization. It must both request scopes for protected resources and also attach the authorization token as a header.
+
+    1. Setup a `ConfigMap` for Authservice. Fill in [`authservice-configmap-template-for-authn-and-authz.yaml`](authservice-configmap-template-for-authn-and-authz.yaml) to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md) for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
+
+    ```bash
+    kubectl -f config/authservice-configmap-template-for-authn-and-authz.yaml
+    ```
+     This `ConfigMap` has two notable additions compared to the `ConfigMap` for authentication only ([`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml)).
+
+     1. It contains a key `chains[*].filters[*].oidc.scopes` which contains a list of strings of scopes that the Authservice is enabled to request on behalf of the service it is protecting. In this example, the Authservice will request `productpage.read`. 
+
+     1. It contains a key `chains[*].filters[*].oidc.access_token` which is an object defining a preamble and a header name to provide the access token as a header after receipt.
+
+1. Configure the Bookinfo app
+
+    1. Edit [`config/bookinfo-with-authservice-template.yaml`](config/bookinfo-with-authservice-template.yaml)
+
+       1. Supply a Authservice image. This has previously been described in the steps ["Deploy Bookinfo Using the Authservice for Token Acquisition"](#authservice-image) from above. 
+
+    1. Deploy Bookinfo and Authservice by applying the Authservice deployment file.
+       
+       ```bash
+       kubectl apply -f config/bookinfo-with-authservice-template.yaml
+       watch kubectl get pods -A
+       ```
+          
+    1. Wait for the new pods to be in `Running` state. Note that the Authservice will be deployed in the same Pod as `productpage`.
+
+    1. If the `callback` or `logout` paths in [`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml) were edited in a previous step, then edit those same paths in [`config/bookinfo-gateway.yaml`](config/bookinfo-gateway.yaml). Otherwise, no edit is needed. When ready, apply the file to create the ingress gateway and routing rules for Bookinfo:
+       ```bash
+       kubectl apply -f config/bookinfo-gateway.yaml
+       ```
+       
+    1. Next confirm that the Bookinfo app is running.
+       
+       After determining the [ingress IP and port](https://istio.io/docs/tasks/traffic-management/ingress/ingress-control/#determining-the-ingress-ip-and-ports), use a browser to navigate to the `productpage` UI, substituting the ingress host: `https://<INGRESS_HOST>/productpage`.
+    
+       Note that at this point, the Bookinfo sample apps are deployed without any authentication, and without activating the Authservice, so the `productpage` UI should show in the browser without being asked to authenticate.
+
+1. Enable Authz
+
+    1. Apply the authentication policy, which creates a `Policy` that enforces authentication on the services under `targets`. Replace the fields under `jwt`(`issuer` and `jwksUri` settings).
+    
+       ```bash
+       kubectl apply -f config/bookinfo-authn-policy-template-adding-reviews.yaml
+       ```
+       
+    1. Apply the authorization policy, creating one `AuthorizationPolicy` each for `productpage` and `reviews`. 
+       
+        ```bash
+       kubectl apply -f config/bookinfo-authz-using-istio-authorization-policy.yaml
+       ```
+       
+       Note: `config/bookinfo-authz-using-deprecated-rbac.yaml` can also be used, but will be removed in Istio 1.6.
+    
+    | ⚠️Note⚠️: Unless logout is setup prior these steps, multiple users with different scopes will be required. |
+    | --- |
+    
+    1. Navigate to the `productpage`, substituting the ingress host: `https://<INGRESS_HOST>/productpage`. Because authentication is enabled, the user is prompted to provide their credentials for the identity provider given in the `ConfigMap`.
+    
+    1. Assuming the authenticated user has neither `productpage.read` nor the `reviews.read` scopes, then they should not see the `productpage` but instead should be met with an Istio unauthorized message `"RBAC: access denied"`.
+    
+    1. Add the scope `productpage.read` to a different user and login. The user should be able to view the `productpage` sans reviews.
+       * A message should appear on the `productpage` stating `"Sorry, product reviews are currently unavailable for this book."` This is because the authenticated user is not authorized to access the `reviews` service and would require the scope `reviews.read` in order to access it.
+    
+#### Authz with `review` service (optional)
+
+1. Patch `productpage` to forward authorization headers to other services.
+    1. Clone https://github.com/istio/istio.
+    1. Make the changes below and build the image using `/samples/bookinfo/src/productpage/Dockerfile`.
+    
+          ```diff
+           diff --git a/samples/bookinfo/src/productpage/productpage.py b/samples/bookinfo/src/productpage/productpage.py
+           index af5a411ea..722434405 100755
+           --- a/samples/bookinfo/src/productpage/productpage.py
+           +++ b/samples/bookinfo/src/productpage/productpage.py
+           @@ -182,7 +182,9 @@ def getForwardHeaders(request):
+                if 'user' in session:
+                    headers['end-user'] = session['user']
+           
+           -    incoming_headers = ['x-request-id', 'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled']
+           +    incoming_headers = ['x-request-id',
+           +                        'x-datadog-trace-id', 'x-datadog-parent-id', 'x-datadog-sampled',
+           +                        'authorization']
+           
+                # Add user-agent to headers manually
+                if 'user-agent' in request.headers:
+           ```
+    1. Tag and push the image created to an accessible registry.
+    1. Replace the `productpage` image in `config/bookinfo-with-authservice-template.yaml` with the image built above.
+    1. Reapply the deployment file.
+          ```bash
+          kubectl apply -f config/bookinfo-with-authservice-template.yaml
+          ```
+       
+1. Add the scope `reviews.read` to another user and login. The user should be able to view the `productpage` with reviews.
+   
+   There are three scenarios once authenticated:
+   
+   | Behavior                                        | productpage.read | reviews.read |
+   |-------------------------------------------------|------------------|--------------|
+   | Page is fully viewable                          | x                | x            |
+   | Page is viewable but reviews are not            | x                |              |
+   | Istio unauthorized message: RBAC: access denied |                  |              |
+
+Through this demo, the user will have set up a cluster with a custom Istio installed, installed the Bookinfo app, and set
+up authentication and authorization. 
+
+This doc shows how to integrate Authservice into an Istio system deployed on Kubernetes.
+
+This demo uses the [Istio Bookinfo sample application](https://istio.io/docs/examples/bookinfo/).
+
+This demo takes advantage of an Istio feature set that gives the ability to inject http filters on Sidecars. This feature set was released in Istio 1.3.0.
+

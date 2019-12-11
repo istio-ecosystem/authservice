@@ -1,0 +1,76 @@
+#
+# A simple example of enabling authorization for some services using
+# the Istio RBAC feature that was deprecated in Istio 1.4.
+# See docs: https://istio.io/docs/reference/config/security/istio.rbac.v1alpha1/
+#
+
+---
+# Turn on the RBAC feature
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ClusterRbacConfig
+metadata:
+  name: default
+spec:
+  mode: 'ON_WITH_INCLUSION'
+  inclusion:
+    services:
+      # Turning on RBAC for only the following services.
+      # Note that this assumes that the authentication policy was enabled for these services.
+      - productpage.default.svc.cluster.local
+      - reviews.default.svc.cluster.local
+
+---
+# Create a service role
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: productpage-viewer
+  namespace: default
+spec:
+  rules:
+    - services: ["productpage.*"]
+      methods: ["GET"]
+
+---
+# Assign the role to users who have a certain scope
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: bind-productpage-viewer
+  namespace: default
+spec:
+  subjects:
+    - properties:
+        request.auth.claims[scope]: "productpage.read"
+        request.auth.claims[aud]: "productpage"
+  roleRef:
+    kind: ServiceRole
+    name: "productpage-viewer"
+
+---
+# Create a service role
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRole
+metadata:
+  name: reviews-viewer
+  namespace: default
+spec:
+  rules:
+    - services: ["reviews.*"]
+      methods: ["GET"]
+
+---
+# Assign the role to users who have a certain scope
+apiVersion: "rbac.istio.io/v1alpha1"
+kind: ServiceRoleBinding
+metadata:
+  name: bind-reviews-viewer
+  namespace: default
+spec:
+  subjects:
+    - properties:
+        request.auth.claims[scope]: "reviews.read"
+        request.auth.claims[aud]: "reviews"
+  roleRef:
+    kind: ServiceRole
+    name: "reviews-viewer"

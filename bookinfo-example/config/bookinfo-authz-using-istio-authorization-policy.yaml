@@ -1,0 +1,53 @@
+#
+# A simple example of enabling authorization for some services using
+# the `AuthorizationPolicy` that was introduced in Istio 1.4.
+# See docs: https://istio.io/docs/tasks/security/authorization/authz-http/
+#
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: productpage
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: productpage
+  # By default all requests are denied
+  rules:
+    # Allow GETs when the following claims are contained in the user's JWT
+    - to:
+        - operation:
+            methods: ["GET"]
+      when:
+        - key: request.auth.claims[scope]
+          values:
+            - productpage.read
+        - key: request.auth.claims[aud]
+          values:
+            - productpage
+
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: reviews
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: reviews
+  # By default all requests are denied
+  rules:
+    # Allow GETs when the following claims are contained in the user's JWT
+    - to:
+        - operation:
+            methods: ["GET"]
+      when:
+        - key: request.auth.claims[scope]
+          values:
+            - reviews.read
+        - key: request.auth.claims[aud]
+          values:
+            - reviews
