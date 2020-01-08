@@ -60,7 +60,16 @@ class TokenResponseParserImpl final : public TokenResponseParser {
  private:
   google::jwt_verify::JwksPtr keys_;
 
- public:
+  int64_t GetExpiry(
+      google::protobuf::Map<std::string, google::protobuf::Value> &fields,
+      const google::jwt_verify::Jwt &id_token) const;
+
+  bool IsInvalid(const std::string &client_id, const std::string &nonce,
+                 google::protobuf::Map<std::string, google::protobuf::Value> &fields,
+                 google::jwt_verify::Jwt &id_token,
+                 google::protobuf::util::Status status) const;
+
+public:
   TokenResponseParserImpl(google::jwt_verify::JwksPtr keys);
   absl::optional<TokenResponse> Parse(const std::string &client_id,
                                       const std::string &nonce,
