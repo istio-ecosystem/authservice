@@ -30,6 +30,19 @@ xx_library(
 )
 
 xx_library(
+    name = "session_id_generator",
+    srcs = [
+        "session_id_generator.cc",
+    ],
+    hdrs = [
+        "session_id_generator.h",
+    ],
+    deps = [
+        "//src/common/utilities:random"
+    ],
+)
+
+xx_library(
     name = "token_encryptor",
     srcs = [
         "token_encryptor.cc",

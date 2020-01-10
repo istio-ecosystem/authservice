@@ -19,14 +19,17 @@ class TokenResponse {
  private:
   google::jwt_verify::Jwt id_token_;
   std::string access_token_;
+  std::string refresh_token_;
   int64_t expiry_;
 
  public:
   TokenResponse(const google::jwt_verify::Jwt &id_token);
   void SetAccessToken(absl::string_view access_token);
+  void SetRefreshToken(absl::string_view refresh_token);
   void SetExpiry(int64_t expiry);
   const google::jwt_verify::Jwt &IDToken() const;
   absl::optional<const std::string> AccessToken() const;
+  absl::optional<const std::string> RefreshToken() const;
   absl::optional<int64_t> Expiry() const;
 };
 

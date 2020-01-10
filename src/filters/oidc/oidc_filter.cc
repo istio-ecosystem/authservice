@@ -23,6 +23,7 @@ namespace oidc {
 namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
+const int64_t NO_TIMEOUT = -1;
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl,
@@ -35,11 +36,13 @@ const std::map<const char *, const char *> standard_headers = {
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
                        const authservice::config::oidc::OIDCConfig &idp_config,
                        TokenResponseParserPtr parser,
-                       common::session::TokenEncryptorPtr cryptor)
+                       common::session::TokenEncryptorPtr cryptor,
+                       common::session::SessionIdGeneratorPtr session_id_generator)
     : http_ptr_(http_ptr),
       idp_config_(idp_config),
       parser_(parser),
-      cryptor_(cryptor) {
+      cryptor_(cryptor),
+      session_id_generator_(session_id_generator){
   spdlog::trace("{}", __func__);
 }
 
@@ -94,6 +97,10 @@ std::string OidcFilter::GetAccessTokenCookieName() const {
   return GetCookieName("access-token");
 }
 
+std::string OidcFilter::GetSessionIdCookieName() const {
+  return GetCookieName("session-id");
+}
+
 std::string OidcFilter::EncodeHeaderValue(const std::string &preamble,
                                           const std::string &value) {
   if (preamble != "") {
@@ -131,15 +138,18 @@ void OidcFilter::DeleteCookie(
 }
 
 std::set<std::string> OidcFilter::GetCookieDirectives(int64_t timeout) {
-  std::string timeoutDirective = EncodeCookieTimeoutDirective(timeout);
   std::set<std::string> token_set_cookie_header_directives =
       {
           common::http::headers::SetCookieDirectives::HttpOnly,
           common::http::headers::SetCookieDirectives::SameSiteLax,
           common::http::headers::SetCookieDirectives::Secure,
-          "Path=/",
-          timeoutDirective
+          "Path=/"
       };
+
+  if (timeout != NO_TIMEOUT) {
+    std::string timeoutDirective = EncodeCookieTimeoutDirective(timeout);
+    token_set_cookie_header_directives.insert(timeoutDirective);
+  }
   return token_set_cookie_header_directives;
 }
 
@@ -237,6 +247,7 @@ google::rpc::Code OidcFilter::Process(
     DeleteCookie(responseHeaders, GetStateCookieName());
     DeleteCookie(responseHeaders, GetAccessTokenCookieName());
     DeleteCookie(responseHeaders, GetIdTokenCookieName());
+    DeleteCookie(responseHeaders, GetSessionIdCookieName());
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
@@ -246,6 +257,13 @@ google::rpc::Code OidcFilter::Process(
   auto headers = request->attributes().request().http().headers();
   if (headers.contains(idp_config_.id_token().header())) {
     return google::rpc::Code::OK;
+  }
+
+  // Check if we have a session_id cookie, if not, set header for sessionId, then continue with normal flow
+  auto session_id = GetSessionIdFromCookie(headers);
+  if (!session_id.has_value()) {
+    auto sessionId = session_id_generator_->Generate();
+    SetSessionIdCookie(response, sessionId);
   }
 
   // Check if we have a valid id_token cookie and optionally an access token
@@ -311,6 +329,18 @@ absl::optional<std::string> OidcFilter::GetTokenFromCookie(const ::google::proto
   }
 }
 
+absl::optional<std::string> OidcFilter::GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
+    ::std::string> &headers) {
+  auto cookie_name = GetSessionIdCookieName();
+  auto cookie = CookieFromHeaders(headers, cookie_name);
+  if (cookie.has_value()) {
+    return cookie.value();
+  } else {
+    spdlog::info("{}: {} session id cookie missing", __func__, cookie_name);
+    return absl::nullopt;
+  }
+}
+
 void OidcFilter::SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
     const std::string &access_token) {
   auto value = EncodeHeaderValue(idp_config_.access_token().preamble(), access_token);
@@ -321,6 +351,11 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
     const std::string& id_token) {
   auto value = EncodeHeaderValue(idp_config_.id_token().preamble(), id_token);
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
+}
+
+void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response,
+                                    const std::string &session_id) {
+  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id, NO_TIMEOUT);
 }
 
 // Performs an HTTP POST and prints the response

@@ -4,6 +4,7 @@ cc_library(
     visibility = ["//test:__subpackages__"],
     deps = [
         "//src/common/session:token_encryptor",
+        "//src/common/session:session_id_generator"
     ],
 )
 
@@ -22,6 +23,16 @@ cc_test(
     srcs = ["gcm_encryptor_test.cc"],
     deps = [
         "//src/common/session:gcm_encryptor",
+        "@com_google_googletest//:gtest_main",
+    ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+)
+
+cc_test(
+    name = "session_id_generator_test",
+    srcs = ["session_id_generator_test.cc"],
+    deps = [
+        "//src/common/session:session_id_generator",
         "@com_google_googletest//:gtest_main",
     ],
     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS

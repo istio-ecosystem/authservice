@@ -1,11 +1,14 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
 #define AUTHSERVICE_SRC_FILTERS_OIDC_OIDC_FILTER_H_
+
 #include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/common/http/http.h"
 #include "src/common/session/token_encryptor.h"
 #include "src/filters/filter.h"
 #include "src/filters/oidc/token_response.h"
+#include "src/common/utilities/random.h"
+#include "src/common/session/session_id_generator.h"
 
 namespace authservice {
 namespace filters {
@@ -19,11 +22,12 @@ namespace oidc {
  * https://openid.net/specs/openid-connect-core-1_0.html.
  */
 class OidcFilter final : public filters::Filter {
- private:
+private:
   common::http::ptr_t http_ptr_;
   const authservice::config::oidc::OIDCConfig idp_config_;
   TokenResponseParserPtr parser_;
   common::session::TokenEncryptorPtr cryptor_;
+  common::session::SessionIdGeneratorPtr session_id_generator_;
 
   /**
    * Set HTTP header helper in a response.
@@ -31,8 +35,7 @@ class OidcFilter final : public filters::Filter {
    * @param name the name of the header
    * @param value the header value
    */
-  static void SetHeader(::google::protobuf::RepeatedPtrField<
-                        ::envoy::api::v2::core::HeaderValueOption> *headers,
+  static void SetHeader(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *headers,
                         absl::string_view name, absl::string_view value);
 
   /** @brief Set standard reply headers.
@@ -100,6 +103,7 @@ class OidcFilter final : public filters::Filter {
    */
   google::rpc::Code RedirectToIdP(
       ::envoy::service::auth::v2::CheckResponse *response);
+
   /** @brief Retrieve tokens from OIDC token endpoint
    *
    * @param request the incoming request
@@ -111,7 +115,7 @@ class OidcFilter final : public filters::Filter {
       const ::envoy::service::auth::v2::CheckRequest *request,
       ::envoy::service::auth::v2::CheckResponse *response,
       absl::string_view query,
-      boost::asio::io_context& ioc,
+      boost::asio::io_context &ioc,
       boost::asio::yield_context yield);
 
   /** @brief Get a cookie name. */
@@ -138,6 +142,14 @@ class OidcFilter final : public filters::Filter {
   void SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response, const std::string &access_token);
 
   /**
+   * @brief Given a session id, put it in a request header for the application to consume
+   *
+   * @param response the outgoing response
+   * @param session_id the session id
+   */
+  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, const std::string &session_id);
+
+  /**
    * @brief Retrieve and decrypt the token from the specified cookie
    *
    * @param headers The request headers to read the cookie from
@@ -146,6 +158,16 @@ class OidcFilter final : public filters::Filter {
    */
   absl::optional<std::string> GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
       ::std::string> &headers, const std::string &cookie_name);
+
+  /**
+   * @brief Retrieve and decrypt the sessionId from cookies
+   *
+   * @param headers The request headers to read the cookie from
+   * @return
+   */
+  absl::optional<std::string> GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
+      ::std::string> &headers);
+
 
   /**
    * @brief Get the directives that should be used when setting a cookie
@@ -162,13 +184,14 @@ public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
              TokenResponseParserPtr parser,
-             common::session::TokenEncryptorPtr cryptor);
+             common::session::TokenEncryptorPtr cryptor,
+             common::session::SessionIdGeneratorPtr session_id_generator);
 
   google::rpc::Code Process(
-          const ::envoy::service::auth::v2::CheckRequest *request,
-          ::envoy::service::auth::v2::CheckResponse *response,
-          boost::asio::io_context& ioc,
-          boost::asio::yield_context yield) override;
+      const ::envoy::service::auth::v2::CheckRequest *request,
+      ::envoy::service::auth::v2::CheckResponse *response,
+      boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) override;
 
   // Required to inherit the 2-argument version of Process from the base class
   using filters::Filter::Process;
@@ -183,6 +206,9 @@ public:
 
   /** @brief Get access token cookie name. */
   std::string GetAccessTokenCookieName() const;
+
+  /** @brief Get sessionID cookie name */
+  std::string GetSessionIdCookieName() const;
 
   void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
                     const std::string &cookieName);

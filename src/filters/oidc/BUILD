@@ -33,6 +33,7 @@ xx_library(
         "//config/oidc:config_cc",
         "//src/common/http",
         "//src/common/session:token_encryptor",
+        "//src/common/session:session_id_generator",
         "//src/common/utilities:random",
         "//src/filters:filter",
         "//src/filters/oidc:state_cookie_codec",

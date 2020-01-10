@@ -40,6 +40,7 @@ namespace filters {
         if (!filter.has_oidc()) {
           throw std::runtime_error("unsupported filter type");
         }
+
         auto token_request_parser =
             std::make_shared<oidc::TokenResponseParserImpl>(
                 google::jwt_verify::Jwks::createFrom(
@@ -50,10 +51,12 @@ namespace filters {
             common::session::EncryptionAlg::AES256GCM,
             common::session::HKDFHash::SHA512);
 
+        auto session_id_generator = std::make_shared<common::session::SessionIdGenerator>();
+
         auto http = common::http::ptr_t(new common::http::http_impl);
 
         result->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
-            http, filter.oidc(), token_request_parser, token_encryptor)));
+            http, filter.oidc(), token_request_parser, token_encryptor, session_id_generator)));
       }
       return result;
     }

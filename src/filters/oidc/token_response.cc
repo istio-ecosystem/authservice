@@ -17,6 +17,7 @@ const char *bearer_token_type = "bearer";
 const char *id_token_field = "id_token";
 const char *access_token_field = "access_token";
 const char *expires_in_field = "expires_in";
+const char *refresh_token_field = "refresh_token";
 }  // namespace
 
 TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
@@ -24,6 +25,10 @@ TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
 
 void TokenResponse::SetAccessToken(absl::string_view access_token) {
   access_token_ = std::string(access_token.data(), access_token.size());
+}
+
+void TokenResponse::SetRefreshToken(absl::string_view refresh_token) {
+  refresh_token_ = std::string(refresh_token.data(), refresh_token.size());
 }
 
 void TokenResponse::SetExpiry(int64_t expiry) {
@@ -37,6 +42,13 @@ const google::jwt_verify::Jwt &TokenResponse::IDToken() const {
 absl::optional<const std::string> TokenResponse::AccessToken() const {
   if (!access_token_.empty()) {
     return access_token_;
+  }
+  return absl::nullopt;
+}
+
+absl::optional<const std::string> TokenResponse::RefreshToken() const {
+  if (!refresh_token_.empty()) {
+    return refresh_token_;
   }
   return absl::nullopt;
 }
@@ -76,6 +88,11 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   if (access_token_iter != fields.end()) {
     result->SetAccessToken(access_token_iter->second.string_value());
   }
+  auto refresh_token_iter = fields.find(refresh_token_field);
+  if (refresh_token_iter != fields.end()) {
+    result->SetRefreshToken(refresh_token_iter->second.string_value());
+  }
+
   result->SetExpiry(GetExpiry(fields, id_token));
   return result;
 }
