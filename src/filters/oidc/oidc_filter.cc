@@ -60,8 +60,6 @@ google::rpc::Code OidcFilter::Process(
   if (!request->attributes().request().has_http()) {
     spdlog::info("{}: missing http in request", __func__);
     SetStandardResponseHeaders(response);
-    ::grpc::Status err(::grpc::StatusCode::INVALID_ARGUMENT,
-                       "missing http parameters");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
@@ -376,20 +374,17 @@ google::rpc::Code OidcFilter::RetrieveToken(
       request->attributes().request().http().headers(), GetStateCookieName());
   if (!encrypted_state_cookie.has_value()) {
     spdlog::info("{}: missing state cookie", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   auto state_cookie = cryptor_->Decrypt(encrypted_state_cookie.value());
   if (!state_cookie.has_value()) {
     spdlog::info("{}: invalid state cookie", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   StateCookieCodec codec;
   auto state_and_nonce = codec.Decode(state_cookie.value());
   if (!state_and_nonce.has_value()) {
     spdlog::info("{}: invalid state cookie encoding", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
@@ -397,7 +392,6 @@ google::rpc::Code OidcFilter::RetrieveToken(
   auto query_data = common::http::http::DecodeQueryData(query);
   if (!query_data.has_value()) {
     spdlog::info("{}: form data is invalid", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   const auto state = query_data->find("state");
@@ -406,12 +400,10 @@ google::rpc::Code OidcFilter::RetrieveToken(
     spdlog::info(
         "{}: form data does not contain expected state and code parameters",
         __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   if (state->second != state_and_nonce->first) {
     spdlog::info("{}: mismatch state", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT, "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
@@ -435,21 +427,17 @@ google::rpc::Code OidcFilter::RetrieveToken(
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");
-    ::grpc::Status error(::grpc::StatusCode::INTERNAL, "IdP connection error");
     return google::rpc::Code::INTERNAL;
   }
   if (retrieve_token_response->result() != boost::beast::http::status::ok) {
     spdlog::info("{}: HTTP token response error: {}", __func__,
                  retrieve_token_response->result_int());
-    ::grpc::Status error(::grpc::StatusCode::UNKNOWN, "IdP connection error");
     return google::rpc::Code::UNKNOWN;
   } else {
     auto nonce = std::string(state_and_nonce->second.data(), state_and_nonce->second.size());
     auto token_response = parser_->Parse(idp_config_.client_id(), nonce, retrieve_token_response->body());
     if (!token_response.has_value()) {
       spdlog::info("{}: Invalid token response", __func__);
-      ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                           "Invalid token response");
       return google::rpc::Code::INVALID_ARGUMENT;
     }
 
@@ -459,8 +447,6 @@ google::rpc::Code OidcFilter::RetrieveToken(
       auto access_token = token_response->AccessToken();
       if (!access_token.has_value()) {
         spdlog::info("{}: Missing expected access_token", __func__);
-        ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                             "Missing expected access_token");
         return google::rpc::Code::INVALID_ARGUMENT;
       }
     }
