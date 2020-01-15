@@ -9,6 +9,7 @@
 #include "src/filters/oidc/token_response.h"
 #include "src/common/utilities/random.h"
 #include "src/common/session/session_id_generator.h"
+#include "src/filters/oidc/session_store.h"
 
 namespace authservice {
 namespace filters {
@@ -28,6 +29,7 @@ private:
   TokenResponseParserPtr parser_;
   common::session::TokenEncryptorPtr cryptor_;
   common::session::SessionIdGeneratorPtr session_id_generator_;
+  SessionStorePtr session_store_;
 
   /**
    * Set HTTP header helper in a response.
@@ -54,6 +56,8 @@ private:
   static void SetRedirectHeaders(
       absl::string_view redirect_url,
       ::envoy::service::auth::v2::CheckResponse *response);
+
+  void SetLogoutHeaders(CheckResponse *response);
 
   /** @brief Encode the given timeout as a cookie Max-Age directive.
    *
@@ -97,24 +101,14 @@ private:
    *
    * Set IdP redirect parameters so that a requesting agent is forced to
    * authenticate the user.
-   *
-   * @param response the redirect response
-   * @return the call state.
    */
-  google::rpc::Code RedirectToIdP(
-      ::envoy::service::auth::v2::CheckResponse *response);
+  void SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response);
 
-  /** @brief Retrieve tokens from OIDC token endpoint
-   *
-   * @param request the incoming request
-   * @param response the outgoing response
-   * @param query the request query string
-   * @return the call status
-   */
+  /** @brief Retrieve tokens from OIDC token endpoint */
   google::rpc::Code RetrieveToken(
       const ::envoy::service::auth::v2::CheckRequest *request,
       ::envoy::service::auth::v2::CheckResponse *response,
-      absl::string_view query,
+      absl::string_view session_id,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield);
 
@@ -150,16 +144,6 @@ private:
   void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, const std::string &session_id);
 
   /**
-   * @brief Retrieve and decrypt the token from the specified cookie
-   *
-   * @param headers The request headers to read the cookie from
-   * @param cookie_name The name of the cookie to read the token from
-   * @return
-   */
-  absl::optional<std::string> GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
-      ::std::string> &headers, const std::string &cookie_name);
-
-  /**
    * @brief Retrieve and decrypt the sessionId from cookies
    *
    * @param headers The request headers to read the cookie from
@@ -167,7 +151,6 @@ private:
    */
   absl::optional<std::string> GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
       ::std::string> &headers);
-
 
   /**
    * @brief Get the directives that should be used when setting a cookie
@@ -177,15 +160,32 @@ private:
    */
   std::set<std::string> GetCookieDirectives(int64_t timeout);
 
+  void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+                    const std::string &cookieName);
+
   /** @brief Check if the request appears to be the callback request. */
-  bool MatchesCallbackRequest(const std::string &request_host, const std::array<std::string, 3> &request_path_parts);
+  bool MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request);
+
+  /** @brief Check if the request appears to be the logout request. */
+  bool MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request);
+
+  /** @brief get the path from the request sans query string */
+  std::string RequestPath(const CheckRequest *request);
+
+  /** @brief get the query string from the request sans path */
+  std::string RequestQueryString(const CheckRequest *request);
+
+  bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
+
+  void AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response);
 
 public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
              TokenResponseParserPtr parser,
              common::session::TokenEncryptorPtr cryptor,
-             common::session::SessionIdGeneratorPtr session_id_generator);
+             common::session::SessionIdGeneratorPtr session_id_generator,
+             SessionStorePtr session_store);
 
   google::rpc::Code Process(
       const ::envoy::service::auth::v2::CheckRequest *request,
@@ -201,17 +201,8 @@ public:
   /** @brief Get state cookie name. */
   std::string GetStateCookieName() const;
 
-  /** @brief Get id token cookie name. */
-  std::string GetIdTokenCookieName() const;
-
-  /** @brief Get access token cookie name. */
-  std::string GetAccessTokenCookieName() const;
-
   /** @brief Get sessionID cookie name */
   std::string GetSessionIdCookieName() const;
-
-  void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
-                    const std::string &cookieName);
 };
 
 }  // namespace oidc

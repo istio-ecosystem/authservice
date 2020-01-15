@@ -29,6 +29,16 @@ cc_test(
 )
 
 cc_test(
+    name = "in_memory_session_store_test",
+    srcs = ["in_memory_session_store_test.cc"],
+    deps = [
+        "//src/filters/oidc:in_memory_session_store",
+        "@com_google_googletest//:gtest_main",
+    ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+)
+
+cc_test(
     name = "oidc_filter_test",
     srcs = ["oidc_filter_test.cc"],
     deps = [

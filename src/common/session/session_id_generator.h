@@ -1,6 +1,7 @@
 #ifndef AUTHSERVICE_SESSION_ID_GENERATOR_H
 #define AUTHSERVICE_SESSION_ID_GENERATOR_H
 
+#include <memory>
 #include <string>
 
 namespace authservice {

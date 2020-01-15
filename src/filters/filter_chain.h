@@ -3,6 +3,7 @@
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "src/filters/filter.h"
 #include "config/config.pb.h"
+#include "src/filters/oidc/session_store.h"
 #include <memory>
 
 namespace authservice {
@@ -34,6 +35,8 @@ public:
 class FilterChainImpl : public FilterChain {
 private:
     authservice::config::FilterChain config_;
+    std::shared_ptr<filters::oidc::SessionStore> session_store_;
+
 public:
     explicit FilterChainImpl(authservice::config::FilterChain config);
     const std::string &Name() const override;
