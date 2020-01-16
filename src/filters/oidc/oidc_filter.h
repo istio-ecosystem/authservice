@@ -10,6 +10,7 @@
 #include "src/common/utilities/random.h"
 #include "src/common/session/session_id_generator.h"
 #include "src/filters/oidc/session_store.h"
+#include <ctime>
 
 namespace authservice {
 namespace filters {
@@ -176,6 +177,10 @@ private:
   std::string RequestQueryString(const CheckRequest *request);
 
   bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
+
+  long long int seconds_since_epoch();
+
+  bool TokensNotExpired(TokenResponse &token_response);
 
   void AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response);
 

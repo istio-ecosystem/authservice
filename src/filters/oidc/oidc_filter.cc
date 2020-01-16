@@ -9,6 +9,7 @@
 #include "src/common/utilities/random.h"
 #include "state_cookie_codec.h"
 #include <algorithm>
+#include <chrono>
 
 namespace beast = boost::beast;    // from <boost/beast.hpp>
 namespace http = beast::http;      // from <boost/beast/http.hpp>
@@ -104,11 +105,10 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id.value(), ioc, yield);
   }
 
-  // If we have a valid id_token cookie and optionally an access token cookie, then let request continue.
-  // TODO Check that tokens have not expired. First draft: if either token has expired, redirect to IDP.
-  //  Next draft: use refresh token.
+  // If we have a valid and unexpired id_token and optionally an access token, then let request continue.
+  // TODO when expired, use refresh token.
   auto token_response = session_store_->get(session_id.value());
-  if (RequiredTokensPresent(token_response)) {
+  if (RequiredTokensPresent(token_response) && TokensNotExpired(token_response.value())) {
     AddTokensToRequestHeaders(response, token_response);
     return google::rpc::Code::OK;
   }
@@ -286,6 +286,28 @@ bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_resp
          (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
 }
 
+long long int OidcFilter::seconds_since_epoch() {
+  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
+      std::chrono::system_clock::now().time_since_epoch()
+  );
+  return seconds.count();
+}
+
+bool OidcFilter::TokensNotExpired(TokenResponse &token_response) {
+  long long int now_seconds = seconds_since_epoch();
+  auto id_token_expiration_seconds = static_cast<int64_t>(token_response.IDToken().exp_);
+
+  if (id_token_expiration_seconds < now_seconds) {
+    return false;
+  }
+
+  if (idp_config_.has_access_token()) {
+    return token_response.Expiry().has_value() && now_seconds < token_response.Expiry().value();
+  }
+
+  return true;
+}
+
 bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
   return idp_config_.has_logout() && RequestPath(request) == idp_config_.logout().path();
 }
@@ -397,9 +419,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   const auto state = query_data->find("state");
   const auto code = query_data->find("code");
   if (state == query_data->end() || code == query_data->end()) {
-    spdlog::info(
-        "{}: form data does not contain expected state and code parameters",
-        __func__);
+    spdlog::info("{}: form data does not contain expected state and code parameters", __func__);
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   if (state->second != state_and_nonce->first) {
