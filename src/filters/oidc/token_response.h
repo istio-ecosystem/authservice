@@ -20,17 +20,17 @@ class TokenResponse {
   google::jwt_verify::Jwt id_token_;
   std::string access_token_;
   std::string refresh_token_;
-  int64_t expiry_;
+  int64_t access_token_expiry_;
 
  public:
   TokenResponse(const google::jwt_verify::Jwt &id_token);
   void SetAccessToken(absl::string_view access_token);
   void SetRefreshToken(absl::string_view refresh_token);
-  void SetExpiry(int64_t expiry);
+  void SetAccessTokenExpiry(int64_t expiry);
   const google::jwt_verify::Jwt &IDToken() const;
   absl::optional<const std::string> AccessToken() const;
   absl::optional<const std::string> RefreshToken() const;
-  absl::optional<int64_t> Expiry() const;
+  absl::optional<int64_t> GetAccessTokenExpiry() const;
 };
 
 class TokenResponseParser;
@@ -63,9 +63,8 @@ class TokenResponseParserImpl final : public TokenResponseParser {
  private:
   google::jwt_verify::JwksPtr keys_;
 
-  int64_t GetExpiry(
-      google::protobuf::Map<std::string, google::protobuf::Value> &fields,
-      const google::jwt_verify::Jwt &id_token) const;
+  absl::optional<int64_t> ParseAccessTokenExpiry(
+      google::protobuf::Map<std::string, google::protobuf::Value> &fields) const;
 
   bool IsInvalid(const std::string &client_id, const std::string &nonce,
                  google::protobuf::Map<std::string, google::protobuf::Value> &fields,

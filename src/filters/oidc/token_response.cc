@@ -21,7 +21,7 @@ const char *refresh_token_field = "refresh_token";
 }  // namespace
 
 TokenResponse::TokenResponse(const google::jwt_verify::Jwt &id_token)
-    : id_token_(id_token) {}
+    : id_token_(id_token), access_token_expiry_(0) {}
 
 void TokenResponse::SetAccessToken(absl::string_view access_token) {
   access_token_ = std::string(access_token.data(), access_token.size());
@@ -31,8 +31,8 @@ void TokenResponse::SetRefreshToken(absl::string_view refresh_token) {
   refresh_token_ = std::string(refresh_token.data(), refresh_token.size());
 }
 
-void TokenResponse::SetExpiry(int64_t expiry) {
-  expiry_ = expiry;
+void TokenResponse::SetAccessTokenExpiry(int64_t expiry) {
+  access_token_expiry_ = expiry;
 }
 
 const google::jwt_verify::Jwt &TokenResponse::IDToken() const {
@@ -53,9 +53,9 @@ absl::optional<const std::string> TokenResponse::RefreshToken() const {
   return absl::nullopt;
 }
 
-absl::optional<int64_t> TokenResponse::Expiry() const {
-  if (expiry_) {
-    return expiry_;
+absl::optional<int64_t> TokenResponse::GetAccessTokenExpiry() const {
+  if (access_token_expiry_) {
+    return access_token_expiry_;
   }
   return absl::nullopt;
 }
@@ -93,7 +93,11 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
     result->SetRefreshToken(refresh_token_iter->second.string_value());
   }
 
-  result->SetExpiry(GetExpiry(fields, id_token));
+  const absl::optional<int64_t> &expiry = ParseAccessTokenExpiry(fields);
+  if (expiry.has_value()) {
+    result->SetAccessTokenExpiry(expiry.value());
+  }
+
   return result;
 }
 
@@ -138,7 +142,7 @@ bool TokenResponseParserImpl::IsInvalid(
     return true;
   }
 
-  // Verify our client_id is set as an entry in the token's `aud` field.
+  // Verify the token signature & that our client_id is set as an entry in the token's `aud` field.
   std::vector<std::string> audiences = {client_id};
   jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
@@ -171,9 +175,8 @@ bool TokenResponseParserImpl::IsInvalid(
   return false;
 }
 
-int64_t TokenResponseParserImpl::GetExpiry(
-    google::protobuf::Map<std::string, google::protobuf::Value> &fields,
-    const google::jwt_verify::Jwt &id_token
+absl::optional<int64_t> TokenResponseParserImpl::ParseAccessTokenExpiry(
+    google::protobuf::Map<std::string, google::protobuf::Value> &fields
 ) const {
   // expires_in field takes precedence over JWT timeout.
   auto expires_in_iter = fields.find(expires_in_field);
@@ -182,7 +185,7 @@ int64_t TokenResponseParserImpl::GetExpiry(
     // Knock 5 seconds off the expiry time to take into account the time it may have taken to retrieve the token.
     return absl::ToUnixSeconds(absl::Now()) + expires_in - 5;
   }
-  return static_cast<int64_t>(id_token.exp_);
+  return absl::nullopt;
 }
 
 }  // namespace oidc

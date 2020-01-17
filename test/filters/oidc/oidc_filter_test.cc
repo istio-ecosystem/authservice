@@ -118,7 +118,7 @@ class OidcFilterTest : public ::testing::Test {
 
     test_token_response_ = std::make_shared<TokenResponse>(test_id_token_jwt_);
     test_token_response_->SetAccessToken("expected_access_token");
-    test_token_response_->SetExpiry(10000000000); // not expired, Sat 20 Nov 2286
+    test_token_response_->SetAccessTokenExpiry(10000000000); // not expired, Sat 20 Nov 2286
   }
 
   void RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request);
@@ -285,7 +285,7 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_);
-  token_response.SetExpiry(2906139022); //Feb 2, 2062
+  token_response.SetAccessTokenExpiry(2906139022); //Feb 2, 2062
   token_response.SetAccessToken(nullptr);
   session_store_->set("session123", token_response);
 
@@ -324,7 +324,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
-  token_response.SetExpiry(1); // already expired
+  token_response.SetAccessTokenExpiry(1); // already expired
   token_response.SetAccessToken("fake_access_token");
   session_store_->set("session123", token_response);
 
@@ -363,7 +363,7 @@ TEST_F(OidcFilterTest, TokenResponseWithAccessTokenButNoExpiresInTimeShouldRedir
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
-  token_response.SetExpiry(0);
+  token_response.SetAccessTokenExpiry(0);
   token_response.SetAccessToken("fake_access_token");
   session_store_->set("session123", token_response);
 
@@ -410,7 +410,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
 
   TokenResponse token_response(expired_id_token_jwt);
   token_response.SetAccessToken("expected_access_token");
-  token_response.SetExpiry(10000000000); // access token not expired, Sat 20 Nov 2286
+  token_response.SetAccessTokenExpiry(10000000000); // access token not expired, Sat 20 Nov 2286
 
   session_store_->set("session123", token_response);
 
@@ -575,7 +575,7 @@ void OidcFilterTest::RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::st
   ASSERT_TRUE(stored_token_response.has_value());
   ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
   ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_access_token");
-  ASSERT_EQ(stored_token_response.value().Expiry(), 10000000000);
+  ASSERT_EQ(stored_token_response.value().GetAccessTokenExpiry(), 10000000000);
 
   ASSERT_THAT(
     response.denied_response().headers(),

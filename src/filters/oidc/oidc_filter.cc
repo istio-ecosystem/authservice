@@ -302,7 +302,7 @@ bool OidcFilter::TokensNotExpired(TokenResponse &token_response) {
   }
 
   if (idp_config_.has_access_token()) {
-    return token_response.Expiry().has_value() && now_seconds < token_response.Expiry().value();
+    return token_response.GetAccessTokenExpiry().has_value() && now_seconds < token_response.GetAccessTokenExpiry().value();
   }
 
   return true;

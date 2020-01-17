@@ -22,7 +22,7 @@ std::shared_ptr<TokenResponse> InMemorySessionStoreTest::CreateTokenResponse() {
   auto token_response = std::make_shared<TokenResponse>(id_token_jwt);
   token_response->SetRefreshToken("fake_refresh_token");
   token_response->SetAccessToken("fake_access_token");
-  token_response->SetExpiry(42);
+  token_response->SetAccessTokenExpiry(42);
   return token_response;
 }
 
@@ -45,9 +45,9 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
   ASSERT_EQ(result.value().AccessToken(), "fake_access_token");
-  ASSERT_EQ(result.value().Expiry(), 42);
+  ASSERT_EQ(result.value().GetAccessTokenExpiry(), 42);
 
-  token_response->SetExpiry(99);
+  token_response->SetAccessTokenExpiry(99);
   in_memory_session_store.set(session_id, *token_response); // overwrite
 
   result = in_memory_session_store.get(session_id);
@@ -55,7 +55,7 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
   ASSERT_EQ(result.value().AccessToken(), "fake_access_token2");
-  ASSERT_EQ(result.value().Expiry(), 99);
+  ASSERT_EQ(result.value().GetAccessTokenExpiry(), 99);
 
   result = in_memory_session_store.get(other_session_id);
   ASSERT_FALSE(result.has_value());
