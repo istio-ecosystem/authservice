@@ -31,6 +31,7 @@ class TokenResponse {
   absl::optional<const std::string> AccessToken() const;
   absl::optional<const std::string> RefreshToken() const;
   absl::optional<int64_t> GetAccessTokenExpiry() const;
+  int64_t GetIDTokenExpiry() const;
 };
 
 class TokenResponseParser;

@@ -286,7 +286,7 @@ bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_resp
          (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
 }
 
-long long int OidcFilter::seconds_since_epoch() {
+int64_t OidcFilter::seconds_since_epoch() {
   auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
       std::chrono::system_clock::now().time_since_epoch()
   );
@@ -294,15 +294,15 @@ long long int OidcFilter::seconds_since_epoch() {
 }
 
 bool OidcFilter::TokensNotExpired(TokenResponse &token_response) {
-  long long int now_seconds = seconds_since_epoch();
-  auto id_token_expiration_seconds = static_cast<int64_t>(token_response.IDToken().exp_);
+  int64_t now_seconds = seconds_since_epoch();
 
-  if (id_token_expiration_seconds < now_seconds) {
+  if (token_response.GetIDTokenExpiry() < now_seconds) {
     return false;
   }
 
   if (idp_config_.has_access_token()) {
-    return token_response.GetAccessTokenExpiry().has_value() && now_seconds < token_response.GetAccessTokenExpiry().value();
+    const absl::optional<int64_t> &accessTokenExpiry = token_response.GetAccessTokenExpiry();
+    return accessTokenExpiry.has_value() && (now_seconds < accessTokenExpiry.value());
   }
 
   return true;

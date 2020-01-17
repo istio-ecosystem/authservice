@@ -60,6 +60,10 @@ absl::optional<int64_t> TokenResponse::GetAccessTokenExpiry() const {
   return absl::nullopt;
 }
 
+int64_t TokenResponse::GetIDTokenExpiry() const {
+  return static_cast<int64_t>(id_token_.exp_);
+}
+
 TokenResponseParserImpl::TokenResponseParserImpl(
     google::jwt_verify::JwksPtr keys)
     : keys_(std::move(keys)) {}

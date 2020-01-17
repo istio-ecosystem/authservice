@@ -178,7 +178,7 @@ private:
 
   bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
 
-  long long int seconds_since_epoch();
+  int64_t seconds_since_epoch();
 
   bool TokensNotExpired(TokenResponse &token_response);
 

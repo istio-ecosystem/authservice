@@ -184,6 +184,8 @@ TEST(TokenResponseParser, Parse) {
   ASSERT_FALSE(refresh_token1.has_value());
   auto access_token_expiry1 = result->GetAccessTokenExpiry();
   ASSERT_FALSE(access_token_expiry1.has_value());
+  auto id_token_expiry = result->GetIDTokenExpiry();
+  ASSERT_EQ(2001001001, id_token_expiry);
 
   result = parser.Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
   ASSERT_TRUE(result.has_value());
