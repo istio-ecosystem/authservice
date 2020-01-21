@@ -91,95 +91,143 @@ const char *valid_refresh_token_response_bearer_with_access_token_and_refresh_to
 
 };  // namespace
 
-TEST(TokenResponseParser, ParseInvalidJSON) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, nonce, "invalid json");
+class TokenResponseParserTest : public ::testing::Test {
+ protected:
+  std::shared_ptr<TokenResponseParserImpl> parser_;
+
+  void SetUp() override {
+    auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
+    EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
+    parser_ = std::make_shared<TokenResponseParserImpl>(std::move(jwks));
+  }
+
+  TokenResponse ValidTokenResponse();
+};
+
+TokenResponse TokenResponseParserTest::ValidTokenResponse() {
+  auto token_response = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
+  return token_response.value();
+}
+
+TEST_F(TokenResponseParserTest, ParseInvalidJSON) {
+  auto result = parser_->Parse(client_id, nonce, "invalid json");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseMissingTokenType) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, nonce, R"({})");
+TEST_F(TokenResponseParserTest, ParseMissingTokenType) {
+  auto result = parser_->Parse(client_id, nonce, R"({})");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseInvalidTokenType) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, nonce, R"({"token_type":"NotBearer"})");
+TEST_F(TokenResponseParserTest, ParseInvalidTokenType) {
+  auto result = parser_->Parse(client_id, nonce, R"({"token_type":"NotBearer"})");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseMissingIdentityToken) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, nonce, R"({"token_type":"Bearer"})");
+TEST_F(TokenResponseParserTest, ParseMissingIdentityToken) {
+  auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer"})");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseInvalidIdentityTokenType) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":1})");
+TEST_F(TokenResponseParserTest, ParseInvalidIdentityTokenType) {
+  auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":1})");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseInvalidJwtEncoding) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result =
-      parser.Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":"wrong"})");
+TEST_F(TokenResponseParserTest, ParseInvalidJwtEncoding) {
+  auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":"wrong"})");
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseInvalidJwtSignature) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(
-      invalid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
+TEST_F(TokenResponseParserTest, ParseInvalidJwtSignature) {
+  auto jwks = google::jwt_verify::Jwks::createFrom(invalid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
   EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
   TokenResponseParserImpl parser(std::move(jwks));
   auto result = parser.Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseMissingAudience) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse("missing", nonce, valid_token_response_Bearer_without_access_token);
+TEST_F(TokenResponseParserTest, ParseMissingAudience) {
+  auto result = parser_->Parse("missing", nonce, valid_token_response_Bearer_without_access_token);
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, ParseInvalidNonce) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-  auto result = parser.Parse(client_id, "invalid", valid_token_response_Bearer_without_access_token);
+TEST_F(TokenResponseParserTest, ParseInvalidNonce) {
+  auto result = parser_->Parse(client_id, "invalid", valid_token_response_Bearer_without_access_token);
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, InvalidExpiresInFieldValue) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-
-  auto result = parser.Parse(client_id, nonce, invalid_expires_in_token_response);
+TEST_F(TokenResponseParserTest, InvalidExpiresInFieldValue) {
+  auto result = parser_->Parse(client_id, nonce, invalid_expires_in_token_response);
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(TokenResponseParser, Parse) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
+TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBeBearer_IgnoringCase) {
+  const char *response_string = R"({"token_type":"BabyBearer",
+                                    "id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiaWF0IjoxOTAxMDAxMDAxLCJhdWQiOlsiY2xpZW50MSJdLCJub25jZSI6InJhbmRvbSJ9.Qf0vE5QhnqlSpcxNn093d6ko2hOHveSs9ShusFYiUVxzS4J9xjmjTeyKkH7RfWWUL7_tFB6a7PC33BGdhUnCxYaHJbTmvLKDBy-AZyvzszBY35j8Kp1MPU-DPyR2LkwCoHKAD50pEro6iwB3Zd4SB1WE99_1SbJtAzpfdeQSCbcDOZgl2tQsDnB2OskwzjOdrEQyIrRl8vZOGbJyUHkz7pg6qUtnesjVSRWqWglQBXcS3rNpJi5Gt3L00IOqdozOlqS4ShCaLnbGZbCP9qey31d2SKLl6HNzULxa0LExvAqzcVM-f87WUWuVe30g6SBAZGlJA8wxyJgXF3Rrh1iKUg"
+                                    })";
 
-  auto result = parser.Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
+  auto result = parser_->Parse(client_id, nonce, response_string);
+  ASSERT_FALSE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeBearer_IgnoringCase) {
+  auto existing_token_response = ValidTokenResponse();
+
+  const char *response_string = R"({"token_type":"baby-bearer",
+                                    "access_token":"refreshed_access_token_value",
+                                    "refresh_token":"refreshed_refresh_token_value"})";
+
+  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+  ASSERT_FALSE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBePresent) {
+  const char *response_string = R"({"id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiaWF0IjoxOTAxMDAxMDAxLCJhdWQiOlsiY2xpZW50MSJdLCJub25jZSI6InJhbmRvbSJ9.Qf0vE5QhnqlSpcxNn093d6ko2hOHveSs9ShusFYiUVxzS4J9xjmjTeyKkH7RfWWUL7_tFB6a7PC33BGdhUnCxYaHJbTmvLKDBy-AZyvzszBY35j8Kp1MPU-DPyR2LkwCoHKAD50pEro6iwB3Zd4SB1WE99_1SbJtAzpfdeQSCbcDOZgl2tQsDnB2OskwzjOdrEQyIrRl8vZOGbJyUHkz7pg6qUtnesjVSRWqWglQBXcS3rNpJi5Gt3L00IOqdozOlqS4ShCaLnbGZbCP9qey31d2SKLl6HNzULxa0LExvAqzcVM-f87WUWuVe30g6SBAZGlJA8wxyJgXF3Rrh1iKUg"})";
+
+  auto result = parser_->Parse(client_id, nonce, response_string);
+
+  ASSERT_FALSE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBePresent) {
+  auto existing_token_response = ValidTokenResponse();
+
+  const char *response_string = R"({"access_token":"refreshed_access_token_value",
+                                    "refresh_token":"refreshed_refresh_token_value"})";
+
+  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+  ASSERT_FALSE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest,
+     ParseRefreshTokenResponse_ReturnsAnEmptyOptional_WhenTheExpiresInFieldIsInvalid_ByHavingAnInvalidValueOfZero) {
+
+  auto existing_token_response = ValidTokenResponse();
+
+  const char *response_string = R"({"token_type":"bearer",
+                                    "access_token":"refreshed_access_token_value",
+                                    "refresh_token":"refreshed_refresh_token_value",
+                                    "expires_in": 0})";
+
+  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+  ASSERT_FALSE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ConsidersResponseValid_WhenTheExpiresInFieldIsOmitted) {
+  https://tools.ietf.org/html/rfc6749#section-5.1 The expires_in field is recommended and not required.
+  TokenResponse existing_token_response = ValidTokenResponse();
+
+  const char *response_string = R"({"token_type":"bearer",
+                                    "access_token":"refreshed_access_token_value",
+                                    "refresh_token":"refreshed_refresh_token_value"})";
+
+  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+  ASSERT_TRUE(result.has_value());
+}
+
+TEST_F(TokenResponseParserTest, Parse) {
+  auto result = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
   ASSERT_TRUE(result.has_value());
   auto access_token1 = result->AccessToken();
   ASSERT_FALSE(access_token1.has_value());
@@ -190,7 +238,7 @@ TEST(TokenResponseParser, Parse) {
   auto id_token_expiry = result->GetIDTokenExpiry();
   ASSERT_EQ(2001001001, id_token_expiry);
 
-  result = parser.Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
+  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
   ASSERT_TRUE(result.has_value());
   auto access_token2 = result->AccessToken();
   ASSERT_TRUE(access_token2.has_value());
@@ -200,7 +248,7 @@ TEST(TokenResponseParser, Parse) {
   auto access_token_expiry2 = result->GetAccessTokenExpiry();
   ASSERT_TRUE(access_token_expiry2.has_value());
 
-  result = parser.Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
+  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
   ASSERT_TRUE(result.has_value());
   auto access_token3 = result->AccessToken();
   ASSERT_TRUE(access_token3.has_value());
@@ -212,23 +260,18 @@ TEST(TokenResponseParser, Parse) {
   ASSERT_TRUE(access_token_expiry3.has_value());
 }
 
-TEST(TokenResponseParser, ParseRefreshTokenResponse) {
-  auto jwks = google::jwt_verify::Jwks::createFrom(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-  TokenResponseParserImpl parser(std::move(jwks));
-
-  auto existing_token_response = parser.Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
-  ASSERT_TRUE(existing_token_response.has_value());
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
+  auto existing_token_response = ValidTokenResponse();
 
   const char *response_string = valid_refresh_token_response_bearer_with_access_token_and_refresh_token_no_id_token;
-  auto refreshed_token_response = parser.ParseRefreshTokenResponse(existing_token_response.value(),
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response,
                                                                    client_id,
                                                                    response_string);
   ASSERT_TRUE(refreshed_token_response.has_value());
 
-  ASSERT_EQ(existing_token_response->IDToken().jwt_, refreshed_token_response->IDToken().jwt_);
+  ASSERT_EQ(existing_token_response.IDToken().jwt_, refreshed_token_response->IDToken().jwt_);
   auto refreshed_id_token_expiry = refreshed_token_response->GetIDTokenExpiry();
-  ASSERT_EQ(existing_token_response->GetIDTokenExpiry(), refreshed_id_token_expiry);
+  ASSERT_EQ(existing_token_response.GetIDTokenExpiry(), refreshed_id_token_expiry);
 
   auto refreshed_access_token = refreshed_token_response->AccessToken();
   ASSERT_TRUE(refreshed_access_token.has_value());
