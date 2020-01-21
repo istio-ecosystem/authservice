@@ -1,5 +1,6 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
 #define AUTHSERVICE_SRC_FILTERS_OIDC_TOKEN_RESPONSE_H_
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/strings/string_view.h"
@@ -54,6 +55,11 @@ class TokenResponseParser {
   virtual absl::optional<TokenResponse> Parse(const std::string &client_id,
                                               const std::string &nonce,
                                               const std::string &raw) const = 0;
+
+  virtual absl::optional<TokenResponse> ParseRefreshTokenResponse(
+      const TokenResponse existing_token_response,
+      const std::string &client_id,
+      const std::string &raw_response_string) const = 0;
 };
 
 /**
@@ -67,16 +73,26 @@ class TokenResponseParserImpl final : public TokenResponseParser {
   absl::optional<int64_t> ParseAccessTokenExpiry(
       google::protobuf::Map<std::string, google::protobuf::Value> &fields) const;
 
-  bool IsInvalid(const std::string &client_id, const std::string &nonce,
-                 google::protobuf::Map<std::string, google::protobuf::Value> &fields,
-                 google::jwt_verify::Jwt &id_token,
-                 google::protobuf::util::Status status) const;
+  bool IsInvalid(google::protobuf::Map<std::string, google::protobuf::Value> &fields) const;
+
+  bool IsIDTokenInvalid(const std::string &client_id,
+                        const std::string &nonce,
+                        google::jwt_verify::Jwt &id_token) const;
+
+  absl::optional<google::jwt_verify::Jwt> ParseIDToken(
+      google::protobuf::Map<std::string, google::protobuf::Value> fields
+  ) const;
 
 public:
   TokenResponseParserImpl(google::jwt_verify::JwksPtr keys);
   absl::optional<TokenResponse> Parse(const std::string &client_id,
                                       const std::string &nonce,
-                                      const std::string &raw) const override;
+                                      const std::string &raw_response_string) const override;
+
+  absl::optional<TokenResponse> ParseRefreshTokenResponse(
+      const TokenResponse existing_token_response,
+      const std::string &client_id,
+      const std::string &raw_response_string) const override;
 };
 
 }  // namespace oidc
