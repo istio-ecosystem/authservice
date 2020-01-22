@@ -359,7 +359,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   );
 }
 
-TEST_F(OidcFilterTest, TokenResponseWithAccessTokenButNoExpiresInTimeShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured) {
+TEST_F(OidcFilterTest, ShouldPermitTheRequestToContinue_WhenTokenResponseWithAccessTokenButNoExpiresInTime_GivenTheAccessTokenHeaderHasBeenConfigured) {
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
@@ -367,33 +367,22 @@ TEST_F(OidcFilterTest, TokenResponseWithAccessTokenButNoExpiresInTimeShouldRedir
   token_response.SetAccessToken("fake_access_token");
   session_store_->set("session123", token_response);
 
-  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto httpRequest =
-      request.mutable_attributes()->mutable_request()->mutable_http();
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
-  // We expect to be redirected to authenticate
-  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
 
+  ASSERT_EQ(status, google::rpc::Code::OK);
   ASSERT_THAT(
-      response.denied_response().headers(),
+      response.ok_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
-                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
-                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
-                          {
-                           common::http::headers::SetCookie,
-                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-                                    "HttpOnly; Max-Age=300; Path=/; "
-                                    "SameSite=Lax; Secure")
-                          }
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))},
+                          {"access_token", StrEq("fake_access_token")},
                       })
   );
 }

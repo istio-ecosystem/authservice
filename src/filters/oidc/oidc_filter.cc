@@ -105,14 +105,16 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id.value(), ioc, yield);
   }
 
-  // If we have a valid and unexpired id_token and optionally an access token, then let request continue.
   // TODO when expired, use refresh token.
+
+  // If we have a valid and unexpired id_token and optionally an access token, then let request continue.
   auto token_response = session_store_->get(session_id.value());
-  if (RequiredTokensPresent(token_response) && TokensNotExpired(token_response.value())) {
+  if (RequiredTokensPresent(token_response) && !TokensExpired(token_response.value())) {
     AddTokensToRequestHeaders(response, token_response);
     return google::rpc::Code::OK;
   }
 
+  // Tokens are either missing or expired, reject the request and redirect to IDP
   SetRedirectToIdPHeaders(response);
   return google::rpc::Code::UNAUTHENTICATED;
 }
@@ -293,19 +295,17 @@ int64_t OidcFilter::seconds_since_epoch() {
   return seconds.count();
 }
 
-bool OidcFilter::TokensNotExpired(TokenResponse &token_response) {
+bool OidcFilter::TokensExpired(TokenResponse &token_response) {
   int64_t now_seconds = seconds_since_epoch();
 
   if (token_response.GetIDTokenExpiry() < now_seconds) {
-    return false;
+    return true;
   }
 
-  if (idp_config_.has_access_token()) {
-    const absl::optional<int64_t> &accessTokenExpiry = token_response.GetAccessTokenExpiry();
-    return accessTokenExpiry.has_value() && (now_seconds < accessTokenExpiry.value());
-  }
-
-  return true;
+  // Don't require expires_in. Rely on presence of field to determine if check should be made.
+  //  The oauth spec does not require a expires_in https://tools.ietf.org/html/rfc6749#section-5.1
+  const absl::optional<int64_t> &accessTokenExpiry = token_response.GetAccessTokenExpiry();
+  return accessTokenExpiry.has_value() && accessTokenExpiry.value() < now_seconds;
 }
 
 bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request) {

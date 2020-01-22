@@ -180,7 +180,7 @@ private:
 
   int64_t seconds_since_epoch();
 
-  bool TokensNotExpired(TokenResponse &token_response);
+  bool TokensExpired(TokenResponse &token_response);
 
   void AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response);
 
