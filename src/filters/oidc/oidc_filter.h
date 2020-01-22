@@ -115,8 +115,6 @@ private:
 
   /** @brief Refresh tokens from OIDC token endpoint */
   absl::optional<TokenResponse> RefreshToken(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response,
       absl::string_view session_id,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield);

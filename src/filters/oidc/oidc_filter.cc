@@ -114,7 +114,7 @@ google::rpc::Code OidcFilter::Process(
 
   // TODO: token_response may not be present
   if (token_response->RefreshToken().has_value()) {
-    auto refreshed_token_response = RefreshToken(request, response, session_id.value(), ioc, yield);
+    auto refreshed_token_response = RefreshToken(session_id.value(), ioc, yield);
     if (refreshed_token_response.has_value()) {
       AddTokensToRequestHeaders(response, refreshed_token_response);
       return google::rpc::Code::OK;
@@ -384,11 +384,10 @@ void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *r
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
 absl::optional<TokenResponse> OidcFilter::RefreshToken(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
     absl::string_view session_id,
     boost::asio::io_context &ioc,
-    boost::asio::yield_context yield) {
+    boost::asio::yield_context yield
+) {
 
   std::map<absl::string_view, absl::string_view> headers = {
       {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
