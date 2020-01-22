@@ -114,10 +114,8 @@ private:
       boost::asio::yield_context yield);
 
   /** @brief Refresh tokens from OIDC token endpoint */
-  absl::optional<TokenResponse> RefreshToken(
-      absl::string_view session_id,
-      boost::asio::io_context &ioc,
-      boost::asio::yield_context yield);
+  absl::optional<TokenResponse> RefreshToken(TokenResponse existing_token_response, boost::asio::io_context &ioc,
+                                             boost::asio::yield_context yield);
 
   /** @brief Get a cookie name. */
   std::string GetCookieName(const std::string &cookie) const;
@@ -188,7 +186,7 @@ private:
 
   bool TokensExpired(TokenResponse &token_response);
 
-  void AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response);
+  void AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse);
 
   void updateOrEvictTokenResponse(const absl::string_view &session_id, absl::optional<TokenResponse> &refreshed_token_response) const;
 

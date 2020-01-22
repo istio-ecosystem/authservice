@@ -74,13 +74,14 @@ google::rpc::Code OidcFilter::Process(
   */
 
   auto headers = request->attributes().request().http().headers();
-  auto session_id = GetSessionIdFromCookie(headers);
+  auto session_id_optional = GetSessionIdFromCookie(headers);
 
   // If the request is for the configured logout path, then logout and redirect
   // to the configured logout redirect uri.
+
   if (MatchesLogoutRequest(request)) {
-    if (session_id.has_value()) {
-      session_store_->remove(session_id.value());
+    if (session_id_optional.has_value()) {
+      session_store_->remove(session_id_optional.value());
     }
     SetLogoutHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
@@ -93,35 +94,43 @@ google::rpc::Code OidcFilter::Process(
   }
 
   // Check if we have a session_id cookie. If not, generate a session id, put it in a header, and redirect for login.
-  if (!session_id.has_value()) {
-    session_id = session_id_generator_->Generate();
-    SetSessionIdCookie(response, session_id.value());
+  if (!session_id_optional.has_value()) {
+    session_id_optional = session_id_generator_->Generate();
+    SetSessionIdCookie(response, session_id_optional.value());
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
+  auto session_id = session_id_optional.value();
+
   // If the request path is the callback for receiving the authorization code, then exchange it for tokens.
   if (MatchesCallbackRequest(request)) {
-    return RetrieveToken(request, response, session_id.value(), ioc, yield);
+    return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
-  // If we have a valid and unexpired id_token and optionally an access token, then let request continue.
-  auto token_response = session_store_->get(session_id.value());
-  if (RequiredTokensPresent(token_response) && !TokensExpired(token_response.value())) {
+  auto token_response_optional = session_store_->get(session_id);
+
+  if (!RequiredTokensPresent(token_response_optional)) {
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  auto token_response = token_response_optional.value();
+  
+  if (!TokensExpired(token_response)) {
     AddTokensToRequestHeaders(response, token_response);
     return google::rpc::Code::OK;
   }
 
-  // TODO: token_response may not be present
-  if (token_response->RefreshToken().has_value()) {
-    auto refreshed_token_response = RefreshToken(session_id.value(), ioc, yield);
+  if (token_response.RefreshToken().has_value()) {
+    auto refreshed_token_response = RefreshToken(token_response, ioc, yield);
+    updateOrEvictTokenResponse(session_id, refreshed_token_response);
     if (refreshed_token_response.has_value()) {
-      AddTokensToRequestHeaders(response, refreshed_token_response);
+      AddTokensToRequestHeaders(response, refreshed_token_response.value());
       return google::rpc::Code::OK;
     }
   }
 
-  // Tokens are either missing or expired, reject the request and redirect to IDP
   SetRedirectToIdPHeaders(response);
   return google::rpc::Code::UNAUTHENTICATED;
 }
@@ -282,11 +291,11 @@ void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
   DeleteCookie(responseHeaders, GetSessionIdCookieName());
 }
 
-void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response) {
-  auto id_token = token_response.value().IDToken().jwt_;
+void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse) {
+  auto id_token = tokenResponse.IDToken().jwt_;
   SetIdTokenHeader(response, id_token);
-  if (idp_config_.has_access_token() && token_response.value().AccessToken().has_value()) {
-    SetAccessTokenHeader(response, token_response.value().AccessToken().value());
+  if (idp_config_.has_access_token() && tokenResponse.AccessToken().has_value()) {
+    SetAccessTokenHeader(response, tokenResponse.AccessToken().value());
   }
 }
 
@@ -383,28 +392,27 @@ void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *r
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
-absl::optional<TokenResponse> OidcFilter::RefreshToken(
-    absl::string_view session_id,
-    boost::asio::io_context &ioc,
-    boost::asio::yield_context yield
-) {
+absl::optional<TokenResponse> OidcFilter::RefreshToken(TokenResponse existing_token_response,
+                                                       boost::asio::io_context &ioc,
+                                                       boost::asio::yield_context yield) {
 
   std::map<absl::string_view, absl::string_view> headers = {
       {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
   };
-  auto existing_token_response = session_store_->get(session_id);
-  //TODO the existing token response may be nil
+
   auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"client_id",     idp_config_.client_id()},
       {"client_secret", idp_config_.client_secret()},
       {"grant_type",    "refresh_token"},
-      {"refresh_token", existing_token_response->RefreshToken().value()},
+      {"refresh_token", existing_token_response.RefreshToken().value()},
       // {"scope", scopes}, // according to this link, omitting scope param should return new
       // tokens with previously requested scope
       // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
   };
 
+
+  //TODO: the Post may have returned 'non-ok', needs coverage
   auto retrieve_token_response = http_ptr_->Post(
       idp_config_.token(),
       headers,
@@ -412,16 +420,11 @@ absl::optional<TokenResponse> OidcFilter::RefreshToken(
       ioc,
       yield);
 
-  //TODO: the Post may have returned 'non-ok'
-  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(
-      existing_token_response.value(),
+  return parser_->ParseRefreshTokenResponse(
+      existing_token_response,
       idp_config_.client_id(),
       retrieve_token_response->body()
   );
-
-  updateOrEvictTokenResponse(session_id, refreshed_token_response);
-
-  return refreshed_token_response;
 }
 
 // TODO: Move to session_store wrapper class, whenever it emerges
