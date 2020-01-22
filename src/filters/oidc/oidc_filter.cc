@@ -105,12 +105,18 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id.value(), ioc, yield);
   }
 
-  // TODO when expired, use refresh token.
-
   // If we have a valid and unexpired id_token and optionally an access token, then let request continue.
   auto token_response = session_store_->get(session_id.value());
   if (RequiredTokensPresent(token_response) && !TokensExpired(token_response.value())) {
     AddTokensToRequestHeaders(response, token_response);
+    return google::rpc::Code::OK;
+  }
+
+  // TODO: token_response may not be present
+  if (token_response->RefreshToken().has_value()) {
+    auto refreshed_token_response = RefreshToken(request, response, session_id.value(), ioc, yield);
+    // TODO: refreshed token response may not be present
+    AddTokensToRequestHeaders(response, refreshed_token_response);
     return google::rpc::Code::OK;
   }
 
@@ -373,6 +379,50 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
 void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response,
                                     const std::string &session_id) {
   SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id, NO_TIMEOUT);
+}
+
+// https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
+absl::optional<TokenResponse> OidcFilter::RefreshToken(
+    const ::envoy::service::auth::v2::CheckRequest *request,
+    ::envoy::service::auth::v2::CheckResponse *response,
+    absl::string_view session_id,
+    boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
+
+  std::map<absl::string_view, absl::string_view> headers = {
+      {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
+  };
+  auto existing_token_response = session_store_->get(session_id);
+  //TODO the existing token response may be nil
+  auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
+  std::multimap<absl::string_view, absl::string_view> params = {
+      {"client_id",     idp_config_.client_id()},
+      {"client_secret", idp_config_.client_secret()},
+      {"grant_type",    "refresh_token"},
+      {"refresh_token", existing_token_response->RefreshToken().value()},
+      // {"scope", scopes}, // according to this link, omitting scope param should return new
+      // tokens with previously requested scope
+      // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
+  };
+
+  auto retrieve_token_response = http_ptr_->Post(
+      idp_config_.token(),
+      headers,
+      common::http::http::EncodeFormData(params),
+      ioc,
+      yield);
+
+  //TODO: the Post may have returned 'non-ok'
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(
+      existing_token_response.value(),
+      idp_config_.client_id(),
+      retrieve_token_response->body()
+  );
+
+  // TODO: don't store nothing
+  session_store_->set(session_id, refreshed_token_response.value());
+
+  return refreshed_token_response;
 }
 
 // Performs an HTTP POST and prints the response

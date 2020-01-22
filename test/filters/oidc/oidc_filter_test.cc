@@ -77,6 +77,11 @@ class OidcFilterTest : public ::testing::Test {
   const char* test_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MDYxMzkwMjJ9.jV2_EH7JB30wgg248x2AlCkZnIUH417I_7FPw3nr5BQ";
   google::jwt_verify::Jwt test_id_token_jwt_;
 
+  // TODO Do we need to use this, or can we just use the above ID token jwt string?
+  // id_token exp of May 29, 2062
+  const char* test_refreshed_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MTYxMzkwMjJ9.w8Q1JBUHvCj4LDxOM9SiiD9d7XaBzjyle5uoZlvdQFs";
+  google::jwt_verify::Jwt test_refreshed_id_token_jwt_;
+
   void SetUp() override {
     config_.mutable_authorization()->set_scheme("https");
     config_.mutable_authorization()->set_hostname("acme-idp.tld");
@@ -357,6 +362,64 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainW
                           }
                       })
   );
+}
+
+// id token is unexpired, access token is expired, server returns only access token from refresh endpoint
+TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponseWhenTheAccessTokenHeaderHasBeenConfiguredAndThereIsRefreshToken) {
+  EnableAccessTokens(config_);
+
+  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
+  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
+  expired_token_response.SetAccessToken("fake_access_token");
+  expired_token_response.SetRefreshToken("fake_refresh_token");
+  session_store_->set("session123", expired_token_response);
+
+  auto mocked_http = new common::http::http_mock();
+  auto *pMessage = new beast::http::response<beast::http::string_body>();
+  auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
+  raw_http_token_response_from_idp->result(beast::http::status::ok);
+  //TODO: figure out how to assert the right args were passed to POST
+  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+
+  auto jwt_status = test_refreshed_id_token_jwt_.parseFromString(test_refreshed_id_token_jwt_string_);
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+  TokenResponse test_refresh_token_response(test_refreshed_id_token_jwt_);
+  test_refresh_token_response.SetAccessToken("expected_refreshed_access_token");
+  test_refresh_token_response.SetAccessTokenExpiry(11000000000); // July 30, 2318
+  test_refresh_token_response.SetRefreshToken("expected_refreshed_refresh_token");
+
+  // TODO: figure out how to assert the right args were taken from the POST response and sent to ParseRefreshTokenResponse
+//  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, config_.client_id(), test_refreshed_id_token_jwt_string_))
+  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _))
+      .WillOnce(::testing::Return(test_refresh_token_response));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_THAT(
+      response.ok_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_refreshed_id_token_jwt_string_))},
+                          {"access_token", StrEq("expected_refreshed_access_token")},
+                      })
+  );
+  
+  auto stored_token_response = session_store_->get("session123");
+  ASSERT_TRUE(stored_token_response.has_value());
+  ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_refreshed_id_token_jwt_string_);
+  ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_refreshed_access_token");
+  ASSERT_EQ(stored_token_response.value().GetAccessTokenExpiry(), 11000000000);
+  ASSERT_EQ(stored_token_response.value().RefreshToken(), "expected_refreshed_refresh_token");
 }
 
 TEST_F(OidcFilterTest, ShouldPermitTheRequestToContinue_WhenTokenResponseWithAccessTokenButNoExpiresInTime_GivenTheAccessTokenHeaderHasBeenConfigured) {
