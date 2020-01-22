@@ -115,9 +115,10 @@ google::rpc::Code OidcFilter::Process(
   // TODO: token_response may not be present
   if (token_response->RefreshToken().has_value()) {
     auto refreshed_token_response = RefreshToken(request, response, session_id.value(), ioc, yield);
-    // TODO: refreshed token response may not be present
-    AddTokensToRequestHeaders(response, refreshed_token_response);
-    return google::rpc::Code::OK;
+    if (refreshed_token_response.has_value()) {
+      AddTokensToRequestHeaders(response, refreshed_token_response);
+      return google::rpc::Code::OK;
+    }
   }
 
   // Tokens are either missing or expired, reject the request and redirect to IDP
@@ -419,10 +420,21 @@ absl::optional<TokenResponse> OidcFilter::RefreshToken(
       retrieve_token_response->body()
   );
 
-  // TODO: don't store nothing
-  session_store_->set(session_id, refreshed_token_response.value());
+  updateOrEvictTokenResponse(session_id, refreshed_token_response);
 
   return refreshed_token_response;
+}
+
+// TODO: Move to session_store wrapper class, whenever it emerges
+void OidcFilter::updateOrEvictTokenResponse(
+    const absl::string_view &session_id,
+    absl::optional<TokenResponse> &refreshed_token_response
+) const {
+  if (refreshed_token_response.has_value()) {
+    session_store_->set(session_id, refreshed_token_response.value());
+  } else {
+    session_store_->remove(session_id);
+  }
 }
 
 // Performs an HTTP POST and prints the response

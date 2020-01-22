@@ -192,6 +192,8 @@ private:
 
   void AddTokensToRequestHeaders(CheckResponse *response, absl::optional<TokenResponse> &token_response);
 
+  void updateOrEvictTokenResponse(const absl::string_view &session_id, absl::optional<TokenResponse> &refreshed_token_response) const;
+
 public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
