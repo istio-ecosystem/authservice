@@ -124,6 +124,8 @@ class OidcFilterTest : public ::testing::Test {
   void RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request);
 
   void EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig);
+
+  void SetExpiredAccessTokenResponseInSessionStore();
 };
 
 TEST_F(OidcFilterTest, Constructor) {
@@ -320,7 +322,7 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   );
 }
 
-TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured) {
+TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured_AndThereIsNoRefreshToken) {
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
@@ -363,11 +365,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainW
 TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponseWhenTheAccessTokenHeaderHasBeenConfiguredAndThereIsRefreshToken) {
   EnableAccessTokens(config_);
 
-  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
-  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
-  expired_token_response.SetAccessToken("fake_access_token");
-  expired_token_response.SetRefreshToken("fake_refresh_token");
-  session_store_->set("session123", expired_token_response);
+  SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::http_mock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
@@ -455,11 +453,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenThereIsNoStoredT
 TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTheRefreshedTokenResponse) {
   EnableAccessTokens(config_);
 
-  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
-  expired_token_response.SetAccessTokenExpiry(1); // access token already expired
-  expired_token_response.SetAccessToken("fake_access_token");
-  expired_token_response.SetRefreshToken("fake_refresh_token");
-  session_store_->set("session123", expired_token_response);
+  SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::http_mock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
@@ -482,6 +476,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
+
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_THAT(
       response.denied_response().headers(),
@@ -505,11 +500,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
 TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstablishHttpConnectionToIDP) {
   EnableAccessTokens(config_);
 
-  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
-  expired_token_response.SetAccessTokenExpiry(1); // access token already expired
-  expired_token_response.SetAccessToken("fake_access_token");
-  expired_token_response.SetRefreshToken("fake_refresh_token");
-  session_store_->set("session123", expired_token_response);
+  SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::http_mock();
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(nullptr)));
@@ -550,11 +541,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
 TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsuccessfulHttpResponseCode) {
   EnableAccessTokens(config_);
 
-  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
-  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
-  expired_token_response.SetAccessToken("fake_access_token");
-  expired_token_response.SetRefreshToken("fake_refresh_token");
-  session_store_->set("session123", expired_token_response);
+  SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::http_mock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
@@ -769,6 +756,15 @@ TEST_F(OidcFilterTest, LogoutWithNoCookies) {
                       })
   );
 }
+
+void OidcFilterTest::SetExpiredAccessTokenResponseInSessionStore() {
+  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
+  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
+  expired_token_response.SetAccessToken("fake_access_token");
+  expired_token_response.SetRefreshToken("fake_refresh_token");
+  session_store_->set("session123", expired_token_response);
+}
+
 void OidcFilterTest::EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig) {
   oidcConfig.mutable_access_token()->set_header("access_token");
 }
