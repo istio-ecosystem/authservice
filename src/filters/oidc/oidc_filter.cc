@@ -411,14 +411,20 @@ absl::optional<TokenResponse> OidcFilter::RefreshToken(TokenResponse existing_to
       // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
   };
 
-
-  //TODO: the Post may have returned 'non-ok', needs coverage
   auto retrieve_token_response = http_ptr_->Post(
       idp_config_.token(),
       headers,
       common::http::http::EncodeFormData(params),
       ioc,
       yield);
+
+  if (retrieve_token_response == nullptr) {
+    return absl::nullopt;
+  }
+
+  if (retrieve_token_response->result() != boost::beast::http::status::ok) {
+    return absl::nullopt;
+  }
 
   return parser_->ParseRefreshTokenResponse(
       existing_token_response,
