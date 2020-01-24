@@ -124,12 +124,15 @@ google::rpc::Code OidcFilter::Process(
 
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (refresh_token_optional.has_value()) {
-    auto refresh_token = refresh_token_optional.value();
+    spdlog::info("{}: POSTing to refresh access token for session {}.", __func__, session_id);
+    const auto &refresh_token = refresh_token_optional.value();
     auto refreshed_token_response = RefreshToken(token_response, refresh_token, ioc, yield);
     updateOrEvictTokenResponse(session_id, refreshed_token_response);
     if (refreshed_token_response.has_value()) {
       AddTokensToRequestHeaders(response, refreshed_token_response.value());
       return google::rpc::Code::OK;
+    } else {
+      spdlog::info("{}: Attempt to refresh access token did not yield refreshed token. Sending user with session id {} to re-authenticate.", __func__, session_id);
     }
   }
 
@@ -418,25 +421,29 @@ absl::optional<TokenResponse> OidcFilter::RefreshToken(
       {"scope", GetSpaceDelimitedScopes()}
   };
 
-  auto retrieve_token_response = http_ptr_->Post(
+  auto retrieved_token_response = http_ptr_->Post(
       idp_config_.token(),
       headers,
       common::http::http::EncodeFormData(params),
       ioc,
       yield);
 
-  if (retrieve_token_response == nullptr) {
+  if (retrieved_token_response == nullptr) {
+    spdlog::warn("{}: Received null pointer as response from identity provider.", __func__);
     return absl::nullopt;
   }
 
-  if (retrieve_token_response->result() != boost::beast::http::status::ok) {
+  http::status status = retrieved_token_response->result();
+  if (status != boost::beast::http::status::ok) {
+    spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__, std::to_string(
+        static_cast<double>(status)));
     return absl::nullopt;
   }
 
   return parser_->ParseRefreshTokenResponse(
-      existing_token_response,
+      std::move(existing_token_response),
       idp_config_.client_id(),
-      retrieve_token_response->body()
+      retrieved_token_response->body()
   );
 }
 
