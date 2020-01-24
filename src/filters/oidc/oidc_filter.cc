@@ -258,13 +258,10 @@ void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckRespon
   common::utilities::RandomGenerator generator;
   auto state = generator.Generate(32).Str();
   auto nonce = generator.Generate(32).Str();
-  std::set<absl::string_view> scopes = {mandatory_scope_};
-  for (const auto &scope : idp_config_.scopes()) {
-    scopes.insert(scope);
-  }
+
+  std::string encoded_scopes = GetSpaceDelimitedScopes();
 
   auto callback = common::http::http::ToUrl(idp_config_.callback());
-  auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
       {"scope",         encoded_scopes},
@@ -283,6 +280,14 @@ void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckRespon
   StateCookieCodec codec;
   SetEncryptedCookie(response->mutable_denied_response()->mutable_headers(), GetStateCookieName(),
                      codec.Encode(state, nonce), idp_config_.timeout());
+}
+
+std::string OidcFilter::GetSpaceDelimitedScopes() const {
+  std::set<absl::string_view> scopes = {mandatory_scope_};
+  for (const auto &scope : idp_config_.scopes()) {
+    scopes.insert(scope);
+  }
+  return absl::StrJoin(scopes, " ");
 }
 
 void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
@@ -394,8 +399,7 @@ void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *r
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
-absl::optional<TokenResponse>
-OidcFilter::RefreshToken(
+absl::optional<TokenResponse> OidcFilter::RefreshToken(
     TokenResponse existing_token_response,
     const std::string &refresh_token,
     boost::asio::io_context &ioc,
@@ -411,9 +415,7 @@ OidcFilter::RefreshToken(
       {"client_secret", idp_config_.client_secret()},
       {"grant_type",    "refresh_token"},
       {"refresh_token", refresh_token},
-      // {"scope", scopes}, // according to this link, omitting scope param should return new
-      // tokens with previously requested scope
-      // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
+      {"scope", GetSpaceDelimitedScopes()}
   };
 
   auto retrieve_token_response = http_ptr_->Post(
