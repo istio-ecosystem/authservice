@@ -1,4 +1,5 @@
 #include <google/protobuf/util/json_util.h>
+#include <spdlog/spdlog.h>
 #include "src/filters/oidc/token_response.h"
 #include "gtest/gtest.h"
 
@@ -190,6 +191,40 @@ TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBePresent) {
   ASSERT_FALSE(result.has_value());
 }
 
+TEST_F(TokenResponseParserTest, Parse) {
+  auto result = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
+  ASSERT_TRUE(result.has_value());
+  auto access_token1 = result->AccessToken();
+  ASSERT_FALSE(access_token1.has_value());
+  auto refresh_token1 = result->RefreshToken();
+  ASSERT_FALSE(refresh_token1.has_value());
+  auto access_token_expiry1 = result->GetAccessTokenExpiry();
+  ASSERT_FALSE(access_token_expiry1.has_value());
+  auto id_token_expiry = result->GetIDTokenExpiry();
+  ASSERT_EQ(2001001001, id_token_expiry);
+
+  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
+  ASSERT_TRUE(result.has_value());
+  auto access_token2 = result->AccessToken();
+  ASSERT_TRUE(access_token2.has_value());
+  ASSERT_EQ(*access_token2, "access_token_value");
+  auto refresh_token2 = result->RefreshToken();
+  ASSERT_FALSE(refresh_token2.has_value());
+  auto access_token_expiry2 = result->GetAccessTokenExpiry();
+  ASSERT_TRUE(access_token_expiry2.has_value());
+
+  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
+  ASSERT_TRUE(result.has_value());
+  auto access_token3 = result->AccessToken();
+  ASSERT_TRUE(access_token3.has_value());
+  ASSERT_EQ(*access_token3, "access_token_value");
+  auto refresh_token3 = result->RefreshToken();
+  ASSERT_TRUE(refresh_token3.has_value());
+  ASSERT_EQ(*refresh_token3, "refresh_token_value");
+  auto access_token_expiry3 = result->GetAccessTokenExpiry();
+  ASSERT_TRUE(access_token_expiry3.has_value());
+}
+
 TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBePresent) {
   auto existing_token_response = ValidTokenResponse();
 
@@ -226,40 +261,6 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ConsidersResponseValid
   ASSERT_TRUE(result.has_value());
 }
 
-TEST_F(TokenResponseParserTest, Parse) {
-  auto result = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
-  ASSERT_TRUE(result.has_value());
-  auto access_token1 = result->AccessToken();
-  ASSERT_FALSE(access_token1.has_value());
-  auto refresh_token1 = result->RefreshToken();
-  ASSERT_FALSE(refresh_token1.has_value());
-  auto access_token_expiry1 = result->GetAccessTokenExpiry();
-  ASSERT_FALSE(access_token_expiry1.has_value());
-  auto id_token_expiry = result->GetIDTokenExpiry();
-  ASSERT_EQ(2001001001, id_token_expiry);
-
-  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
-  ASSERT_TRUE(result.has_value());
-  auto access_token2 = result->AccessToken();
-  ASSERT_TRUE(access_token2.has_value());
-  ASSERT_EQ(*access_token2, "access_token_value");
-  auto refresh_token2 = result->RefreshToken();
-  ASSERT_FALSE(refresh_token2.has_value());
-  auto access_token_expiry2 = result->GetAccessTokenExpiry();
-  ASSERT_TRUE(access_token_expiry2.has_value());
-
-  result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
-  ASSERT_TRUE(result.has_value());
-  auto access_token3 = result->AccessToken();
-  ASSERT_TRUE(access_token3.has_value());
-  ASSERT_EQ(*access_token3, "access_token_value");
-  auto refresh_token3 = result->RefreshToken();
-  ASSERT_TRUE(refresh_token3.has_value());
-  ASSERT_EQ(*refresh_token3, "refresh_token_value");
-  auto access_token_expiry3 = result->GetAccessTokenExpiry();
-  ASSERT_TRUE(access_token_expiry3.has_value());
-}
-
 TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
   auto existing_token_response = ValidTokenResponse();
 
@@ -283,6 +284,25 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
 
   auto refreshed_access_token_expiry = refreshed_token_response->GetAccessTokenExpiry();
   ASSERT_TRUE(refreshed_access_token_expiry.has_value());
+}
+
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_PrefersRefreshedIdToken_WhenAnIdTokenIsIncludedInTheRefreshTokenResponse) {
+  // id_token exp of May 29, 2062
+  const char* test_refreshed_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MTYxMzkwMjJ9.w8Q1JBUHvCj4LDxOM9SiiD9d7XaBzjyle5uoZlvdQFs";
+  google::jwt_verify::Jwt test_refreshed_id_token_jwt_;
+  auto existing_token_response = ValidTokenResponse();
+  auto response_string = R"({"token_type":"bearer",
+                                    "id_token":")" + std::string(test_refreshed_id_token_jwt_string_) + "\",\n"
+                                    R"("access_token":"refreshed_access_token_value",
+                                    "refresh_token":"refreshed_refresh_token_value"})";
+
+
+
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+
+  auto actual = refreshed_token_response->IDToken().jwt_;
+  auto expected = test_refreshed_id_token_jwt_string_;
+  ASSERT_EQ(actual, expected);
 }
 
 }  // namespace oidc

@@ -143,6 +143,10 @@ absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse
 
   const google::jwt_verify::Jwt &id_token = existing_token_response.IDToken();
   auto result = absl::make_optional<TokenResponse>(id_token);
+  auto new_id_token = ParseIDToken(fields);
+  if (new_id_token.has_value()) {
+    result = absl::make_optional<TokenResponse>(new_id_token.value());
+  }
 
   auto access_token_iter = fields.find(access_token_field);
   if (access_token_iter != fields.end()) {
