@@ -114,8 +114,11 @@ private:
       boost::asio::yield_context yield);
 
   /** @brief Refresh tokens from OIDC token endpoint */
-  absl::optional<TokenResponse> RefreshToken(TokenResponse existing_token_response, boost::asio::io_context &ioc,
-                                             boost::asio::yield_context yield);
+  absl::optional<TokenResponse> RefreshToken(
+      TokenResponse existing_token_response,
+      const std::string &refresh_token,
+      boost::asio::io_context &ioc,
+      boost::asio::yield_context yield);
 
   /** @brief Get a cookie name. */
   std::string GetCookieName(const std::string &cookie) const;

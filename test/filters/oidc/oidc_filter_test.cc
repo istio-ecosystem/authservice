@@ -322,7 +322,7 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   );
 }
 
-TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured_AndThereIsNoRefreshToken) {
+TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain_WhenTheAccessTokenHeaderHasBeenConfigured_GivenThereIsNoRefreshToken) {
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
@@ -362,7 +362,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRedirectToIdpToAuthenticateAgainW
 }
 
 // id token is unexpired, access token is expired, server returns only access token from refresh endpoint
-TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponseWhenTheAccessTokenHeaderHasBeenConfiguredAndThereIsRefreshToken) {
+TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAccessTokenHeaderHasBeenConfigured_GivenThereIsRefreshToken) {
   EnableAccessTokens(config_);
 
   SetExpiredAccessTokenResponseInSessionStore();

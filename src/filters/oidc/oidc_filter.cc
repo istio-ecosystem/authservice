@@ -122,8 +122,10 @@ google::rpc::Code OidcFilter::Process(
     return google::rpc::Code::OK;
   }
 
-  if (token_response.RefreshToken().has_value()) {
-    auto refreshed_token_response = RefreshToken(token_response, ioc, yield);
+  const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
+  if (refresh_token_optional.has_value()) {
+    auto refresh_token = refresh_token_optional.value();
+    auto refreshed_token_response = RefreshToken(token_response, refresh_token, ioc, yield);
     updateOrEvictTokenResponse(session_id, refreshed_token_response);
     if (refreshed_token_response.has_value()) {
       AddTokensToRequestHeaders(response, refreshed_token_response.value());
@@ -392,9 +394,12 @@ void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *r
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
-absl::optional<TokenResponse> OidcFilter::RefreshToken(TokenResponse existing_token_response,
-                                                       boost::asio::io_context &ioc,
-                                                       boost::asio::yield_context yield) {
+absl::optional<TokenResponse>
+OidcFilter::RefreshToken(
+    TokenResponse existing_token_response,
+    const std::string &refresh_token,
+    boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
 
   std::map<absl::string_view, absl::string_view> headers = {
       {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
@@ -405,7 +410,7 @@ absl::optional<TokenResponse> OidcFilter::RefreshToken(TokenResponse existing_to
       {"client_id",     idp_config_.client_id()},
       {"client_secret", idp_config_.client_secret()},
       {"grant_type",    "refresh_token"},
-      {"refresh_token", existing_token_response.RefreshToken().value()},
+      {"refresh_token", refresh_token},
       // {"scope", scopes}, // according to this link, omitting scope param should return new
       // tokens with previously requested scope
       // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
