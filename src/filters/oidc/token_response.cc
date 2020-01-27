@@ -159,6 +159,8 @@ absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse
   if (refresh_token_iter != fields.end()) {
     spdlog::info("{}: Updating refresh token.", __func__);
     result->SetRefreshToken(refresh_token_iter->second.string_value());
+  } else {
+    result->SetRefreshToken(existing_token_response.RefreshToken().value());
   }
 
   const absl::optional<int64_t> &access_token_expiry = ParseAccessTokenExpiry(fields);

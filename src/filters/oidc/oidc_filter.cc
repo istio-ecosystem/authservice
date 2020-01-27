@@ -414,8 +414,8 @@ OidcFilter::RefreshToken(
       {"client_secret", idp_config_.client_secret()},
       {"grant_type",    "refresh_token"},
       {"refresh_token", refresh_token},
-      // {"scope", scopes}, // according to this link, omitting scope param should return new
-      // tokens with previously requested scope
+      // according to this link, omitting the `scope` param should return new
+      // tokens with the previously requested `scope`
       // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
   };
 

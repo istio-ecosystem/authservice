@@ -103,10 +103,16 @@ class TokenResponseParserTest : public ::testing::Test {
   }
 
   TokenResponse ValidTokenResponse();
+  TokenResponse ValidTokenResponseWithRefreshToken();
 };
 
 TokenResponse TokenResponseParserTest::ValidTokenResponse() {
   auto token_response = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
+  return token_response.value();
+}
+
+TokenResponse TokenResponseParserTest::ValidTokenResponseWithRefreshToken() {
+  auto token_response = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
   return token_response.value();
 }
 
@@ -286,7 +292,7 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
   ASSERT_TRUE(refreshed_access_token_expiry.has_value());
 }
 
-TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_PrefersRefreshedIdToken_WhenAnIdTokenIsIncludedInTheRefreshTokenResponse) {
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsRefreshedIdToken_WhenAnIdTokenIsIncludedInTheRefreshTokenResponse) {
   // id_token exp of May 29, 2062
   const char* test_refreshed_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MTYxMzkwMjJ9.w8Q1JBUHvCj4LDxOM9SiiD9d7XaBzjyle5uoZlvdQFs";
   google::jwt_verify::Jwt test_refreshed_id_token_jwt_;
@@ -302,7 +308,22 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_PrefersRefreshedIdToke
 
   auto actual = refreshed_token_response->IDToken().jwt_;
   auto expected = test_refreshed_id_token_jwt_string_;
-  ASSERT_EQ(actual, expected);
+  ASSERT_EQ(expected, actual);
+}
+
+TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsExistingRefreshToken_WhenARefreshTokenIsNotIncludedInTheRefreshTokenResponse) {
+  auto existing_token_response = ValidTokenResponseWithRefreshToken();
+
+  const char *response_string = valid_token_response_bearer_with_access_token;
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response,
+                                                                   client_id,
+                                                                   response_string);
+
+  ASSERT_TRUE(refreshed_token_response.has_value());
+
+  auto actual_refresh_token = refreshed_token_response->RefreshToken();
+  ASSERT_TRUE(actual_refresh_token.has_value());
+  ASSERT_EQ("refresh_token_value", actual_refresh_token.value());
 }
 
 }  // namespace oidc
