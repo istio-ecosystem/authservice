@@ -262,7 +262,7 @@ TEST_F(OidcFilterTest, NoSessionCookie) {
 
 TEST_F(OidcFilterTest, AlreadyHasUnexpiredIdTokenShouldSendRequestToAppWithAuthorizationHeaderContainingIdToken) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
-  session_store_->set("session123", *test_token_response_);
+  session_store_->Set("session123", *test_token_response_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -289,7 +289,7 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   TokenResponse token_response(test_id_token_jwt_);
   token_response.SetAccessTokenExpiry(2906139022); //Feb 2, 2062
   token_response.SetAccessToken(nullptr);
-  session_store_->set("session123", token_response);
+  session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
@@ -328,7 +328,7 @@ TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
   token_response.SetAccessTokenExpiry(1); // already expired
   token_response.SetAccessToken("fake_access_token");
-  session_store_->set("session123", token_response);
+  session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
@@ -404,7 +404,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAc
                       })
   );
   
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_TRUE(stored_token_response.has_value());
   ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
   ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_refreshed_access_token");
@@ -446,7 +446,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenThereIsNoStoredT
                       })
   );
 
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_FALSE(stored_token_response.has_value());
 }
 
@@ -493,7 +493,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
                       })
   );
 
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_FALSE(stored_token_response.has_value());
 }
 
@@ -534,7 +534,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
                       })
   );
 
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_FALSE(stored_token_response.has_value());
 }
 
@@ -584,7 +584,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
                       })
   );
 
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_FALSE(stored_token_response.has_value());
 }
 
@@ -594,7 +594,7 @@ TEST_F(OidcFilterTest, ShouldPermitTheRequestToContinue_WhenTokenResponseWithAcc
   TokenResponse token_response(test_id_token_jwt_); // id token, not expired
   token_response.SetAccessTokenExpiry(0);
   token_response.SetAccessToken("fake_access_token");
-  session_store_->set("session123", token_response);
+  session_store_->Set("session123", token_response);
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
@@ -630,7 +630,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
   token_response.SetAccessToken("expected_access_token");
   token_response.SetAccessTokenExpiry(10000000000); // access token not expired, Sat 20 Nov 2286
 
-  session_store_->set("session123", token_response);
+  session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
@@ -665,7 +665,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
 
 TEST_F(OidcFilterTest, AlreadyHasUnexpiredTokensShouldSendRequestToAppWithHeadersContainingBothTokensWhenTheAccessTokenHeaderHasBeenConfigured) {
   EnableAccessTokens(config_);
-  session_store_->set("session123", *test_token_response_);
+  session_store_->Set("session123", *test_token_response_);
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -688,7 +688,7 @@ TEST_F(OidcFilterTest, AlreadyHasUnexpiredTokensShouldSendRequestToAppWithHeader
 }
 
 TEST_F(OidcFilterTest, LogoutWithCookies) {
-  session_store_->set("session123", *test_token_response_);
+  session_store_->Set("session123", *test_token_response_);
   config_.mutable_logout()->set_path("/logout");
   config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
@@ -706,7 +706,7 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
 
   auto status = filter.Process(&request, &response);
 
-  ASSERT_FALSE(session_store_->get("session123").has_value());
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response.denied_response().status().code(),
@@ -762,7 +762,7 @@ void OidcFilterTest::SetExpiredAccessTokenResponseInSessionStore() {
   expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
   expired_token_response.SetAccessToken("fake_access_token");
   expired_token_response.SetRefreshToken("fake_refresh_token");
-  session_store_->set("session123", expired_token_response);
+  session_store_->Set("session123", expired_token_response);
 }
 
 void OidcFilterTest::EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig) {
@@ -798,7 +798,7 @@ void OidcFilterTest::RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::st
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
 
-  auto stored_token_response = session_store_->get("session123");
+  auto stored_token_response = session_store_->Get("session123");
   ASSERT_TRUE(stored_token_response.has_value());
   ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
   ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_access_token");
@@ -896,7 +896,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWhenTokenResponseIsMissingAccessToken) {
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  ASSERT_FALSE(session_store_->get("session123").has_value());
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -919,7 +919,7 @@ TEST_F(OidcFilterTest, RetrieveTokenWhenTokenResponseIsMissingAccessToken) {
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
-  ASSERT_FALSE(session_store_->get("session123").has_value());
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
   ASSERT_THAT(
     response.denied_response().headers(),
     ContainsHeaders({

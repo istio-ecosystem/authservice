@@ -19,6 +19,8 @@ class AuthServiceImpl final : public Authorization::Service {
       ::grpc::ServerContext* context,
       const ::envoy::service::auth::v2::CheckRequest* request,
       ::envoy::service::auth::v2::CheckResponse* response) override;
+
+  virtual void DoPeriodicCleanup();
 };
 }  // namespace service
 }  // namespace authservice

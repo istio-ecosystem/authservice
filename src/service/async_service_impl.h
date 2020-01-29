@@ -26,6 +26,8 @@ private:
   std::unique_ptr<grpc::Server> server_;
 
   std::shared_ptr<boost::asio::io_context> io_context_;
+
+  void SchedulePeriodicCleanupTask();
 };
 
 }

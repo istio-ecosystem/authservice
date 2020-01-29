@@ -96,6 +96,8 @@ void AsyncAuthServiceImpl::Run() {
   // Add a work object to the IO service so it will not shut down when it has nothing left to do
   auto work = std::make_shared<boost::asio::io_context::work>(*io_context_);
 
+  SchedulePeriodicCleanupTask();
+
   // Spin up our worker threads
   // Config validation should have already ensured that the number of threads is > 0
   boost::thread_group threadpool;
@@ -160,6 +162,27 @@ void AsyncAuthServiceImpl::Run() {
   // Reset the work item for the IO service will terminate once it finishes any outstanding jobs
   work.reset();
   threadpool.join_all();
+}
+
+void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
+  std::chrono::seconds interval_in_seconds(60);
+  boost::asio::steady_timer timer(*io_context_, interval_in_seconds);
+  std::function<void (const boost::system::error_code &ec)> timer_handler_function;
+
+  timer_handler_function = [&](const boost::system::error_code &ec) {
+    spdlog::info("Starting periodic cleanup");
+
+    impl_.DoPeriodicCleanup();
+
+    // Reset the timer for some seconds in the future
+    timer.expires_at(std::chrono::steady_clock::now() + interval_in_seconds);
+
+    // Schedule the next invocation of this same handler on the same timer
+    timer.async_wait(timer_handler_function);
+  };
+
+  // Schedule the first invocation of the handler on the timer
+  timer.async_wait(timer_handler_function);
 }
 
 }
