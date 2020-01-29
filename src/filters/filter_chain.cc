@@ -66,5 +66,10 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   return result;
 }
 
+void FilterChainImpl::DoPeriodicCleanup() {
+  spdlog::info("{}: removing expired sessions from chain {}", __func__, Name());
+  session_store_->RemoveAllExpired();
+}
+
 }  // namespace filters
 }  // namespace authservice

@@ -81,7 +81,7 @@ google::rpc::Code OidcFilter::Process(
 
   if (MatchesLogoutRequest(request)) {
     if (session_id_optional.has_value()) {
-      session_store_->remove(session_id_optional.value());
+      session_store_->Remove(session_id_optional.value());
     }
     SetLogoutHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
@@ -108,7 +108,7 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
-  auto token_response_optional = session_store_->get(session_id);
+  auto token_response_optional = session_store_->Get(session_id);
 
   if (!RequiredTokensPresent(token_response_optional)) {
     SetRedirectToIdPHeaders(response);
@@ -451,9 +451,9 @@ void OidcFilter::updateOrEvictTokenResponse(
     absl::optional<TokenResponse> &refreshed_token_response
 ) const {
   if (refreshed_token_response.has_value()) {
-    session_store_->set(session_id, refreshed_token_response.value());
+    session_store_->Set(session_id, refreshed_token_response.value());
   } else {
-    session_store_->remove(session_id);
+    session_store_->Remove(session_id);
   }
 }
 
@@ -553,7 +553,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
       }
     }
 
-    session_store_->set(session_id, token_response.value());
+    session_store_->Set(session_id, token_response.value());
 
     SetRedirectHeaders(idp_config_.landing_page(), response);
     return google::rpc::Code::UNAUTHENTICATED;

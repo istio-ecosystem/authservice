@@ -4,13 +4,13 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-void InMemorySessionStore::set(absl::string_view session_id, TokenResponse &token_response) {
+void InMemorySessionStore::Set(absl::string_view session_id, TokenResponse &token_response) {
   //TODO: should this be synchronized somehow? can haz multithreads?
   map.erase(session_id.data());
   map.emplace(session_id, token_response);
 }
 
-absl::optional<TokenResponse> InMemorySessionStore::get(absl::string_view session_id) {
+absl::optional<TokenResponse> InMemorySessionStore::Get(absl::string_view session_id) {
   auto search = map.find(session_id.data());
   if (search != map.end()) {
     return absl::optional<TokenResponse>(search->second);
@@ -19,8 +19,12 @@ absl::optional<TokenResponse> InMemorySessionStore::get(absl::string_view sessio
   }
 }
 
-void InMemorySessionStore::remove(absl::string_view session_id) {
+void InMemorySessionStore::Remove(absl::string_view session_id) {
   map.erase(session_id.data());
+}
+
+void InMemorySessionStore::RemoveAllExpired() {
+  // TODO
 }
 
 }  // namespace oidc

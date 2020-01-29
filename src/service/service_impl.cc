@@ -60,5 +60,12 @@ AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
   }
   return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
 }
+
+void AuthServiceImpl::DoPeriodicCleanup() {
+  for (const auto &chain : chains_) {
+    chain->DoPeriodicCleanup();
+  }
+}
+
 }  // namespace service
 }  // namespace authservice
