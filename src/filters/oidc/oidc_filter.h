@@ -185,13 +185,9 @@ private:
 
   bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
 
-  int64_t seconds_since_epoch();
-
   bool TokensExpired(TokenResponse &token_response);
 
   void AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse);
-
-  void updateOrEvictTokenResponse(const absl::string_view &session_id, absl::optional<TokenResponse> &refreshed_token_response) const;
 
 public:
   OidcFilter(common::http::ptr_t http_ptr,

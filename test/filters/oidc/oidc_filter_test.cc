@@ -111,7 +111,9 @@ class OidcFilterTest : public ::testing::Test {
     parser_mock_ = std::make_shared<TokenResponseParserMock>();
     cryptor_mock_ = std::make_shared<common::session::TokenEncryptorMock>();
     session_id_generator_mock_ = std::make_shared<common::session::SessionIdGeneratorMock>();
-    session_store_ = std::static_pointer_cast<SessionStore>(std::make_shared<InMemorySessionStore>());
+    session_store_ = std::static_pointer_cast<SessionStore>(std::make_shared<InMemorySessionStore>(
+        std::make_shared<common::utilities::TimeService>(), 1000, 1000)
+    );
 
     auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
     ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
