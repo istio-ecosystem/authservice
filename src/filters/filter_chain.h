@@ -44,7 +44,7 @@ public:
 class FilterChainImpl : public FilterChain {
 private:
   authservice::config::FilterChain config_;
-  std::shared_ptr<filters::oidc::SessionStore> session_store_;
+  std::shared_ptr<filters::oidc::SessionStore> oidc_session_store_;
 
 public:
   explicit FilterChainImpl(authservice::config::FilterChain config);
@@ -55,7 +55,7 @@ public:
 
   std::unique_ptr<Filter> New() override;
 
-  virtual void DoPeriodicCleanup();
+  virtual void DoPeriodicCleanup() override;
 };
 
 }  // namespace filters

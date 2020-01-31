@@ -8,12 +8,8 @@
 namespace authservice {
 namespace filters {
 
-FilterChainImpl::FilterChainImpl(authservice::config::FilterChain config) : config_(std::move(config)) {
-  // Ensure each instance returned by New() has the same session store.
-  // Each request gets a new instance of Filter.
-  session_store_ = std::static_pointer_cast<filters::oidc::SessionStore>(
-      std::make_shared<filters::oidc::InMemorySessionStore>());
-}
+FilterChainImpl::FilterChainImpl(authservice::config::FilterChain config) :
+    config_(std::move(config)), oidc_session_store_(nullptr) {}
 
 const std::string &FilterChainImpl::Name() const {
   return config_.name();
@@ -41,9 +37,15 @@ bool FilterChainImpl::Matches(const ::envoy::service::auth::v2::CheckRequest *re
 std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
+  int oidc_filter_count = 0;
   for (const auto &filter : config_.filters()) {
     if (!filter.has_oidc()) {
       throw std::runtime_error("unsupported filter type");
+    } else {
+      oidc_filter_count++;
+    }
+    if (oidc_filter_count > 1) {
+      throw std::runtime_error("only one filter of type \"oidc\" is allowed in a chain");
     }
 
     auto token_request_parser =
@@ -60,15 +62,30 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
 
     auto http = common::http::ptr_t(new common::http::http_impl);
 
+    if (oidc_session_store_ == nullptr) {
+      // Note that each incoming request gets a new instance of Filter to handle it,
+      // so here we ensure that each instance returned by New() shares the same session store.
+      auto max_absolute_session_timeout = filter.oidc().max_absolute_session_timeout();
+      auto max_session_idle_timeout = filter.oidc().max_session_idle_timeout();
+      oidc_session_store_ = std::static_pointer_cast<filters::oidc::SessionStore>(
+          std::make_shared<filters::oidc::InMemorySessionStore>(
+              std::make_shared<common::utilities::TimeService>(),
+              max_absolute_session_timeout,
+              max_session_idle_timeout)
+      );
+    }
+
     result->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
-        http, filter.oidc(), token_request_parser, token_encryptor, session_id_generator, session_store_)));
+        http, filter.oidc(), token_request_parser, token_encryptor, session_id_generator, oidc_session_store_)));
   }
   return result;
 }
 
 void FilterChainImpl::DoPeriodicCleanup() {
-  spdlog::info("{}: removing expired sessions from chain {}", __func__, Name());
-  session_store_->RemoveAllExpired();
+  if (oidc_session_store_ != nullptr) {
+    spdlog::info("{}: removing expired sessions from chain {}", __func__, Name());
+    oidc_session_store_->RemoveAllExpired();
+  }
 }
 
 }  // namespace filters

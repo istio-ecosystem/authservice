@@ -7,6 +7,7 @@
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
 #include "src/common/utilities/random.h"
+#include "src/common/utilities/time_service.h"
 #include "state_cookie_codec.h"
 #include <algorithm>
 #include <chrono>
@@ -80,21 +81,26 @@ google::rpc::Code OidcFilter::Process(
   // to the configured logout redirect uri.
 
   if (MatchesLogoutRequest(request)) {
+    spdlog::info("{}: Handling logout", __func__);
     if (session_id_optional.has_value()) {
+      spdlog::info("{}: Removing session info from session store during logout", __func__);
       session_store_->Remove(session_id_optional.value());
     }
     SetLogoutHeaders(response);
+    spdlog::info("{}: Logout complete. Sending user to re-authenticate.", __func__);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
   // If the id_token header already exists, let request continue.
   // It is up to the downstream system to validate the header is valid.
   if (headers.contains(idp_config_.id_token().header())) {
+    spdlog::info("{}: ID Token header already present. Allowing request to proceed without adding any additional headers.", __func__);
     return google::rpc::Code::OK;
   }
 
   // Check if we have a session_id cookie. If not, generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
+    spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
     session_id_optional = session_id_generator_->Generate();
     SetSessionIdCookie(response, session_id_optional.value());
     SetRedirectToIdPHeaders(response);
@@ -111,6 +117,7 @@ google::rpc::Code OidcFilter::Process(
   auto token_response_optional = session_store_->Get(session_id);
 
   if (!RequiredTokensPresent(token_response_optional)) {
+    spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
@@ -119,21 +126,27 @@ google::rpc::Code OidcFilter::Process(
   
   if (!TokensExpired(token_response)) {
     AddTokensToRequestHeaders(response, token_response);
+    spdlog::info("{}: Tokens not expired. Allowing request to proceed.", __func__);
     return google::rpc::Code::OK;
   }
 
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (refresh_token_optional.has_value()) {
-    spdlog::info("{}: POSTing to refresh access token for session {}.", __func__, session_id);
+    spdlog::info("{}: POSTing to refresh access token", __func__);
     const auto &refresh_token = refresh_token_optional.value();
     auto refreshed_token_response = RefreshToken(token_response, refresh_token, ioc, yield);
-    updateOrEvictTokenResponse(session_id, refreshed_token_response);
+
     if (refreshed_token_response.has_value()) {
+      session_store_->Set(session_id, refreshed_token_response.value());
+      spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.", __func__);
       AddTokensToRequestHeaders(response, refreshed_token_response.value());
       return google::rpc::Code::OK;
     } else {
-      spdlog::info("{}: Attempt to refresh access token did not yield refreshed token. Sending user with session id {} to re-authenticate.", __func__, session_id);
+      session_store_->Remove(session_id);
+      spdlog::info("{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.", __func__);
     }
+  } else {
+    spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
   }
 
   SetRedirectToIdPHeaders(response);
@@ -309,15 +322,9 @@ bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_resp
          (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
 }
 
-int64_t OidcFilter::seconds_since_epoch() {
-  auto seconds = std::chrono::duration_cast<std::chrono::seconds>(
-      std::chrono::system_clock::now().time_since_epoch()
-  );
-  return seconds.count();
-}
-
 bool OidcFilter::TokensExpired(TokenResponse &token_response) {
-  int64_t now_seconds = seconds_since_epoch();
+  common::utilities::TimeService timeService;
+  int64_t now_seconds = timeService.GetCurrentTimeInSecondsSinceEpoch();
 
   if (token_response.GetIDTokenExpiry() < now_seconds) {
     return true;
@@ -445,18 +452,6 @@ OidcFilter::RefreshToken(
   );
 }
 
-// TODO: Move to session_store wrapper class, whenever it emerges
-void OidcFilter::updateOrEvictTokenResponse(
-    const absl::string_view &session_id,
-    absl::optional<TokenResponse> &refreshed_token_response
-) const {
-  if (refreshed_token_response.has_value()) {
-    session_store_->Set(session_id, refreshed_token_response.value());
-  } else {
-    session_store_->Remove(session_id);
-  }
-}
-
 // Performs an HTTP POST and prints the response
 google::rpc::Code OidcFilter::RetrieveToken(
     const ::envoy::service::auth::v2::CheckRequest *request,
@@ -553,6 +548,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
       }
     }
 
+    spdlog::info("{}: Saving token response to session store", __func__);
     session_store_->Set(session_id, token_response.value());
 
     SetRedirectHeaders(idp_config_.landing_page(), response);

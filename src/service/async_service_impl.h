@@ -27,6 +27,10 @@ private:
 
   std::shared_ptr<boost::asio::io_context> io_context_;
 
+  std::chrono::seconds interval_in_seconds_;
+  boost::asio::steady_timer timer_;
+  std::function<void (const boost::system::error_code &ec)> timer_handler_function_;
+
   void SchedulePeriodicCleanupTask();
 };
 

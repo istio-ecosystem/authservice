@@ -1,5 +1,6 @@
 #ifndef AUTHSERVICE_SRC_COMMON_UTILITIES_RANDOM_H_
 #define AUTHSERVICE_SRC_COMMON_UTILITIES_RANDOM_H_
+
 #include <memory>
 #include <string>
 #include <vector>
