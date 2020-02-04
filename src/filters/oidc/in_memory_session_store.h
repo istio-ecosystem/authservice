@@ -34,7 +34,6 @@ public:
     time_accessed_ = time_accessed;
   }
 
-  std::string to_string();
 };
 
 class InMemorySessionStore : public SessionStore {
@@ -58,8 +57,6 @@ public:
   virtual void Remove(absl::string_view session_id) override;
 
   virtual void RemoveAllExpired() override;
-
-  std::string to_string();
 };
 
 }  // namespace oidc

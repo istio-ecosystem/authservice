@@ -234,23 +234,25 @@ TEST_F(InMemorySessionStoreTest, ThreadSafety) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
   std::vector<std::thread> threads;
-  auto token_response = CreateTokenResponse();
 
+  int thread_count = 10;
+  int iterations = 1000;
   // Do lots of simultaneous sets and gets
-  for (int i = 0; i < 10; ++i) {
-    threads.emplace_back([this, i, &in_memory_session_store]() {
-      for (int j = 1; j < 101; ++j) {
-        int unique_number = (i * 100) + j;
-        auto token_response = CreateTokenResponse();
+  for (int i = 0; i < thread_count; ++i) {
+    // Each thread has its own instance of token_response because otherwise the threads clobber the token_response
+    auto token_response = CreateTokenResponse();
+    threads.emplace_back([iterations, i, &in_memory_session_store, token_response]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        int unique_number = (i * iterations) + j;
         token_response->SetAccessTokenExpiry(unique_number);
 
         auto key = std::string("session_id_") + std::to_string(unique_number);
         in_memory_session_store.Set(key, *token_response);
-        auto result = in_memory_session_store.Get(key);
+        auto retrieved_token_response = in_memory_session_store.Get(key);
 
-        ASSERT_TRUE(result.has_value());
-        ASSERT_TRUE(result->GetAccessTokenExpiry().has_value());
-        ASSERT_EQ(result->GetAccessTokenExpiry().value(), unique_number);
+        ASSERT_TRUE(retrieved_token_response.has_value());
+        ASSERT_TRUE(retrieved_token_response->GetAccessTokenExpiry().has_value());
+        ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
       }
     });
   }
@@ -261,15 +263,15 @@ TEST_F(InMemorySessionStoreTest, ThreadSafety) {
   threads.clear();
 
   // Do lots of simultaneous gets and removes
-  for (int i = 0; i < 10; ++i) {
-    threads.emplace_back([ i, &in_memory_session_store]() {
-      for (int j = 1; j < 101; ++j) {
-        int unique_number = (i * 100) + j;
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, i, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
 
-        auto result = in_memory_session_store.Get(key);
-        ASSERT_TRUE(result.has_value());
-        ASSERT_EQ(result->GetAccessTokenExpiry().value(), unique_number);
+        auto retrieved_token_response = in_memory_session_store.Get(key);
+        ASSERT_TRUE(retrieved_token_response.has_value());
+        ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
         in_memory_session_store.Remove(key);
         ASSERT_FALSE(in_memory_session_store.Get(key).has_value());
       }

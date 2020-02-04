@@ -67,23 +67,6 @@ void InMemorySessionStore::RemoveAllExpired() {
 SessionData::SessionData(TokenResponse &token_response, uint32_t time_added)
     : token_response_(token_response), time_added_(time_added), time_accessed_(time_added) {}
 
-std::string SessionData::to_string() {
-  return "expiry:" + std::to_string(token_response_.GetAccessTokenExpiry().value());
-}
-
-
-std::string InMemorySessionStore::to_string() {
-  std::string output;
-  std::string result;
-  std::string convert;
-  for (const auto & it : map) {
-    convert = it.second->to_string();
-    output += (it.first) + ":" + (convert) + ", ";
-  }
-  result = output.substr(0, output.size() - 2);
-  return result;
-}
-
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice
