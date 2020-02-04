@@ -1,4 +1,6 @@
+#include <thread>
 #include <include/gmock/gmock-actions.h>
+#include <spdlog/spdlog.h>
 #include "gtest/gtest.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 #include "test/common/utilities/mocks.h"
@@ -107,10 +109,12 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 
   in_memory_session_store.RemoveAllExpired();
   ASSERT_FALSE(in_memory_session_store.Get(session_id_will_expire).has_value()); // has been in 195 seconds, evicted
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
+  ASSERT_TRUE(
+      in_memory_session_store.Get(session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotRemoveSessionsWhenTheMaxAbsoluteSessionTimeoutIsZeroUntilIdleIsReached) {
+TEST_F(InMemorySessionStoreTest,
+       RemoveAllExpired_DoesNotRemoveSessionsWhenTheMaxAbsoluteSessionTimeoutIsZeroUntilIdleIsReached) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 1000);
   auto session_id = std::string("fake_session_id");
@@ -128,10 +132,12 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotRemoveSessionsWhenTheMa
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1501));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(session_id).has_value()); // removed due to idle timeout, don't care about time since added
+  ASSERT_FALSE(in_memory_session_store.Get(
+      session_id).has_value()); // removed due to idle timeout, don't care about time since added
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotRemoveSessionsWhenTheIdleSessionTimeoutIsZeroUntilMaxAbsoluteTimeoutIsReached) {
+TEST_F(InMemorySessionStoreTest,
+       RemoveAllExpired_DoesNotRemoveSessionsWhenTheIdleSessionTimeoutIsZeroUntilMaxAbsoluteTimeoutIsReached) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 1000, 0);
   auto session_id = std::string("fake_session_id");
@@ -152,7 +158,8 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotRemoveSessionsWhenTheId
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1006));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(session_id).has_value()); // removed due to max absolute timeout, even though it was just accessed
+  ASSERT_FALSE(in_memory_session_store.Get(
+      session_id).has_value()); // removed due to max absolute timeout, even though it was just accessed
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotEverRemoveSessionsWhenBothTimeoutsAreZero) {
@@ -206,7 +213,8 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
   ASSERT_TRUE(in_memory_session_store.Get(session_id_active).has_value()); // last active 40 seconds ago
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeoutEvenIfThatSessionWasNeverAccessed) {
+TEST_F(InMemorySessionStoreTest,
+       RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeoutEvenIfThatSessionWasNeverAccessed) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 50);
   auto session_id_idle = std::string("fake_session_id_idle");
@@ -220,6 +228,57 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 
   in_memory_session_store.RemoveAllExpired();
   ASSERT_FALSE(in_memory_session_store.Get(session_id_idle).has_value());
+}
+
+TEST_F(InMemorySessionStoreTest, ThreadSafety) {
+  const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
+  std::vector<std::thread> threads;
+  auto token_response = CreateTokenResponse();
+
+  // Do lots of simultaneous sets and gets
+  for (int i = 0; i < 10; ++i) {
+    threads.emplace_back([this, i, &in_memory_session_store]() {
+      for (int j = 1; j < 101; ++j) {
+        int unique_number = (i * 100) + j;
+        auto token_response = CreateTokenResponse();
+        token_response->SetAccessTokenExpiry(unique_number);
+
+        auto key = std::string("session_id_") + std::to_string(unique_number);
+        in_memory_session_store.Set(key, *token_response);
+        auto result = in_memory_session_store.Get(key);
+
+        ASSERT_TRUE(result.has_value());
+        ASSERT_TRUE(result->GetAccessTokenExpiry().has_value());
+        ASSERT_EQ(result->GetAccessTokenExpiry().value(), unique_number);
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+
+  threads.clear();
+
+  // Do lots of simultaneous gets and removes
+  for (int i = 0; i < 10; ++i) {
+    threads.emplace_back([ i, &in_memory_session_store]() {
+      for (int j = 1; j < 101; ++j) {
+        int unique_number = (i * 100) + j;
+        auto key = std::string("session_id_") + std::to_string(unique_number);
+
+        auto result = in_memory_session_store.Get(key);
+        ASSERT_TRUE(result.has_value());
+        ASSERT_EQ(result->GetAccessTokenExpiry().value(), unique_number);
+        in_memory_session_store.Remove(key);
+        ASSERT_FALSE(in_memory_session_store.Get(key).has_value());
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+  threads.clear();
 }
 
 }  // namespace oidc

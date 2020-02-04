@@ -3,6 +3,7 @@
 
 #include "src/filters/oidc/session_store.h"
 #include "src/common/utilities/time_service.h"
+#include "src/common/utilities/synchronized.h"
 
 namespace authservice {
 namespace filters {
@@ -17,13 +18,23 @@ private:
 public:
   SessionData(TokenResponse &token_response, uint32_t time_added);
 
-  TokenResponse &GetTokenResponse();
+  inline TokenResponse &GetTokenResponse() {
+    return token_response_;
+  }
 
-  uint32_t GetTimeAdded();
+  inline uint32_t GetTimeAdded() {
+    return time_added_;
+  }
 
-  uint32_t GetTimeMostRecentlyAccessed();
+  inline uint32_t GetTimeMostRecentlyAccessed() {
+    return time_accessed_;
+  }
 
-  void SetTimeMostRecentlyAccessed(uint32_t time_accessed);
+  inline void SetTimeMostRecentlyAccessed(uint32_t time_accessed) {
+    time_accessed_ = time_accessed;
+  }
+
+  std::string to_string();
 };
 
 class InMemorySessionStore : public SessionStore {
@@ -32,6 +43,7 @@ private:
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;
+  std::recursive_mutex mutex_;
 
 public:
   InMemorySessionStore(
@@ -46,6 +58,8 @@ public:
   virtual void Remove(absl::string_view session_id) override;
 
   virtual void RemoveAllExpired() override;
+
+  std::string to_string();
 };
 
 }  // namespace oidc
