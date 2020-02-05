@@ -185,7 +185,7 @@ private:
 
   bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
 
-  bool TokensExpired(TokenResponse &token_response);
+  bool RequiredTokensExpired(TokenResponse &token_response);
 
   void AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse);
 

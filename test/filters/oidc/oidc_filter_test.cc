@@ -612,6 +612,33 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
   ASSERT_FALSE(stored_token_response.has_value());
 }
 
+TEST_F(OidcFilterTest, Process_PermitsTheRequestToContinue_GivenTheAccessTokenIsExpired_ButGivenTheAccessTokenHeaderHasNotBeenConfigured) {
+  TokenResponse token_response(test_id_token_jwt_); // id token, not expired
+  token_response.SetAccessTokenExpiry(1); // access token, already expired
+  token_response.SetAccessToken("fake_access_token");
+  session_store_->Set("session123", token_response);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_THAT(
+      response.ok_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))}
+                      })
+  );
+}
+
 TEST_F(OidcFilterTest, ShouldPermitTheRequestToContinue_WhenTokenResponseWithAccessTokenButNoExpiresInTime_GivenTheAccessTokenHeaderHasBeenConfigured) {
   EnableAccessTokens(config_);
 
