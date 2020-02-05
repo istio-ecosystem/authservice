@@ -135,27 +135,30 @@ google::rpc::Code OidcFilter::Process(
     return google::rpc::Code::OK;
   }
 
-  // If the user has a unexpired refresh token and it is used to successfully request a fresh token_response,
-  // then allow the request to proceed.
+  // If there is no refresh token,
+  // then direct the request to the identity provider for authentication
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
-  if (refresh_token_optional.has_value()) {
-    spdlog::info("{}: POSTing to refresh access token", __func__);
-    const auto &refresh_token = refresh_token_optional.value();
-    auto refreshed_token_response = RefreshToken(token_response, refresh_token, ioc, yield);
-
-    if (refreshed_token_response.has_value()) {
-      session_store_->Set(session_id, refreshed_token_response.value());
-      spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.", __func__);
-      AddTokensToRequestHeaders(response, refreshed_token_response.value());
-      return google::rpc::Code::OK;
-    } else {
-      session_store_->Remove(session_id);
-      spdlog::info("{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.", __func__);
-      SetRedirectToIdPHeaders(response);
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-  } else {
+  if (!refresh_token_optional.has_value()) {
     spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  // If the user has an unexpired refresh token
+  // then use it to request a fresh token_response,
+  // then, if successful, allow the request to proceed.
+  auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
+  if (refreshed_token_response.has_value()) {
+    session_store_->Set(session_id, refreshed_token_response.value());
+    spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
+                 __func__);
+    AddTokensToRequestHeaders(response, refreshed_token_response.value());
+    return google::rpc::Code::OK;
+  } else {
+    session_store_->Remove(session_id);
+    spdlog::info(
+        "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
+        __func__);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
@@ -436,6 +439,7 @@ OidcFilter::RefreshToken(
       // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
   };
 
+  spdlog::info("{}: POSTing to refresh access token", __func__);
   auto retrieved_token_response = http_ptr_->Post(
       idp_config_.token(),
       headers,
