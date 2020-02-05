@@ -77,9 +77,8 @@ google::rpc::Code OidcFilter::Process(
   auto headers = request->attributes().request().http().headers();
   auto session_id_optional = GetSessionIdFromCookie(headers);
 
-  // If the request is for the configured logout path, then logout and redirect
-  // to the configured logout redirect uri.
-
+  // If the request is for the configured logout path,
+  // then logout and redirect to the configured logout redirect uri.
   if (MatchesLogoutRequest(request)) {
     spdlog::info("{}: Handling logout", __func__);
     if (session_id_optional.has_value()) {
@@ -91,45 +90,53 @@ google::rpc::Code OidcFilter::Process(
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
-  // If the id_token header already exists, let request continue.
-  // It is up to the downstream system to validate the header is valid.
+  // If the id_token header already exists,
+  // then let request continue.
+  // (It is up to the downstream system to validate the header is valid.)
   if (headers.contains(idp_config_.id_token().header())) {
     spdlog::info("{}: ID Token header already present. Allowing request to proceed without adding any additional headers.", __func__);
     return google::rpc::Code::OK;
   }
 
-  // Check if we have a session_id cookie. If not, generate a session id, put it in a header, and redirect for login.
+  // If the request does not have a session_id cookie,
+  // then generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
     spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
-    SetSessionIdCookie(response);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
   auto session_id = session_id_optional.value();
 
-  // If the request path is the callback for receiving the authorization code, then exchange it for tokens.
+  // If the request path is the callback for receiving the authorization code,
+  // then exchange it for tokens.
   if (MatchesCallbackRequest(request)) {
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
   auto token_response_optional = session_store_->Get(session_id);
 
+  // If the user has a session_id cookie but there are no entries in the session store associated with it,
+  // then redirect for login.
   if (!RequiredTokensPresent(token_response_optional)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
-    SetSessionIdCookie(response);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
   auto token_response = token_response_optional.value();
-  
+
+  // If both ID & Access token are still unexpired,
+  // then allow the request to proceed (no need to intervene).
+  // TODO: Should this account for when the access_token is configured to be disabled? (i.e. idp_config_.has_access_token() is false)
   if (!TokensExpired(token_response)) {
     AddTokensToRequestHeaders(response, token_response);
     spdlog::info("{}: Tokens not expired. Allowing request to proceed.", __func__);
     return google::rpc::Code::OK;
   }
 
+  // If the user has a unexpired refresh token and it is used to successfully request a fresh token_response,
+  // then allow the request to proceed.
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (refresh_token_optional.has_value()) {
     spdlog::info("{}: POSTing to refresh access token", __func__);
@@ -144,14 +151,14 @@ google::rpc::Code OidcFilter::Process(
     } else {
       session_store_->Remove(session_id);
       spdlog::info("{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.", __func__);
+      SetRedirectToIdPHeaders(response);
+      return google::rpc::Code::UNAUTHENTICATED;
     }
   } else {
     spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
   }
-
-  SetSessionIdCookie(response);
-  SetRedirectToIdPHeaders(response);
-  return google::rpc::Code::UNAUTHENTICATED;
 }
 
 void OidcFilter::SetHeader(
@@ -300,6 +307,9 @@ void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckRespon
   StateCookieCodec codec;
   SetEncryptedCookie(response->mutable_denied_response()->mutable_headers(), GetStateCookieName(),
                      codec.Encode(state, nonce), idp_config_.timeout());
+
+  // Set a fresh session id to alleviate Session fixation attack
+  SetSessionIdCookie(response);
 }
 
 void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
