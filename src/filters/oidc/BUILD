@@ -32,6 +32,7 @@ xx_library(
     deps = [
         "//src/filters/oidc:token_response",
         "//src/common/utilities:time_service",
+        "//src/common/utilities:synchronized",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",

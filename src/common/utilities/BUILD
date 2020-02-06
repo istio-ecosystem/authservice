@@ -20,3 +20,10 @@ xx_library(
     deps = [
     ],
 )
+
+xx_library(
+    name = "synchronized",
+    hdrs = ["synchronized.h"],
+    deps = [
+    ],
+)
