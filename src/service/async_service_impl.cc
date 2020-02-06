@@ -83,8 +83,11 @@ void CompleteState::Proceed() {
 }
 
 AsyncAuthServiceImpl::AsyncAuthServiceImpl(authservice::config::Config config)
-        : config_(std::move(config)), impl_(config_),
-          io_context_(std::make_shared<boost::asio::io_context>()) {
+    : config_(std::move(config)),
+      impl_(config_),
+      io_context_(std::make_shared<boost::asio::io_context>()),
+      interval_in_seconds_(60),
+      timer_(*io_context_, interval_in_seconds_) {
   grpc::ServerBuilder builder;
   builder.AddListeningPort(config::GetConfiguredAddress(config_), grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
@@ -165,24 +168,20 @@ void AsyncAuthServiceImpl::Run() {
 }
 
 void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
-  std::chrono::seconds interval_in_seconds(60);
-  boost::asio::steady_timer timer(*io_context_, interval_in_seconds);
-  std::function<void (const boost::system::error_code &ec)> timer_handler_function;
-
-  timer_handler_function = [&](const boost::system::error_code &ec) {
-    spdlog::info("Starting periodic cleanup");
+  timer_handler_function_ = [this](const boost::system::error_code &ec) {
+    spdlog::info("{}: Starting periodic cleanup (period of {} seconds)", __func__, interval_in_seconds_.count());
 
     impl_.DoPeriodicCleanup();
 
     // Reset the timer for some seconds in the future
-    timer.expires_at(std::chrono::steady_clock::now() + interval_in_seconds);
+    timer_.expires_at(std::chrono::steady_clock::now() + interval_in_seconds_);
 
     // Schedule the next invocation of this same handler on the same timer
-    timer.async_wait(timer_handler_function);
+    timer_.async_wait(timer_handler_function_);
   };
 
   // Schedule the first invocation of the handler on the timer
-  timer.async_wait(timer_handler_function);
+  timer_.async_wait(timer_handler_function_);
 }
 
 }

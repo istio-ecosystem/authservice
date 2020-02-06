@@ -1,3 +1,13 @@
+cc_library(
+    name = "mocks",
+    hdrs = ["mocks.h"],
+    visibility = ["//test:__subpackages__"],
+    deps = [
+        "//src/common/utilities:time_service",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
 cc_test(
     name = "random_test",
     srcs = ["random_test.cc"],

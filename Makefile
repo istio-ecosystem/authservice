@@ -29,6 +29,7 @@ docker-compile-env:
 	docker build -f build/Dockerfile.interactive-compile-environment -t authservice-build-env:$(USER) .
 
 bazel-bin/src/main/auth_server:
+    # Note: add --compilation_mode=dbg to the end of the next line to build a debug executable with `make docker-from-scratch`
 	bazel build $(BAZEL_FLAGS) //src/main:auth_server
 
 build:

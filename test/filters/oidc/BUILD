@@ -32,6 +32,8 @@ cc_test(
     name = "in_memory_session_store_test",
     srcs = ["in_memory_session_store_test.cc"],
     deps = [
+        "//test/common/utilities:mocks",
+        "//src/common/utilities:time_service",
         "//src/filters/oidc:in_memory_session_store",
         "@com_google_googletest//:gtest_main",
     ],
