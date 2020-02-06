@@ -145,22 +145,26 @@ absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse
   auto result = absl::make_optional<TokenResponse>(id_token);
   auto new_id_token = ParseIDToken(fields);
   if (new_id_token.has_value()) {
+    spdlog::info("{}: Updating id token.", __func__);
     result = absl::make_optional<TokenResponse>(new_id_token.value());
   }
 
   auto access_token_iter = fields.find(access_token_field);
   if (access_token_iter != fields.end()) {
+    spdlog::info("{}: Updating access token.", __func__);
     result->SetAccessToken(access_token_iter->second.string_value());
   }
 
   auto refresh_token_iter = fields.find(refresh_token_field);
   if (refresh_token_iter != fields.end()) {
+    spdlog::info("{}: Updating refresh token.", __func__);
     result->SetRefreshToken(refresh_token_iter->second.string_value());
   }
 
-  const absl::optional<int64_t> &expiry = ParseAccessTokenExpiry(fields);
-  if (expiry.has_value()) {
-    result->SetAccessTokenExpiry(expiry.value());
+  const absl::optional<int64_t> &access_token_expiry = ParseAccessTokenExpiry(fields);
+  if (access_token_expiry.has_value()) {
+    spdlog::info("{}: Updating access token expiration.", __func__);
+    result->SetAccessTokenExpiry(access_token_expiry.value());
   }
 
   if (IsInvalid(fields)) {
