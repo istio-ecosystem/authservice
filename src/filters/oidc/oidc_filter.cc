@@ -128,8 +128,7 @@ google::rpc::Code OidcFilter::Process(
 
   // If both ID & Access token are still unexpired,
   // then allow the request to proceed (no need to intervene).
-  // TODO: Should this account for when the access_token is configured to be disabled? (i.e. idp_config_.has_access_token() is false)
-  if (!TokensExpired(token_response)) {
+  if (!RequiredTokensExpired(token_response)) {
     AddTokensToRequestHeaders(response, token_response);
     spdlog::info("{}: Tokens not expired. Allowing request to proceed.", __func__);
     return google::rpc::Code::OK;
@@ -336,7 +335,7 @@ bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_resp
          (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
 }
 
-bool OidcFilter::TokensExpired(TokenResponse &token_response) {
+bool OidcFilter::RequiredTokensExpired(TokenResponse &token_response) {
   common::utilities::TimeService timeService;
   int64_t now_seconds = timeService.GetCurrentTimeInSecondsSinceEpoch();
 
@@ -347,7 +346,7 @@ bool OidcFilter::TokensExpired(TokenResponse &token_response) {
   // Don't require expires_in. Rely on presence of field to determine if check should be made.
   //  The oauth spec does not require a expires_in https://tools.ietf.org/html/rfc6749#section-5.1
   const absl::optional<int64_t> &accessTokenExpiry = token_response.GetAccessTokenExpiry();
-  return accessTokenExpiry.has_value() && accessTokenExpiry.value() < now_seconds;
+  return idp_config_.has_access_token() && accessTokenExpiry.has_value() && accessTokenExpiry.value() < now_seconds;
 }
 
 bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
@@ -552,8 +551,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
       return google::rpc::Code::INVALID_ARGUMENT;
     }
 
-    // Check whether access_token forwarding is configured and if it is we have
-    // an access token in our token response.
+    // If access_token forwarding is configured but there is not an access token in the token response
+    // then there is a problem
     if (idp_config_.has_access_token()) {
       auto access_token = token_response->AccessToken();
       if (!access_token.has_value()) {
