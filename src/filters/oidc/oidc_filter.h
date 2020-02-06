@@ -149,7 +149,7 @@ private:
    * @param response the outgoing response
    * @param session_id the session id
    */
-  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, const std::string &session_id);
+  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response);
 
   /**
    * @brief Retrieve and decrypt the sessionId from cookies

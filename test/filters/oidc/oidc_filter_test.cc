@@ -285,7 +285,7 @@ TEST_F(OidcFilterTest, AlreadyHasUnexpiredIdTokenShouldSendRequestToAppWithAutho
   );
 }
 
-TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured) {
+TEST_F(OidcFilterTest, ShouldRedirectToIdpToAuthenticateAgain_WhenAccessTokenIsMissing_GivenTheAccessTokenHeaderHasBeenConfigured) {
   EnableAccessTokens(config_);
 
   TokenResponse token_response(test_id_token_jwt_);
@@ -294,6 +294,8 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
   session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -319,6 +321,10 @@ TEST_F(OidcFilterTest, MissingAccessTokenShouldRedirectToIdpToAuthenticateAgainW
         StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
               "HttpOnly; Max-Age=300; Path=/; "
               "SameSite=Lax; Secure")
+      },
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")
       }
     })
   );
@@ -333,6 +339,8 @@ TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain
   session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -358,7 +366,9 @@ TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 }
@@ -405,7 +415,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAc
                           {"access_token", StrEq("expected_refreshed_access_token")},
                       })
   );
-  
+
   auto stored_token_response = session_store_->Get("session123");
   ASSERT_TRUE(stored_token_response.has_value());
   ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
@@ -414,11 +424,12 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAc
   ASSERT_EQ(stored_token_response.value().RefreshToken(), "expected_refreshed_refresh_token");
 }
 
-TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenThereIsNoStoredTokenResponseAssociatedWithTheUsersSession) {
+TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessionId_WhenThereIsNoStoredTokenResponseAssociatedWithTheUsersSession) {
   EnableAccessTokens(config_);
 
   auto mocked_http = new common::http::http_mock();
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
 
@@ -444,7 +455,9 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenThereIsNoStoredT
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 
@@ -466,6 +479,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _))
       .WillOnce(::testing::Return(absl::nullopt));
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
 
@@ -491,7 +505,9 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 
@@ -508,6 +524,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(nullptr)));
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
 
@@ -532,7 +549,9 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 
@@ -553,6 +572,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted")); // The redirect to IDP requires a state/nonce cookie.
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _)).Times(0); // we want the code to return before attempting to parse the bad response
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
 
   auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
   ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
@@ -582,7 +602,9 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 
@@ -635,6 +657,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
   session_store_->Set("session123", token_response);
 
   EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -660,7 +683,9 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
                               StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
                                     "HttpOnly; Max-Age=300; Path=/; "
                                     "SameSite=Lax; Secure")
-                          }
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
 }

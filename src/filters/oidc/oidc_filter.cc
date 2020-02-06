@@ -101,8 +101,7 @@ google::rpc::Code OidcFilter::Process(
   // Check if we have a session_id cookie. If not, generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
     spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
-    session_id_optional = session_id_generator_->Generate();
-    SetSessionIdCookie(response, session_id_optional.value());
+    SetSessionIdCookie(response);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
@@ -118,6 +117,7 @@ google::rpc::Code OidcFilter::Process(
 
   if (!RequiredTokensPresent(token_response_optional)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
+    SetSessionIdCookie(response);
     SetRedirectToIdPHeaders(response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
@@ -149,6 +149,7 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
   }
 
+  SetSessionIdCookie(response);
   SetRedirectToIdPHeaders(response);
   return google::rpc::Code::UNAUTHENTICATED;
 }
@@ -398,9 +399,8 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
 }
 
-void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response,
-                                    const std::string &session_id) {
-  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id, NO_TIMEOUT);
+void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response) {
+  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id_generator_->Generate(), NO_TIMEOUT);
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
