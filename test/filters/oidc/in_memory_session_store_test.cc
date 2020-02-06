@@ -33,14 +33,14 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   auto other_session_id = "other_session_id";
   auto token_response = CreateTokenResponse();
 
-  auto result = in_memory_session_store.get(session_id);
+  auto result = in_memory_session_store.Get(session_id);
   ASSERT_FALSE(result.has_value());
 
-  in_memory_session_store.set(session_id, *token_response);
+  in_memory_session_store.Set(session_id, *token_response);
   // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of set()
   token_response->SetAccessToken("fake_access_token2");
 
-  result = in_memory_session_store.get(session_id);
+  result = in_memory_session_store.Get(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
@@ -48,16 +48,16 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 42);
 
   token_response->SetAccessTokenExpiry(99);
-  in_memory_session_store.set(session_id, *token_response); // overwrite
+  in_memory_session_store.Set(session_id, *token_response); // overwrite
 
-  result = in_memory_session_store.get(session_id);
+  result = in_memory_session_store.Get(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
   ASSERT_EQ(result.value().AccessToken(), "fake_access_token2");
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 99);
 
-  result = in_memory_session_store.get(other_session_id);
+  result = in_memory_session_store.Get(other_session_id);
   ASSERT_FALSE(result.has_value());
 }
 
@@ -66,12 +66,12 @@ TEST_F(InMemorySessionStoreTest, Remove) {
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
-  in_memory_session_store.set(session_id, *token_response);
-  ASSERT_TRUE(in_memory_session_store.get(session_id).has_value());
-  in_memory_session_store.remove(session_id);
-  ASSERT_FALSE(in_memory_session_store.get(session_id).has_value());
+  in_memory_session_store.Set(session_id, *token_response);
+  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  in_memory_session_store.Remove(session_id);
+  ASSERT_FALSE(in_memory_session_store.Get(session_id).has_value());
 
-  in_memory_session_store.remove("other-session-id"); // ignore non-existent keys without error
+  in_memory_session_store.Remove("other-session-id"); // ignore non-existent keys without error
 }
 
 }  // namespace oidc

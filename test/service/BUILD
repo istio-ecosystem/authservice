@@ -1,6 +1,6 @@
 cc_test(
     name = "serviceimpl_test",
-    srcs = ["serviceimpl_test.cc"],
+    srcs = ["service_impl_test.cc"],
     data = ["//test/fixtures"],
     deps = [
         "//src/config",

@@ -14,11 +14,13 @@ typedef std::shared_ptr<SessionStore> SessionStorePtr;
 class SessionStore {
 public:
 
-  virtual void set(absl::string_view session_id, TokenResponse &token_response) = 0;
+  virtual void Set(absl::string_view session_id, TokenResponse &token_response) = 0;
 
-  virtual absl::optional<TokenResponse> get(absl::string_view session_id) = 0;
+  virtual absl::optional<TokenResponse> Get(absl::string_view session_id) = 0;
 
-  virtual void remove(absl::string_view session_id) = 0;
+  virtual void Remove(absl::string_view session_id) = 0;
+
+  virtual void RemoveAllExpired() = 0;
 };
 
 }  // namespace oidc

@@ -12,11 +12,13 @@ private:
   std::unordered_map<std::string, TokenResponse> map;
 
 public:
-  virtual void set(absl::string_view session_id, TokenResponse &token_response);
+  virtual void Set(absl::string_view session_id, TokenResponse &token_response);
 
-  virtual absl::optional<TokenResponse> get(absl::string_view session_id);
+  virtual absl::optional<TokenResponse> Get(absl::string_view session_id);
 
-  virtual void remove(absl::string_view session_id);
+  virtual void Remove(absl::string_view session_id);
+
+  virtual void RemoveAllExpired();
 };
 
 }  // namespace oidc
