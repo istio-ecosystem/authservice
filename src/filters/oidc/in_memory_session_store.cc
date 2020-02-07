@@ -5,11 +5,11 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-SessionTokenResponse::SessionTokenResponse(TokenResponse &token_response, uint32_t time_added)
+SessionOfTokenResponse::SessionOfTokenResponse(TokenResponse &token_response, uint32_t time_added)
     : token_response_(token_response), time_added_(time_added), time_accessed_(time_added) {}
 
-SessionLocation::SessionLocation(std::string location)
-    : location_(location) {}
+SessionOfRequestedURL::SessionOfRequestedURL(std::string requested_url)
+    : requested_url_(requested_url) {}
 
 InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
                                            uint32_t max_absolute_session_timeout_in_seconds,
@@ -20,9 +20,9 @@ InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::Ti
 
 void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) {
   synchronized(mutex_) {
-    RemoveSessionTokenResponse(session_id);
+    RemoveSessionOfTokenResponse(session_id);
     token_response_map.emplace(session_id.data(),
-                               std::make_shared<SessionTokenResponse>(token_response, time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+                               std::make_shared<SessionOfTokenResponse>(token_response, time_service_->GetCurrentTimeInSecondsSinceEpoch()));
   }
 }
 
@@ -38,34 +38,34 @@ absl::optional<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::strin
   }
 }
 
-void InMemorySessionStore::SetLocation(absl::string_view session_id, std::string location) {
+void InMemorySessionStore::SetRequestedURL(absl::string_view session_id, std::string requested_url) {
   synchronized(mutex_) {
-    RemoveSessionLocation(session_id);
-    location_map.emplace(session_id.data(),
-                         std::make_shared<SessionLocation>(location));
+    RemoveSessionOfRequestedURL(session_id);
+    url_map.emplace(session_id.data(),
+                    std::make_shared<SessionOfRequestedURL>(requested_url));
   }
 }
 
-absl::optional<std::string> InMemorySessionStore::GetLocation(absl::string_view session_id) {
+absl::optional<std::string> InMemorySessionStore::GetRequestedURL(absl::string_view session_id) {
   synchronized(mutex_) {
-    auto search = location_map.find(session_id.data());
-    if (search == location_map.end()) {
+    auto search = url_map.find(session_id.data());
+    if (search == url_map.end()) {
       return absl::nullopt;
     }
     auto session_data = search->second;
-    return absl::optional<std::string>(session_data->GetLocation());
+    return absl::optional<std::string>(session_data->GetRequestedURL());
   }
 }
 
-void InMemorySessionStore::RemoveSessionTokenResponse(absl::string_view session_id) {
+void InMemorySessionStore::RemoveSessionOfTokenResponse(absl::string_view session_id) {
   synchronized(mutex_) {
     token_response_map.erase(session_id.data());
   }
 }
 
-void InMemorySessionStore::RemoveSessionLocation(absl::string_view session_id) {
+void InMemorySessionStore::RemoveSessionOfRequestedURL(absl::string_view session_id) {
   synchronized(mutex_) {
-    location_map.erase(session_id.data());
+    url_map.erase(session_id.data());
   }
 }
 

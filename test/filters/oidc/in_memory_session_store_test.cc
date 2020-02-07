@@ -67,29 +67,29 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 99);
 }
 
-TEST_F(InMemorySessionStoreTest, SetLocationAndGetLocation) {
+TEST_F(InMemorySessionStoreTest, SetRequestedURLAndGetRequestedURL) {
   InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128);
   auto session_id = std::string("fake_session_id");
   auto other_session_id = "other_session_id";
-  auto location = "https://example.com";
+  auto requested_url = "https://example.com";
 
-  auto result = in_memory_session_store.GetLocation(session_id);
+  auto result = in_memory_session_store.GetRequestedURL(session_id);
   ASSERT_FALSE(result.has_value());
 
-  in_memory_session_store.SetLocation(session_id, location);
-  // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of SetLocation()
-  location = "https://example2.com";
+  in_memory_session_store.SetRequestedURL(session_id, requested_url);
+  // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of SetRequestedURL()
+  requested_url = "https://example2.com";
 
-  result = in_memory_session_store.GetLocation(other_session_id);
+  result = in_memory_session_store.GetRequestedURL(other_session_id);
   ASSERT_FALSE(result.has_value());
 
-  result = in_memory_session_store.GetLocation(session_id);
+  result = in_memory_session_store.GetRequestedURL(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result, "https://example.com");
 
-  in_memory_session_store.SetLocation(session_id, location); // overwrite
+  in_memory_session_store.SetRequestedURL(session_id, requested_url); // overwrite
 
-  result = in_memory_session_store.GetLocation(session_id);
+  result = in_memory_session_store.GetRequestedURL(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result, "https://example2.com");
 }
@@ -101,10 +101,10 @@ TEST_F(InMemorySessionStoreTest, Remove) {
 
   in_memory_session_store.SetTokenResponse(session_id, *token_response);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
-  in_memory_session_store.RemoveSessionTokenResponse(session_id);
+  in_memory_session_store.RemoveSessionOfTokenResponse(session_id);
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
-  in_memory_session_store.RemoveSessionTokenResponse("other-session-id"); // ignore non-existent keys without error
+  in_memory_session_store.RemoveSessionOfTokenResponse("other-session-id"); // ignore non-existent keys without error
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxAbsoluteSessionTimeout) {
@@ -299,7 +299,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
         auto retrieved_token_response = in_memory_session_store.GetTokenResponse(key);
         ASSERT_TRUE(retrieved_token_response.has_value());
         ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
-        in_memory_session_store.RemoveSessionTokenResponse(key);
+        in_memory_session_store.RemoveSessionOfTokenResponse(key);
         ASSERT_FALSE(in_memory_session_store.GetTokenResponse(key).has_value());
       }
     });
@@ -310,7 +310,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
   threads.clear();
 }
 
-TEST_F(InMemorySessionStoreTest, ThreadSafetyForLocationOperations) {
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForRequestedURLOperations) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
   std::vector<std::thread> threads;
@@ -320,19 +320,19 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForLocationOperations) {
 
   // Do lots of simultaneous sets and gets
   for (int i = 0; i < thread_count; ++i) {
-    // Each thread has its own instance of location because otherwise the threads clobber the location
+    // Each thread has its own instance of URL because otherwise the threads clobber the URL
     auto token_response = CreateTokenResponse();
     threads.emplace_back([iterations, i, &in_memory_session_store, token_response]() {
       for (int j = 1; j < iterations + 1; ++j) {
         int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
-        auto unique_location = std::string("https://example.com") + std::to_string(unique_number);
+        auto unique_url = std::string("https://example.com") + std::to_string(unique_number);
 
-        in_memory_session_store.SetLocation(key, unique_location);
-        auto retrieved_optional_location = in_memory_session_store.GetLocation(key);
+        in_memory_session_store.SetRequestedURL(key, unique_url);
+        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
 
-        ASSERT_TRUE(retrieved_optional_location.has_value());
-        ASSERT_EQ(retrieved_optional_location.value(), unique_location);
+        ASSERT_TRUE(retrieved_optional_url.has_value());
+        ASSERT_EQ(retrieved_optional_url.value(), unique_url);
       }
     });
   }
@@ -349,10 +349,10 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForLocationOperations) {
         int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
 
-        auto retrieved_optional_location = in_memory_session_store.GetLocation(key);
-        ASSERT_TRUE(retrieved_optional_location.has_value());
-        in_memory_session_store.RemoveSessionLocation(key);
-        ASSERT_FALSE(in_memory_session_store.GetLocation(key).has_value());
+        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
+        ASSERT_TRUE(retrieved_optional_url.has_value());
+        in_memory_session_store.RemoveSessionOfRequestedURL(key);
+        ASSERT_FALSE(in_memory_session_store.GetRequestedURL(key).has_value());
       }
     });
   }

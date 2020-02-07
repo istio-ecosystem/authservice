@@ -83,7 +83,7 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info("{}: Handling logout", __func__);
     if (session_id_optional.has_value()) {
       spdlog::info("{}: Removing session info from session store during logout", __func__);
-      session_store_->RemoveSessionTokenResponse(session_id_optional.value());
+      session_store_->RemoveSessionOfTokenResponse(session_id_optional.value());
     }
     SetLogoutHeaders(response);
     spdlog::info("{}: Logout complete. Sending user to re-authenticate.", __func__);
@@ -154,7 +154,7 @@ google::rpc::Code OidcFilter::Process(
     AddTokensToRequestHeaders(response, refreshed_token_response.value());
     return google::rpc::Code::OK;
   } else {
-    session_store_->RemoveSessionTokenResponse(session_id);
+    session_store_->RemoveSessionOfTokenResponse(session_id);
     spdlog::info(
         "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
         __func__);

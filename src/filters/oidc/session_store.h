@@ -16,15 +16,15 @@ public:
 
   virtual void SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) = 0;
 
-  virtual void SetLocation(absl::string_view session_id, std::string location) = 0;
+  virtual void SetRequestedURL(absl::string_view session_id, std::string requested_url) = 0;
 
   virtual absl::optional<TokenResponse> GetTokenResponse(absl::string_view session_id) = 0;
 
-  virtual absl::optional<std::string> GetLocation(absl::string_view session_id) = 0;
+  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) = 0;
 
-  virtual void RemoveSessionTokenResponse(absl::string_view session_id) = 0;
+  virtual void RemoveSessionOfTokenResponse(absl::string_view session_id) = 0;
 
-  virtual void RemoveSessionLocation(absl::string_view session_id) = 0;
+  virtual void RemoveSessionOfRequestedURL(absl::string_view session_id) = 0;
 
   virtual void RemoveAllExpired() = 0;
 };

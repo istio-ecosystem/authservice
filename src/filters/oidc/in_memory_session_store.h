@@ -9,14 +9,14 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-class SessionTokenResponse {
+class SessionOfTokenResponse {
 private:
   TokenResponse token_response_;
   uint32_t time_added_;
   uint32_t time_accessed_;
 
 public:
-  SessionTokenResponse(TokenResponse &token_response, uint32_t time_added);
+  SessionOfTokenResponse(TokenResponse &token_response, uint32_t time_added);
 
   inline TokenResponse &GetTokenResponse() {
     return token_response_;
@@ -36,22 +36,22 @@ public:
 
 };
 
-class SessionLocation {
+class SessionOfRequestedURL {
 private:
-  std::string location_;
+  std::string requested_url_;
 
 public:
-  SessionLocation(std::string location);
+  SessionOfRequestedURL(std::string requested_url);
 
-  inline std::string &GetLocation() {
-    return location_;
+  inline std::string &GetRequestedURL() {
+    return requested_url_;
   }
 };
 
 class InMemorySessionStore : public SessionStore {
 private:
-  std::unordered_map<std::string, std::shared_ptr<SessionTokenResponse>> token_response_map;
-  std::unordered_map<std::string, std::shared_ptr<SessionLocation>> location_map;
+  std::unordered_map<std::string, std::shared_ptr<SessionOfTokenResponse>> token_response_map;
+  std::unordered_map<std::string, std::shared_ptr<SessionOfRequestedURL>> url_map;
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;
@@ -65,15 +65,15 @@ public:
 
   virtual void SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) override;
 
-  virtual void SetLocation(absl::string_view session_id, std::string location) override;
+  virtual void SetRequestedURL(absl::string_view session_id, std::string requested_url) override;
 
   virtual absl::optional<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
 
-  virtual absl::optional<std::string> GetLocation(absl::string_view session_id) override;
+  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) override;
 
-  virtual void RemoveSessionTokenResponse(absl::string_view session_id) override;
+  virtual void RemoveSessionOfTokenResponse(absl::string_view session_id) override;
 
-  virtual void RemoveSessionLocation(absl::string_view session_id) override;
+  virtual void RemoveSessionOfRequestedURL(absl::string_view session_id) override;
 
   virtual void RemoveAllExpired() override;
 };
