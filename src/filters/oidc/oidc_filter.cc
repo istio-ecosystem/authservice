@@ -83,7 +83,7 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info("{}: Handling logout", __func__);
     if (session_id_optional.has_value()) {
       spdlog::info("{}: Removing session info from session store during logout", __func__);
-      session_store_->Remove(session_id_optional.value());
+      session_store_->RemoveSessionTokenResponse(session_id_optional.value());
     }
     SetLogoutHeaders(response);
     spdlog::info("{}: Logout complete. Sending user to re-authenticate.", __func__);
@@ -114,7 +114,7 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
-  auto token_response_optional = session_store_->Get(session_id);
+  auto token_response_optional = session_store_->GetTokenResponse(session_id);
 
   // If the user has a session_id cookie but there are no entries in the session store associated with it,
   // then redirect for login.
@@ -148,13 +148,13 @@ google::rpc::Code OidcFilter::Process(
   // then, if successful, allow the request to proceed.
   auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
   if (refreshed_token_response.has_value()) {
-    session_store_->Set(session_id, refreshed_token_response.value());
+    session_store_->SetTokenResponse(session_id, refreshed_token_response.value());
     spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
                  __func__);
     AddTokensToRequestHeaders(response, refreshed_token_response.value());
     return google::rpc::Code::OK;
   } else {
-    session_store_->Remove(session_id);
+    session_store_->RemoveSessionTokenResponse(session_id);
     spdlog::info(
         "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
         __func__);
@@ -562,7 +562,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     }
 
     spdlog::info("{}: Saving token response to session store", __func__);
-    session_store_->Set(session_id, token_response.value());
+    session_store_->SetTokenResponse(session_id, token_response.value());
 
     SetRedirectHeaders(idp_config_.landing_page(), response);
     return google::rpc::Code::UNAUTHENTICATED;

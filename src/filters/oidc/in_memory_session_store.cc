@@ -5,6 +5,12 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
+SessionTokenResponse::SessionTokenResponse(TokenResponse &token_response, uint32_t time_added)
+    : token_response_(token_response), time_added_(time_added), time_accessed_(time_added) {}
+
+SessionLocation::SessionLocation(std::string location)
+    : location_(location) {}
+
 InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
                                            uint32_t max_absolute_session_timeout_in_seconds,
                                            uint32_t max_session_idle_timeout_in_seconds) :
@@ -12,30 +18,54 @@ InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::Ti
     max_absolute_session_timeout_in_seconds_(max_absolute_session_timeout_in_seconds),
     max_session_idle_timeout_in_seconds_(max_session_idle_timeout_in_seconds) {}
 
-void InMemorySessionStore::Set(absl::string_view session_id, TokenResponse &token_response) {
+void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) {
   synchronized(mutex_) {
-    Remove(session_id);
-    map.emplace(session_id.data(),
-                std::make_shared<SessionData>(token_response, time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+    RemoveSessionTokenResponse(session_id);
+    token_response_map.emplace(session_id.data(),
+                               std::make_shared<SessionTokenResponse>(token_response, time_service_->GetCurrentTimeInSecondsSinceEpoch()));
   }
 }
 
-absl::optional <TokenResponse> InMemorySessionStore::Get(absl::string_view session_id) {
+absl::optional<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::string_view session_id) {
   synchronized(mutex_) {
-    auto search = map.find(session_id.data());
-    if (search != map.end()) {
-      auto value = search->second;
-      value->SetTimeMostRecentlyAccessed(time_service_->GetCurrentTimeInSecondsSinceEpoch());
-      return absl::optional<TokenResponse>(value->GetTokenResponse());
-    } else {
+    auto search = token_response_map.find(session_id.data());
+    if (search == token_response_map.end()) {
       return absl::nullopt;
     }
+    auto value = search->second;
+    value->SetTimeMostRecentlyAccessed(time_service_->GetCurrentTimeInSecondsSinceEpoch());
+    return absl::optional<TokenResponse>(value->GetTokenResponse());
   }
 }
 
-void InMemorySessionStore::Remove(absl::string_view session_id) {
+void InMemorySessionStore::SetLocation(absl::string_view session_id, std::string location) {
   synchronized(mutex_) {
-    map.erase(session_id.data());
+    RemoveSessionLocation(session_id);
+    location_map.emplace(session_id.data(),
+                         std::make_shared<SessionLocation>(location));
+  }
+}
+
+absl::optional<std::string> InMemorySessionStore::GetLocation(absl::string_view session_id) {
+  synchronized(mutex_) {
+    auto search = location_map.find(session_id.data());
+    if (search == location_map.end()) {
+      return absl::nullopt;
+    }
+    auto session_data = search->second;
+    return absl::optional<std::string>(session_data->GetLocation());
+  }
+}
+
+void InMemorySessionStore::RemoveSessionTokenResponse(absl::string_view session_id) {
+  synchronized(mutex_) {
+    token_response_map.erase(session_id.data());
+  }
+}
+
+void InMemorySessionStore::RemoveSessionLocation(absl::string_view session_id) {
+  synchronized(mutex_) {
+    location_map.erase(session_id.data());
   }
 }
 
@@ -49,23 +79,20 @@ void InMemorySessionStore::RemoveAllExpired() {
   bool check_time_idle = max_session_idle_timeout_in_seconds_ > 0;
 
   synchronized(mutex_) {
-    auto it = map.begin();
-    while (it != map.end()) {
+    auto it = token_response_map.begin();
+    while (it != token_response_map.end()) {
       auto value = it->second;
       bool expired_based_on_time_added = value->GetTimeAdded() < earliest_time_added_to_keep;
       bool expired_based_on_idle_time = value->GetTimeMostRecentlyAccessed() < earliest_time_idle_to_keep;
 
       if ((check_time_added && expired_based_on_time_added) || (check_time_idle && expired_based_on_idle_time)) {
-        it = map.erase(it);
+        it = token_response_map.erase(it);
       } else {
         it++;
       }
     }
   }
 }
-
-SessionData::SessionData(TokenResponse &token_response, uint32_t time_added)
-    : token_response_(token_response), time_added_(time_added), time_accessed_(time_added) {}
 
 }  // namespace oidc
 }  // namespace filters

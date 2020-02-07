@@ -39,14 +39,17 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   auto other_session_id = "other_session_id";
   auto token_response = CreateTokenResponse();
 
-  auto result = in_memory_session_store.Get(session_id);
+  auto result = in_memory_session_store.GetTokenResponse(session_id);
   ASSERT_FALSE(result.has_value());
 
-  in_memory_session_store.Set(session_id, *token_response);
+  in_memory_session_store.SetTokenResponse(session_id, *token_response);
   // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of set()
   token_response->SetAccessToken("fake_access_token2");
 
-  result = in_memory_session_store.Get(session_id);
+  result = in_memory_session_store.GetTokenResponse(other_session_id);
+  ASSERT_FALSE(result.has_value());
+
+  result = in_memory_session_store.GetTokenResponse(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
@@ -54,17 +57,41 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 42);
 
   token_response->SetAccessTokenExpiry(99);
-  in_memory_session_store.Set(session_id, *token_response); // overwrite
+  in_memory_session_store.SetTokenResponse(session_id, *token_response); // overwrite
 
-  result = in_memory_session_store.Get(session_id);
+  result = in_memory_session_store.GetTokenResponse(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result.value().IDToken().jwt_, id_token_jwt.jwt_);
   ASSERT_EQ(result.value().RefreshToken(), "fake_refresh_token");
   ASSERT_EQ(result.value().AccessToken(), "fake_access_token2");
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 99);
+}
 
-  result = in_memory_session_store.Get(other_session_id);
+TEST_F(InMemorySessionStoreTest, SetLocationAndGetLocation) {
+  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128);
+  auto session_id = std::string("fake_session_id");
+  auto other_session_id = "other_session_id";
+  auto location = "https://example.com";
+
+  auto result = in_memory_session_store.GetLocation(session_id);
   ASSERT_FALSE(result.has_value());
+
+  in_memory_session_store.SetLocation(session_id, location);
+  // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of SetLocation()
+  location = "https://example2.com";
+
+  result = in_memory_session_store.GetLocation(other_session_id);
+  ASSERT_FALSE(result.has_value());
+
+  result = in_memory_session_store.GetLocation(session_id);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ(result, "https://example.com");
+
+  in_memory_session_store.SetLocation(session_id, location); // overwrite
+
+  result = in_memory_session_store.GetLocation(session_id);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ(result, "https://example2.com");
 }
 
 TEST_F(InMemorySessionStoreTest, Remove) {
@@ -72,12 +99,12 @@ TEST_F(InMemorySessionStoreTest, Remove) {
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
-  in_memory_session_store.Set(session_id, *token_response);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
-  in_memory_session_store.Remove(session_id);
-  ASSERT_FALSE(in_memory_session_store.Get(session_id).has_value());
+  in_memory_session_store.SetTokenResponse(session_id, *token_response);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
+  in_memory_session_store.RemoveSessionTokenResponse(session_id);
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
-  in_memory_session_store.Remove("other-session-id"); // ignore non-existent keys without error
+  in_memory_session_store.RemoveSessionTokenResponse("other-session-id"); // ignore non-existent keys without error
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxAbsoluteSessionTimeout) {
@@ -91,26 +118,26 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id_will_expire, *token_response_will_expire);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_will_expire).has_value());
+  in_memory_session_store.SetTokenResponse(session_id_will_expire, *token_response_will_expire);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(20));
 
-  in_memory_session_store.Set(session_id_will_not_expire, *token_response_will_not_expire);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_will_not_expire).has_value());
+  in_memory_session_store.SetTokenResponse(session_id_will_not_expire, *token_response_will_not_expire);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_not_expire).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_will_expire).has_value()); // has been in for 25 seconds
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_will_not_expire).has_value()); // has been in for 10 seconds
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value()); // has been in for 25 seconds
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_not_expire).has_value()); // has been in for 10 seconds
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(200));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(session_id_will_expire).has_value()); // has been in 195 seconds, evicted
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value()); // has been in 195 seconds, evicted
   ASSERT_TRUE(
-      in_memory_session_store.Get(session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
+      in_memory_session_store.GetTokenResponse(session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
 }
 
 TEST_F(InMemorySessionStoreTest,
@@ -122,17 +149,17 @@ TEST_F(InMemorySessionStoreTest,
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id, *token_response);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  in_memory_session_store.SetTokenResponse(session_id, *token_response);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(500));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1501));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(
       session_id).has_value()); // removed due to idle timeout, don't care about time since added
 }
 
@@ -145,20 +172,20 @@ TEST_F(InMemorySessionStoreTest,
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id, *token_response);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  in_memory_session_store.SetTokenResponse(session_id, *token_response);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(500));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1004));
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1006));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(
       session_id).has_value()); // removed due to max absolute timeout, even though it was just accessed
 }
 
@@ -170,13 +197,13 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotEverRemoveSessionsWhenB
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id, *token_response);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  in_memory_session_store.SetTokenResponse(session_id, *token_response);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(100000000));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.Get(session_id).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeout) {
@@ -190,27 +217,27 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id_idle, *token_response_idle);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_idle).has_value());
+  in_memory_session_store.SetTokenResponse(session_id_idle, *token_response_idle);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value());
 
-  in_memory_session_store.Set(session_id_active, *token_response_active);
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_active).has_value());
+  in_memory_session_store.SetTokenResponse(session_id_active, *token_response_active);
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value());
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_idle).has_value()); // last active 25 seconds ago
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_active).has_value()); // last active 25 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value()); // last active 25 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // last active 25 seconds ago
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
 
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_active).has_value()); // accessing at time 50
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // accessing at time 50
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(session_id_idle).has_value()); // last active 60 seconds ago
-  ASSERT_TRUE(in_memory_session_store.Get(session_id_active).has_value()); // last active 40 seconds ago
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value()); // last active 60 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // last active 40 seconds ago
 }
 
 TEST_F(InMemorySessionStoreTest,
@@ -222,15 +249,15 @@ TEST_F(InMemorySessionStoreTest,
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
 
-  in_memory_session_store.Set(session_id_idle, *token_response_idle);
+  in_memory_session_store.SetTokenResponse(session_id_idle, *token_response_idle);
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(56));
 
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.Get(session_id_idle).has_value());
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value());
 }
 
-TEST_F(InMemorySessionStoreTest, ThreadSafety) {
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
   std::vector<std::thread> threads;
@@ -245,14 +272,14 @@ TEST_F(InMemorySessionStoreTest, ThreadSafety) {
       for (int j = 1; j < iterations + 1; ++j) {
         int unique_number = (i * iterations) + j;
         token_response->SetAccessTokenExpiry(unique_number);
-
         auto key = std::string("session_id_") + std::to_string(unique_number);
-        in_memory_session_store.Set(key, *token_response);
-        auto retrieved_token_response = in_memory_session_store.Get(key);
 
-        ASSERT_TRUE(retrieved_token_response.has_value());
-        ASSERT_TRUE(retrieved_token_response->GetAccessTokenExpiry().has_value());
-        ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
+        in_memory_session_store.SetTokenResponse(key, *token_response);
+        auto retrieved_optional_token_response = in_memory_session_store.GetTokenResponse(key);
+
+        ASSERT_TRUE(retrieved_optional_token_response.has_value());
+        ASSERT_TRUE(retrieved_optional_token_response->GetAccessTokenExpiry().has_value());
+        ASSERT_EQ(retrieved_optional_token_response->GetAccessTokenExpiry().value(), unique_number);
       }
     });
   }
@@ -269,11 +296,11 @@ TEST_F(InMemorySessionStoreTest, ThreadSafety) {
         int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
 
-        auto retrieved_token_response = in_memory_session_store.Get(key);
+        auto retrieved_token_response = in_memory_session_store.GetTokenResponse(key);
         ASSERT_TRUE(retrieved_token_response.has_value());
         ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
-        in_memory_session_store.Remove(key);
-        ASSERT_FALSE(in_memory_session_store.Get(key).has_value());
+        in_memory_session_store.RemoveSessionTokenResponse(key);
+        ASSERT_FALSE(in_memory_session_store.GetTokenResponse(key).has_value());
       }
     });
   }
@@ -281,6 +308,59 @@ TEST_F(InMemorySessionStoreTest, ThreadSafety) {
     t.join();
   }
   threads.clear();
+}
+
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForLocationOperations) {
+  const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
+  std::vector<std::thread> threads;
+
+  int thread_count = 10;
+  int iterations = 1000;
+
+  // Do lots of simultaneous sets and gets
+  for (int i = 0; i < thread_count; ++i) {
+    // Each thread has its own instance of location because otherwise the threads clobber the location
+    auto token_response = CreateTokenResponse();
+    threads.emplace_back([iterations, i, &in_memory_session_store, token_response]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        int unique_number = (i * iterations) + j;
+        auto key = std::string("session_id_") + std::to_string(unique_number);
+        auto unique_location = std::string("https://example.com") + std::to_string(unique_number);
+
+        in_memory_session_store.SetLocation(key, unique_location);
+        auto retrieved_optional_location = in_memory_session_store.GetLocation(key);
+
+        ASSERT_TRUE(retrieved_optional_location.has_value());
+        ASSERT_EQ(retrieved_optional_location.value(), unique_location);
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+  threads.clear();
+
+
+  // Do lots of simultaneous gets and removes
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, i, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        int unique_number = (i * iterations) + j;
+        auto key = std::string("session_id_") + std::to_string(unique_number);
+
+        auto retrieved_optional_location = in_memory_session_store.GetLocation(key);
+        ASSERT_TRUE(retrieved_optional_location.has_value());
+        in_memory_session_store.RemoveSessionLocation(key);
+        ASSERT_FALSE(in_memory_session_store.GetLocation(key).has_value());
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+  threads.clear();
+
 }
 
 }  // namespace oidc
