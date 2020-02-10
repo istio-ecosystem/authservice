@@ -102,7 +102,8 @@ google::rpc::Code OidcFilter::Process(
   // then generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
     spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
-    SetRedirectToIdPHeaders(response);
+    auto session_id = session_id_generator_->Generate();
+    SetRedirectToIdPHeaders(response, session_id);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
@@ -120,7 +121,8 @@ google::rpc::Code OidcFilter::Process(
   // then redirect for login.
   if (!RequiredTokensPresent(token_response_optional)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
-    SetRedirectToIdPHeaders(response);
+    session_id = session_id_generator_->Generate();
+    SetRedirectToIdPHeaders(response, session_id);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
@@ -139,7 +141,8 @@ google::rpc::Code OidcFilter::Process(
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (!refresh_token_optional.has_value()) {
     spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
-    SetRedirectToIdPHeaders(response);
+    session_id = session_id_generator_->Generate();
+    SetRedirectToIdPHeaders(response, session_id);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
@@ -158,7 +161,8 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info(
         "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
         __func__);
-    SetRedirectToIdPHeaders(response);
+    session_id = session_id_generator_->Generate();
+    SetRedirectToIdPHeaders(response, session_id);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 }
@@ -280,7 +284,7 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
   return absl::nullopt;
 }
 
-void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response) {
+void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id) {
   common::utilities::RandomGenerator generator;
   auto state = generator.Generate(32).Str();
   auto nonce = generator.Generate(32).Str();
@@ -311,7 +315,7 @@ void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckRespon
                      codec.Encode(state, nonce), idp_config_.timeout());
 
   // Set a fresh session id to alleviate Session fixation attack
-  SetSessionIdCookie(response);
+  SetSessionIdCookie(response, session_id);
 }
 
 void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
@@ -411,8 +415,8 @@ void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *res
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
 }
 
-void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response) {
-  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id_generator_->Generate(), NO_TIMEOUT);
+void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, std::string session_id) {
+  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id, NO_TIMEOUT);
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens

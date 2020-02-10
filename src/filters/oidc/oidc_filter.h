@@ -103,7 +103,7 @@ private:
    * Set IdP redirect parameters so that a requesting agent is forced to
    * authenticate the user.
    */
-  void SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response);
+  void SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
   /** @brief Retrieve tokens from OIDC token endpoint */
   google::rpc::Code RetrieveToken(
@@ -149,7 +149,7 @@ private:
    * @param response the outgoing response
    * @param session_id the session id
    */
-  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response);
+  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
   /**
    * @brief Retrieve and decrypt the sessionId from cookies
