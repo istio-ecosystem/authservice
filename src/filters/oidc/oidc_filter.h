@@ -161,6 +161,14 @@ private:
       ::std::string> &headers);
 
   /**
+ * @brief Assemble a URL string from a request
+ *
+ * @param The http request
+ * @return The requested Url from the http request as a string
+ */
+  static std::string GetRequestUrl(const AttributeContext_HttpRequest &httpRequest);
+
+  /**
    * @brief Get the directives that should be used when setting a cookie
    *
    * @param timeout The value of the Max-Age for the cookie

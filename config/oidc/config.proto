@@ -107,11 +107,6 @@ message OIDCConfig {
     // Required, but an empty array is allowed.
     repeated string scopes = 8;
 
-    // The URL to which the user's browser is redirected after successful authentication
-    // and token acquisition.
-    // Required.
-    string landing_page = 9 [(validate.rules).string.min_len = 1]; // <!-- TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++ -->
-
     // A secret used to derive cryptographic material for protecting cookies and other data.
     // Can be any string.
     // Required.
