@@ -75,8 +75,8 @@ void InMemorySessionStore::RemoveAllExpired() {
   auto earliest_time_idle_to_keep =
       time_service_->GetCurrentTimeInSecondsSinceEpoch() - max_session_idle_timeout_in_seconds_;
 
-  bool check_time_added = max_absolute_session_timeout_in_seconds_ > 0;
-  bool check_time_idle = max_session_idle_timeout_in_seconds_ > 0;
+  bool should_check_absolute_timeout = max_absolute_session_timeout_in_seconds_ > 0;
+  bool should_check_idle_timeout = max_session_idle_timeout_in_seconds_ > 0;
 
   synchronized(mutex_) {
     auto it = token_response_map.begin();
@@ -85,7 +85,7 @@ void InMemorySessionStore::RemoveAllExpired() {
       bool expired_based_on_time_added = value->GetTimeAdded() < earliest_time_added_to_keep;
       bool expired_based_on_idle_time = value->GetTimeMostRecentlyAccessed() < earliest_time_idle_to_keep;
 
-      if ((check_time_added && expired_based_on_time_added) || (check_time_idle && expired_based_on_idle_time)) {
+      if ((should_check_absolute_timeout && expired_based_on_time_added) || (should_check_idle_timeout && expired_based_on_idle_time)) {
         it = token_response_map.erase(it);
       } else {
         it++;

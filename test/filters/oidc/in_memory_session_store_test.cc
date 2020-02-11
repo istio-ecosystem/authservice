@@ -109,31 +109,33 @@ TEST_F(InMemorySessionStoreTest, Remove) {
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxAbsoluteSessionTimeout) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 190, 1000);
+  int max_absolute_session_timeout_in_seconds = 190;
+  int max_session_idle_timeout_in_seconds = 1000;
+  InMemorySessionStore in_memory_session_store(time_service_mock, max_absolute_session_timeout_in_seconds,
+                                               max_session_idle_timeout_in_seconds);
+  
+  // Create session that will expire
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_will_expire = std::string("fake_session_id_1");
   auto token_response_will_expire = CreateTokenResponse();
-
-  auto session_id_will_not_expire = std::string("fake_session_id_2");
-  auto token_response_will_not_expire = CreateTokenResponse();
-
-  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
-
   in_memory_session_store.SetTokenResponse(session_id_will_expire, *token_response_will_expire);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value());
 
+  // Create session that will not expire
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(20));
-
+  auto session_id_will_not_expire = std::string("fake_session_id_2");
+  auto token_response_will_not_expire = CreateTokenResponse();
   in_memory_session_store.SetTokenResponse(session_id_will_not_expire, *token_response_will_not_expire);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_not_expire).has_value());
 
+  // After 30 seconds, neither should have been cleaned up
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
-
   in_memory_session_store.RemoveAllExpired();
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value()); // has been in for 25 seconds
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_will_not_expire).has_value()); // has been in for 10 seconds
 
+  // After 200 seconds, the older session is cleand up but the younger one is not
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(200));
-
   in_memory_session_store.RemoveAllExpired();
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_will_expire).has_value()); // has been in 195 seconds, evicted
   ASSERT_TRUE(
@@ -209,32 +211,30 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotEverRemoveSessionsWhenB
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeout) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 500, 50);
+
+  // Create two sessions
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_idle = std::string("fake_session_id_idle");
   auto token_response_idle = CreateTokenResponse();
-
-  auto session_id_active = std::string("fake_session_id_active");
-  auto token_response_active = CreateTokenResponse();
-
-  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
-
   in_memory_session_store.SetTokenResponse(session_id_idle, *token_response_idle);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value());
-
+  auto session_id_active = std::string("fake_session_id_active");
+  auto token_response_active = CreateTokenResponse();
   in_memory_session_store.SetTokenResponse(session_id_active, *token_response_active);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value());
 
+  // Access both at time 30
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
-
   in_memory_session_store.RemoveAllExpired();
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value()); // last active 25 seconds ago
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // last active 25 seconds ago
 
+  // Access only one of two at time 50
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
-
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // accessing at time 50
 
+  // The idle session should be removed at time 90
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
-
   in_memory_session_store.RemoveAllExpired();
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value()); // last active 60 seconds ago
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // last active 40 seconds ago
@@ -244,15 +244,13 @@ TEST_F(InMemorySessionStoreTest,
        RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeoutEvenIfThatSessionWasNeverAccessed) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
   InMemorySessionStore in_memory_session_store(time_service_mock, 0, 50);
-  auto session_id_idle = std::string("fake_session_id_idle");
-  auto token_response_idle = CreateTokenResponse();
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
-
+  auto session_id_idle = std::string("fake_session_id_idle");
+  auto token_response_idle = CreateTokenResponse();
   in_memory_session_store.SetTokenResponse(session_id_idle, *token_response_idle);
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(56));
-
   in_memory_session_store.RemoveAllExpired();
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value());
 }
