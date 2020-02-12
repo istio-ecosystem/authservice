@@ -96,18 +96,18 @@ google::rpc::Code OidcFilter::Process(
   // then let request continue.
   // (It is up to the downstream system to validate the header is valid.)
   if (headers.contains(idp_config_.id_token().header())) {
-    spdlog::info("{}: ID Token header already present. Allowing request to proceed without adding any additional headers.", __func__);
+    spdlog::info(
+        "{}: ID Token header already present. Allowing request to proceed without adding any additional headers.",
+        __func__);
     return google::rpc::Code::OK;
   }
 
   // If the request does not have a session_id cookie,
   // then generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
-    spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
-    auto session_id = session_id_generator_->Generate();
-    SetRedirectToIdPHeaders(response, session_id);
-    session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
-    return google::rpc::Code::UNAUTHENTICATED;
+    spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.",
+                 __func__);
+    return RedirectToIdp(response, httpRequest);
   }
 
   auto session_id = session_id_optional.value();
@@ -124,10 +124,7 @@ google::rpc::Code OidcFilter::Process(
   // then redirect for login.
   if (!RequiredTokensPresent(token_response_optional)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
-    session_id = session_id_generator_->Generate();
-    SetRedirectToIdPHeaders(response, session_id);
-    session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
-    return google::rpc::Code::UNAUTHENTICATED;
+    return RedirectToIdp(response, httpRequest);
   }
 
   auto token_response = token_response_optional.value();
@@ -145,10 +142,7 @@ google::rpc::Code OidcFilter::Process(
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (!refresh_token_optional.has_value()) {
     spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
-    session_id = session_id_generator_->Generate();
-    SetRedirectToIdPHeaders(response, session_id);
-    session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
-    return google::rpc::Code::UNAUTHENTICATED;
+    return RedirectToIdp(response, httpRequest);
   }
 
   // If the user has an unexpired refresh token
@@ -166,11 +160,15 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info(
         "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
         __func__);
-    session_id = session_id_generator_->Generate();
-    SetRedirectToIdPHeaders(response, session_id);
-    session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
-    return google::rpc::Code::UNAUTHENTICATED;
+    return RedirectToIdp(response, httpRequest);
   }
+}
+
+google::rpc::Code OidcFilter::RedirectToIdp(CheckResponse *response, const AttributeContext_HttpRequest &httpRequest) {
+  auto session_id = session_id_generator_->Generate();
+  SetRedirectToIdPHeaders(response, session_id);
+  session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
+  return google::rpc::UNAUTHENTICATED;
 }
 
 std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &httpRequest) {
@@ -477,8 +475,9 @@ OidcFilter::RefreshToken(
 
   http::status status = retrieved_token_response->result();
   if (status != boost::beast::http::status::ok) {
-    spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__, std::to_string(
-        static_cast<double>(status)));
+    spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__,
+                 std::to_string(
+                     static_cast<double>(status)));
     return absl::nullopt;
   }
 
