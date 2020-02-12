@@ -14,10 +14,12 @@ using ::testing::Return;
 class InMemorySessionStoreTest : public ::testing::Test {
 protected:
   google::jwt_verify::Jwt id_token_jwt;
+  uint32_t login_timeout_in_seconds_;
 
   void SetUp() override {
     auto jwt_status = id_token_jwt.parseFromString(
         "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg");
+    login_timeout_in_seconds_ = 100000;
     ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
   }
 
@@ -34,7 +36,7 @@ std::shared_ptr<TokenResponse> InMemorySessionStoreTest::CreateTokenResponse() {
 
 
 TEST_F(InMemorySessionStoreTest, SetAndGet) {
-  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128);
+  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto other_session_id = "other_session_id";
   auto token_response = CreateTokenResponse();
@@ -68,7 +70,7 @@ TEST_F(InMemorySessionStoreTest, SetAndGet) {
 }
 
 TEST_F(InMemorySessionStoreTest, SetRequestedURLAndGetRequestedURL) {
-  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128);
+  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto other_session_id = "other_session_id";
   auto requested_url = "https://example.com";
@@ -95,7 +97,7 @@ TEST_F(InMemorySessionStoreTest, SetRequestedURLAndGetRequestedURL) {
 }
 
 TEST_F(InMemorySessionStoreTest, Remove) {
-  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128);
+  InMemorySessionStore in_memory_session_store(std::make_shared<common::utilities::TimeServiceMock>(), 42, 128, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
@@ -112,7 +114,7 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
   int max_absolute_session_timeout_in_seconds = 190;
   int max_session_idle_timeout_in_seconds = 1000;
   InMemorySessionStore in_memory_session_store(time_service_mock, max_absolute_session_timeout_in_seconds,
-                                               max_session_idle_timeout_in_seconds);
+                                               max_session_idle_timeout_in_seconds, login_timeout_in_seconds_);
   
   // Create session that will expire
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
@@ -145,7 +147,7 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 TEST_F(InMemorySessionStoreTest,
        RemoveAllExpired_DoesNotRemoveSessionsWhenTheMaxAbsoluteSessionTimeoutIsZeroUntilIdleIsReached) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 1000);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 1000, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
@@ -168,7 +170,7 @@ TEST_F(InMemorySessionStoreTest,
 TEST_F(InMemorySessionStoreTest,
        RemoveAllExpired_DoesNotRemoveSessionsWhenTheIdleSessionTimeoutIsZeroUntilMaxAbsoluteTimeoutIsReached) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 1000, 0);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 1000, 0, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
@@ -193,7 +195,7 @@ TEST_F(InMemorySessionStoreTest,
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotEverRemoveSessionsWhenBothTimeoutsAreZero) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0, login_timeout_in_seconds_);
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
@@ -210,7 +212,7 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_DoesNotEverRemoveSessionsWhenB
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeout) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 500, 50);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 500, 50, login_timeout_in_seconds_);
 
   // Create two sessions
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
@@ -243,7 +245,7 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceed
 TEST_F(InMemorySessionStoreTest,
        RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeoutEvenIfThatSessionWasNeverAccessed) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 50);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 50, login_timeout_in_seconds_);
 
   EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_idle = std::string("fake_session_id_idle");
@@ -255,9 +257,46 @@ TEST_F(InMemorySessionStoreTest,
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value());
 }
 
+TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsOfRequestedURLWhichHaveExceededTheLogInTimeout) {
+  const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
+  int max_absolute_session_timeout_in_seconds = 0; // do not care about token session time out
+  int max_session_idle_timeout_in_seconds = 0; // do not care about token session time out
+  int login_timeout_in_seconds = 190;
+  InMemorySessionStore in_memory_session_store(time_service_mock, max_absolute_session_timeout_in_seconds,
+                                               max_session_idle_timeout_in_seconds, login_timeout_in_seconds);
+
+  // Create session of requested URL that will expire
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
+  auto session_id_will_expire = std::string("fake_session_id_1");
+  in_memory_session_store.SetRequestedURL(session_id_will_expire, "https://example1.com");
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_will_expire).has_value());
+
+  // Create session of requested URL that will not expire
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(20));
+  auto session_id_will_not_expire = std::string("fake_session_id_2");
+  in_memory_session_store.SetRequestedURL(session_id_will_not_expire, "https://example2.com");
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_will_not_expire).has_value());
+
+  // After 30 seconds, neither should have been cleaned up
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
+  in_memory_session_store.RemoveAllExpired();
+  ASSERT_TRUE(
+      in_memory_session_store.GetRequestedURL(session_id_will_expire).has_value()); // has been in for 25 seconds
+  ASSERT_TRUE(
+      in_memory_session_store.GetRequestedURL(session_id_will_not_expire).has_value()); // has been in for 10 seconds
+
+  // After 200 seconds, the older session is cleand up but the younger one is not
+  EXPECT_CALL(*time_service_mock, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(200));
+  in_memory_session_store.RemoveAllExpired();
+  ASSERT_FALSE(
+      in_memory_session_store.GetRequestedURL(session_id_will_expire).has_value()); // has been in 195 seconds, evicted
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(
+      session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
+}
+
 TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0, login_timeout_in_seconds_);
   std::vector<std::thread> threads;
 
   int thread_count = 10;
@@ -310,7 +349,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
 
 TEST_F(InMemorySessionStoreTest, ThreadSafetyForRequestedURLOperations) {
   const std::shared_ptr<common::utilities::TimeServiceMock> &time_service_mock = std::make_shared<common::utilities::TimeServiceMock>();
-  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0);
+  InMemorySessionStore in_memory_session_store(time_service_mock, 0, 0, login_timeout_in_seconds_);
   std::vector<std::thread> threads;
 
   int thread_count = 10;
