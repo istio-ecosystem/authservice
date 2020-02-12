@@ -103,7 +103,7 @@ private:
    * Set IdP redirect parameters so that a requesting agent is forced to
    * authenticate the user.
    */
-  void SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
+  void SetRedirectToIdpHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
   google::rpc::Code RedirectToIdp(CheckResponse *response, const AttributeContext_HttpRequest &httpRequest);
 

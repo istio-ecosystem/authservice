@@ -166,7 +166,7 @@ google::rpc::Code OidcFilter::Process(
 
 google::rpc::Code OidcFilter::RedirectToIdp(CheckResponse *response, const AttributeContext_HttpRequest &httpRequest) {
   auto session_id = session_id_generator_->Generate();
-  SetRedirectToIdPHeaders(response, session_id);
+  SetRedirectToIdpHeaders(response, session_id);
   session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));
   return google::rpc::UNAUTHENTICATED;
 }
@@ -302,7 +302,7 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
   return absl::nullopt;
 }
 
-void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id) {
+void OidcFilter::SetRedirectToIdpHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id) {
   common::utilities::RandomGenerator generator;
   auto state = generator.Generate(32).Str();
   auto nonce = generator.Generate(32).Str();
