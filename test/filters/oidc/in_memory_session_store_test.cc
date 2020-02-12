@@ -101,12 +101,15 @@ TEST_F(InMemorySessionStoreTest, Remove) {
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
 
+  in_memory_session_store.SetRequestedURL(session_id, "some-url");
   in_memory_session_store.SetTokenResponse(session_id, *token_response);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id).has_value());
-  in_memory_session_store.RemoveSessionOfTokenResponse(session_id);
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id).has_value());
+  in_memory_session_store.RemoveSession(session_id);
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id).has_value());
+  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id).has_value());
 
-  in_memory_session_store.RemoveSessionOfTokenResponse("other-session-id"); // ignore non-existent keys without error
+  in_memory_session_store.RemoveSession("other-session-id"); // ignore non-existent keys without error
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxAbsoluteSessionTimeout) {
@@ -336,7 +339,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
         auto retrieved_token_response = in_memory_session_store.GetTokenResponse(key);
         ASSERT_TRUE(retrieved_token_response.has_value());
         ASSERT_EQ(retrieved_token_response->GetAccessTokenExpiry().value(), unique_number);
-        in_memory_session_store.RemoveSessionOfTokenResponse(key);
+        in_memory_session_store.RemoveSession(key);
         ASSERT_FALSE(in_memory_session_store.GetTokenResponse(key).has_value());
       }
     });
@@ -388,7 +391,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForRequestedURLOperations) {
 
         auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
         ASSERT_TRUE(retrieved_optional_url.has_value());
-        in_memory_session_store.RemoveSessionOfRequestedURL(key);
+        in_memory_session_store.RemoveSession(key);
         ASSERT_FALSE(in_memory_session_store.GetRequestedURL(key).has_value());
       }
     });

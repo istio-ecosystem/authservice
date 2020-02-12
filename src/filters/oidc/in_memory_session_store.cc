@@ -40,11 +40,11 @@ absl::optional<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::strin
   }
 }
 
-void InMemorySessionStore::SetRequestedURL(absl::string_view session_id, std::string requested_url) {
+void InMemorySessionStore::SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) {
   synchronized(mutex_) {
     RemoveSessionOfRequestedURL(session_id);
     url_map.emplace(session_id.data(),
-                    std::make_shared<SessionOfRequestedURL>(requested_url, time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+                    std::make_shared<SessionOfRequestedURL>(requested_url.data(), time_service_->GetCurrentTimeInSecondsSinceEpoch()));
   }
 }
 
@@ -57,6 +57,11 @@ absl::optional<std::string> InMemorySessionStore::GetRequestedURL(absl::string_v
     auto session_data = search->second;
     return absl::optional<std::string>(session_data->GetRequestedURL());
   }
+}
+
+void InMemorySessionStore::RemoveSession(absl::string_view session_id) {
+  RemoveSessionOfTokenResponse(session_id);
+  RemoveSessionOfRequestedURL(session_id);
 }
 
 void InMemorySessionStore::RemoveSessionOfTokenResponse(absl::string_view session_id) {
