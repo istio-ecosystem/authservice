@@ -18,6 +18,7 @@ private:
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;
   std::recursive_mutex mutex_;
+  virtual absl::optional<std::shared_ptr<Session>> FindSession(absl::string_view session_id);
 
 public:
   InMemorySessionStore(
