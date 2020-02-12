@@ -67,13 +67,11 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
       // so here we ensure that each instance returned by New() shares the same session store.
       auto max_absolute_session_timeout = filter.oidc().max_absolute_session_timeout();
       auto max_session_idle_timeout = filter.oidc().max_session_idle_timeout();
-      auto login_timeout = filter.oidc().timeout();
       oidc_session_store_ = std::static_pointer_cast<filters::oidc::SessionStore>(
           std::make_shared<filters::oidc::InMemorySessionStore>(
               std::make_shared<common::utilities::TimeService>(),
               max_absolute_session_timeout,
-              max_session_idle_timeout,
-              login_timeout)
+              max_session_idle_timeout)
       );
     }
 
