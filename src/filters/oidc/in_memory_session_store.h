@@ -30,6 +30,8 @@ public:
 
   virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) override;
 
+  virtual void ClearRequestedURL(absl::string_view session_id) override;
+
   virtual absl::optional<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
 
   virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) override;

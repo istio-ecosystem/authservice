@@ -73,13 +73,16 @@ TEST_F(InMemorySessionStoreTest, SetTokenResponseAndGetTokenResponse) {
   ASSERT_EQ(result.value().GetAccessTokenExpiry(), 99);
 }
 
-TEST_F(InMemorySessionStoreTest, SetRequestedURLAndGetRequestedURL) {
+TEST_F(InMemorySessionStoreTest, SetRequestedURLAndClearRequestedURLAndGetRequestedURL) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
   auto session_id = std::string("fake_session_id");
   auto other_session_id = "other_session_id";
   auto requested_url = "https://example.com";
 
   auto result = in_memory_session_store.GetRequestedURL(session_id);
+  ASSERT_FALSE(result.has_value());
+
+  in_memory_session_store.ClearRequestedURL(session_id); // does not crash
   ASSERT_FALSE(result.has_value());
 
   in_memory_session_store.SetRequestedURL(session_id, requested_url);
@@ -98,6 +101,9 @@ TEST_F(InMemorySessionStoreTest, SetRequestedURLAndGetRequestedURL) {
   result = in_memory_session_store.GetRequestedURL(session_id);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result, "https://example2.com");
+
+  in_memory_session_store.ClearRequestedURL(session_id);
+  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id).has_value());
 }
 
 TEST_F(InMemorySessionStoreTest, Remove) {
@@ -309,6 +315,41 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_UpdatingRequestedUrlKeepsSessi
   ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // last active 40 seconds ago
 }
 
+TEST_F(InMemorySessionStoreTest, RemoveAllExpired_ClearRequestedURLKeepsSessionActive) {
+  InMemorySessionStore in_memory_session_store(time_service_mock_, 500, 50);
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
+
+  // Create a session
+  auto session_id_idle = std::string("fake_session_id_idle");
+  in_memory_session_store.SetRequestedURL(session_id_idle, "https://example.com");
+  auto token_response_idle = CreateTokenResponse();
+  in_memory_session_store.SetTokenResponse(session_id_idle, *token_response_idle);
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value());
+
+  // Create another session
+  auto session_id_active = std::string("fake_session_id_active");
+  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com");
+  auto token_response_active = CreateTokenResponse();
+  in_memory_session_store.SetTokenResponse(session_id_active, *token_response_active);
+  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value());
+
+  // Access both at time 30
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
+  in_memory_session_store.RemoveAllExpired();
+  in_memory_session_store.ClearRequestedURL(session_id_idle); // last active 25 seconds ago
+  in_memory_session_store.ClearRequestedURL(session_id_active); // last active 25 seconds ago
+
+  // Access only one of two at time 50
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
+  in_memory_session_store.ClearRequestedURL(session_id_active); // accessing at time 50
+
+  // The idle session should be removed at time 90
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
+  in_memory_session_store.RemoveAllExpired();
+  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle).has_value()); // last active 60 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active).has_value()); // last active 40 seconds ago
+}
+
 TEST_F(InMemorySessionStoreTest,
        RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxIdleSessionTimeoutEvenIfThatSessionWasNeverAccessed) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 50);
@@ -388,13 +429,16 @@ TEST_F(InMemorySessionStoreTest,
   ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // last active 40 seconds ago
 }
 
+// When the concurrency code is incorrect, this test will occasionally fail.
+// If it fails, there is definitely something wrong with the concurrency code.
 TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
   std::vector<std::thread> threads;
 
   int thread_count = 10;
   int iterations = 1000;
-  // Do lots of simultaneous sets and gets
+
+  // Do lots of simultaneous set() and get()
   for (int i = 0; i < thread_count; ++i) {
     // Each thread has its own instance of token_response because otherwise the threads clobber the token_response
     auto token_response = CreateTokenResponse();
@@ -419,7 +463,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
 
   threads.clear();
 
-  // Do lots of simultaneous gets and removes
+  // Do lots of simultaneous get() and remove()
   for (int i = 0; i < thread_count; ++i) {
     threads.emplace_back([iterations, i, &in_memory_session_store]() {
       for (int j = 1; j < iterations + 1; ++j) {
@@ -440,26 +484,94 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
   threads.clear();
 }
 
-TEST_F(InMemorySessionStoreTest, ThreadSafetyForRequestedURLOperations) {
+// When the concurrency code is incorrect, this test will occasionally fail.
+// If it fails, there is definitely something wrong with the concurrency code.
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForClearRequestedURL) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
   std::vector<std::thread> threads;
 
   int thread_count = 10;
-  int iterations = 1000;
+  int iterations = 5000;
 
-  // Do lots of simultaneous sets and gets
+  // Do lots of set() and clear() at the same time that calls to remove() are happening, all on the same session.
+  // Eventually clear() will be called on a session that has already been removed and cause a crash,
+  // unless clear() is properly synchronized.
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        in_memory_session_store.SetRequestedURL("session_id", "https://foo.com");
+        in_memory_session_store.ClearRequestedURL("session_id");
+      }
+    });
+  }
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        in_memory_session_store.RemoveSession("session_id");
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+  threads.clear();
+}
+
+// When the concurrency code is incorrect, this test will occasionally fail.
+// If it fails, there is definitely something wrong with the concurrency code.
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForGetRequestedURL) {
+  InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
+  std::vector<std::thread> threads;
+
+  int thread_count = 10;
+  int iterations = 5000;
+
+  // Do lots of set() and get() at the same time that calls to remove() are happening, all on the same session.
+  // Eventually get() will be called on a session that has already been removed and cause a crash,
+  // unless get() is properly synchronized.
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        in_memory_session_store.SetRequestedURL("session_id", "https://foo.com");
+        in_memory_session_store.GetRequestedURL("session_id");
+      }
+    });
+  }
+  for (int i = 0; i < thread_count; ++i) {
+    threads.emplace_back([iterations, &in_memory_session_store]() {
+      for (int j = 1; j < iterations + 1; ++j) {
+        in_memory_session_store.RemoveSession("session_id");
+      }
+    });
+  }
+  for (auto &t : threads) {
+    t.join();
+  }
+  threads.clear();
+}
+
+// When the concurrency code is incorrect, this test will occasionally fail.
+// If it fails, there is definitely something wrong with the concurrency code.
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForSetRequestedURL) {
+  InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
+  std::vector<std::thread> threads;
+
+  int thread_count = 10;
+  int iterations = 5000;
+
+  // Do lots of simultaneous set() and get() on various sessions.
+  // Eventually a set() will fail if set() is not properly synchronized.
   for (int i = 0; i < thread_count; ++i) {
     // Each thread has its own instance of URL because otherwise the threads clobber the URL
-    auto token_response = CreateTokenResponse();
-    threads.emplace_back([iterations, i, &in_memory_session_store, token_response]() {
+    threads.emplace_back([iterations, i, &in_memory_session_store]() {
       for (int j = 1; j < iterations + 1; ++j) {
         int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
         auto unique_url = std::string("https://example.com") + std::to_string(unique_number);
 
         in_memory_session_store.SetRequestedURL(key, unique_url);
-        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
 
+        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
         ASSERT_TRUE(retrieved_optional_url.has_value());
         ASSERT_EQ(retrieved_optional_url.value(), unique_url);
       }
@@ -469,27 +581,6 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForRequestedURLOperations) {
     t.join();
   }
   threads.clear();
-
-
-  // Do lots of simultaneous gets and removes
-  for (int i = 0; i < thread_count; ++i) {
-    threads.emplace_back([iterations, i, &in_memory_session_store]() {
-      for (int j = 1; j < iterations + 1; ++j) {
-        int unique_number = (i * iterations) + j;
-        auto key = std::string("session_id_") + std::to_string(unique_number);
-
-        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
-        ASSERT_TRUE(retrieved_optional_url.has_value());
-        in_memory_session_store.RemoveSession(key);
-        ASSERT_FALSE(in_memory_session_store.GetRequestedURL(key).has_value());
-      }
-    });
-  }
-  for (auto &t : threads) {
-    t.join();
-  }
-  threads.clear();
-
 }
 
 }  // namespace oidc

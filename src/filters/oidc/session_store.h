@@ -18,6 +18,8 @@ public:
 
   virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) = 0;
 
+  virtual void ClearRequestedURL(absl::string_view session_id) = 0;
+
   virtual absl::optional<TokenResponse> GetTokenResponse(absl::string_view session_id) = 0;
 
   virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) = 0;

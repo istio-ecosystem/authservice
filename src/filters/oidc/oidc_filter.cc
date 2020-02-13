@@ -598,6 +598,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
       return google::rpc::Code::UNAVAILABLE;
     }
 
+    session_store_->ClearRequestedURL(session_id);
+
     spdlog::info("{}: Saving token response to session store", __func__);
     session_store_->SetTokenResponse(session_id, token_response.value());
 

@@ -35,8 +35,12 @@ public:
     return token_response_;
   }
 
-  inline void SetRequestedUrl(absl::string_view requestedUrl) {
-    requested_url_ = requestedUrl.data();
+  inline void SetRequestedURL(absl::string_view requestedURL) {
+    requested_url_ = requestedURL.data();
+  }
+
+  inline void ClearRequestedURL() {
+    requested_url_ = absl::nullopt;
   }
 
   inline absl::optional<std::string> GetRequestedURL() {
@@ -88,11 +92,22 @@ void InMemorySessionStore::SetRequestedURL(absl::string_view session_id, absl::s
     if (session_optional.has_value()) {
       auto session = session_optional.value();
       session->SetTimeMostRecentlyAccessed(time_service_->GetCurrentTimeInSecondsSinceEpoch());
-      session->SetRequestedUrl(requested_url);
+      session->SetRequestedURL(requested_url);
     } else {
       auto new_session = std::make_shared<Session>(time_service_->GetCurrentTimeInSecondsSinceEpoch());
-      new_session->SetRequestedUrl(requested_url);
+      new_session->SetRequestedURL(requested_url);
       session_map_.emplace(session_id.data(), new_session);
+    }
+  }
+}
+
+void InMemorySessionStore::ClearRequestedURL(absl::string_view session_id) {
+  synchronized(mutex_) {
+    auto session_optional = FindSession(session_id);
+    if (session_optional.has_value()) {
+      auto session = session_optional.value();
+      session->SetTimeMostRecentlyAccessed(time_service_->GetCurrentTimeInSecondsSinceEpoch());
+      session->ClearRequestedURL();
     }
   }
 }
@@ -110,11 +125,13 @@ absl::optional<std::string> InMemorySessionStore::GetRequestedURL(absl::string_v
 }
 
 absl::optional<std::shared_ptr<Session>> InMemorySessionStore::FindSession(absl::string_view session_id) {
-  auto search = session_map_.find(session_id.data());
-  if (search == session_map_.end()) {
-    return absl::nullopt;
+  synchronized(mutex_) {
+    auto search = session_map_.find(session_id.data());
+    if (search == session_map_.end()) {
+      return absl::nullopt;
+    }
+    return absl::optional<std::shared_ptr<Session>>(search->second);
   }
-  return absl::optional<std::shared_ptr<Session>>(search->second);
 }
 
 void InMemorySessionStore::RemoveSession(absl::string_view session_id) {

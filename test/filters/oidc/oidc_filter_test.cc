@@ -1184,6 +1184,8 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, s
   ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_access_token");
   ASSERT_EQ(stored_token_response.value().GetAccessTokenExpiry(), 10000000000);
 
+  ASSERT_FALSE(session_store_->GetRequestedURL("session123").has_value());
+
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
