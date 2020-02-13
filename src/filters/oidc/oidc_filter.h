@@ -105,7 +105,10 @@ private:
    */
   void SetRedirectToIdpHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
-  google::rpc::Code RedirectToIdp(CheckResponse *response, const AttributeContext_HttpRequest &httpRequest);
+  google::rpc::Code RedirectToIdp(
+      CheckResponse *response,
+      const AttributeContext_HttpRequest &httpRequest,
+      absl::optional<std::string> old_session_id = absl::nullopt);
 
   /** @brief Retrieve tokens from OIDC token endpoint */
   google::rpc::Code RetrieveToken(

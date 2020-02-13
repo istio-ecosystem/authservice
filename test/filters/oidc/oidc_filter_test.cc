@@ -310,6 +310,9 @@ TEST_F(OidcFilterTest, ShouldRedirectToIdpToAuthenticateAgain_WhenAccessTokenIsM
       }
     })
   );
+
+  // Old token should be deleted
+  ASSERT_FALSE(session_store_->GetTokenResponse("session123").has_value());
 }
 
 TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain_WhenTheAccessTokenHeaderHasBeenConfigured_GivenThereIsNoRefreshToken) {
@@ -335,6 +338,7 @@ TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
 
   AssertRequestedUrlHasBeenStored("session456", requested_url_);
+  ASSERT_FALSE(session_store_->GetTokenResponse("session123").has_value()); // Old token should be deleted
 
   ASSERT_THAT(
       response_.denied_response().headers(),
@@ -417,7 +421,10 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessi
   auto status = filter.Process(&request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+
   AssertRequestedUrlHasBeenStored("session456", requested_url_);
+  ASSERT_FALSE(session_store_->GetRequestedURL("session123").has_value());
+
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
@@ -434,9 +441,6 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessi
                               "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
                       })
   );
-
-  auto stored_token_response = session_store_->GetTokenResponse("session123");
-  ASSERT_FALSE(stored_token_response.has_value());
 }
 
 TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTheRefreshedTokenResponse) {

@@ -124,7 +124,7 @@ google::rpc::Code OidcFilter::Process(
   // then redirect for login.
   if (!RequiredTokensPresent(token_response_optional)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
-    return RedirectToIdp(response, httpRequest);
+    return RedirectToIdp(response, httpRequest, session_id);
   }
 
   auto token_response = token_response_optional.value();
@@ -141,8 +141,10 @@ google::rpc::Code OidcFilter::Process(
   // then direct the request to the identity provider for authentication
   const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
   if (!refresh_token_optional.has_value()) {
-    spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
-    return RedirectToIdp(response, httpRequest);
+    spdlog::info(
+        "{}: A token was expired, but session did not contain a refresh token. Sending user to re-authenticate.",
+        __func__);
+    return RedirectToIdp(response, httpRequest, session_id);
   }
 
   // If the user has an unexpired refresh token
@@ -156,15 +158,20 @@ google::rpc::Code OidcFilter::Process(
     AddTokensToRequestHeaders(response, refreshed_token_response.value());
     return google::rpc::Code::OK;
   } else {
-    session_store_->RemoveSession(session_id);
     spdlog::info(
         "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
         __func__);
-    return RedirectToIdp(response, httpRequest);
+    return RedirectToIdp(response, httpRequest, session_id);
   }
 }
 
-google::rpc::Code OidcFilter::RedirectToIdp(CheckResponse *response, const AttributeContext_HttpRequest &httpRequest) {
+google::rpc::Code OidcFilter::RedirectToIdp(
+    CheckResponse *response,
+    const AttributeContext_HttpRequest &httpRequest,
+    absl::optional<std::string> old_session_id) {
+  if (old_session_id.has_value()) {
+    session_store_->RemoveSession(old_session_id.value());
+  }
   auto session_id = session_id_generator_->Generate();
   SetRedirectToIdpHeaders(response, session_id);
   session_store_->SetRequestedURL(session_id, GetRequestUrl(httpRequest));

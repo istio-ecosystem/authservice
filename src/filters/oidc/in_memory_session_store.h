@@ -13,7 +13,7 @@ class Session;
 
 class InMemorySessionStore : public SessionStore {
 private:
-  std::unordered_map<std::string, std::shared_ptr<Session>> session_map;
+  std::unordered_map<std::string, std::shared_ptr<Session>> session_map_;
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;

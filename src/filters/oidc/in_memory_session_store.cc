@@ -13,7 +13,7 @@ private:
   uint32_t time_accessed_;
 
 public:
-  Session(uint32_t time_added);
+  explicit Session(uint32_t time_added);
 
   inline uint32_t GetTimeAdded() {
     return time_added_;
@@ -65,7 +65,7 @@ void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, TokenR
     } else {
       auto new_session = std::make_shared<Session>(time_service_->GetCurrentTimeInSecondsSinceEpoch());
       new_session->SetTokenResponse(token_response);
-      session_map.emplace(session_id.data(), new_session);
+      session_map_.emplace(session_id.data(), new_session);
     }
   }
 }
@@ -92,7 +92,7 @@ void InMemorySessionStore::SetRequestedURL(absl::string_view session_id, absl::s
     } else {
       auto new_session = std::make_shared<Session>(time_service_->GetCurrentTimeInSecondsSinceEpoch());
       new_session->SetRequestedUrl(requested_url);
-      session_map.emplace(session_id.data(), new_session);
+      session_map_.emplace(session_id.data(), new_session);
     }
   }
 }
@@ -110,8 +110,8 @@ absl::optional<std::string> InMemorySessionStore::GetRequestedURL(absl::string_v
 }
 
 absl::optional<std::shared_ptr<Session>> InMemorySessionStore::FindSession(absl::string_view session_id) {
-  auto search = session_map.find(session_id.data());
-  if (search == session_map.end()) {
+  auto search = session_map_.find(session_id.data());
+  if (search == session_map_.end()) {
     return absl::nullopt;
   }
   return absl::optional<std::shared_ptr<Session>>(search->second);
@@ -119,7 +119,7 @@ absl::optional<std::shared_ptr<Session>> InMemorySessionStore::FindSession(absl:
 
 void InMemorySessionStore::RemoveSession(absl::string_view session_id) {
   synchronized(mutex_) {
-    session_map.erase(session_id.data());
+    session_map_.erase(session_id.data());
   }
 }
 
@@ -133,8 +133,8 @@ void InMemorySessionStore::RemoveAllExpired() {
   bool should_check_idle_timeout = max_session_idle_timeout_in_seconds_ > 0;
 
   synchronized(mutex_) {
-    auto itr = session_map.begin();
-    while (itr != session_map.end()) {
+    auto itr = session_map_.begin();
+    while (itr != session_map_.end()) {
       auto session = itr->second;
       bool expired_based_on_time_added = session->GetTimeAdded() < earliest_time_added_to_keep;
       bool expired_based_on_idle_time =
@@ -142,7 +142,7 @@ void InMemorySessionStore::RemoveAllExpired() {
 
       if ((should_check_absolute_timeout && expired_based_on_time_added) ||
           (should_check_idle_timeout && expired_based_on_idle_time)) {
-        itr = session_map.erase(itr);
+        itr = session_map_.erase(itr);
       } else {
         itr++;
       }
