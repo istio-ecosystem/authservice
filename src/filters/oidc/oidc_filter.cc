@@ -118,16 +118,16 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
-  auto token_response_optional = session_store_->GetTokenResponse(session_id);
+  auto token_response_ptr = session_store_->GetTokenResponse(session_id);
 
   // If the user has a session_id cookie but there are no required tokens in the session store associated with it,
   // then redirect for login.
-  if (!RequiredTokensPresent(token_response_optional)) {
+  if (!RequiredTokensPresent(token_response_ptr)) {
     spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
     return RedirectToIdp(response, httpRequest, session_id);
   }
 
-  auto token_response = token_response_optional.value();
+  auto token_response = *token_response_ptr;
 
   // If both ID & Access token are still unexpired,
   // then allow the request to proceed (no need to intervene).
@@ -139,7 +139,7 @@ google::rpc::Code OidcFilter::Process(
 
   // If there is no refresh token,
   // then direct the request to the identity provider for authentication
-  const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
+  auto refresh_token_optional = token_response.RefreshToken();
   if (!refresh_token_optional.has_value()) {
     spdlog::info(
         "{}: A token was expired, but session did not contain a refresh token. Sending user to re-authenticate.",
@@ -151,11 +151,11 @@ google::rpc::Code OidcFilter::Process(
   // then use it to request a fresh token_response,
   // then, if successful, allow the request to proceed; if unsuccessful, redirect for login.
   auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
-  if (refreshed_token_response.has_value()) {
-    session_store_->SetTokenResponse(session_id, refreshed_token_response.value());
+  if (refreshed_token_response) {
+    session_store_->SetTokenResponse(session_id, refreshed_token_response);
     spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
                  __func__);
-    AddTokensToRequestHeaders(response, refreshed_token_response.value());
+    AddTokensToRequestHeaders(response, *refreshed_token_response);
     return google::rpc::Code::OK;
   } else {
     spdlog::info(
@@ -359,9 +359,9 @@ void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, TokenRespons
   }
 }
 
-bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_response) {
-  return token_response.has_value() &&
-         (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
+bool OidcFilter::RequiredTokensPresent(std::shared_ptr<TokenResponse> token_response) {
+  return token_response &&
+         (!idp_config_.has_access_token() || token_response->AccessToken().has_value());
 }
 
 bool OidcFilter::RequiredTokensExpired(TokenResponse &token_response) {
@@ -445,9 +445,8 @@ void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *r
 }
 
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
-absl::optional<TokenResponse>
-OidcFilter::RefreshToken(
-    TokenResponse existing_token_response,
+std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
+    const TokenResponse &existing_token_response,
     const std::string &refresh_token,
     boost::asio::io_context &ioc,
     boost::asio::yield_context yield) {
@@ -477,7 +476,7 @@ OidcFilter::RefreshToken(
 
   if (retrieved_token_response == nullptr) {
     spdlog::warn("{}: Received null pointer as response from identity provider.", __func__);
-    return absl::nullopt;
+    return nullptr;
   }
 
   http::status status = retrieved_token_response->result();
@@ -485,14 +484,10 @@ OidcFilter::RefreshToken(
     spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__,
                  std::to_string(
                      static_cast<double>(status)));
-    return absl::nullopt;
+    return nullptr;
   }
 
-  return parser_->ParseRefreshTokenResponse(
-      std::move(existing_token_response),
-      idp_config_.client_id(),
-      retrieved_token_response->body()
-  );
+  return parser_->ParseRefreshTokenResponse(existing_token_response, retrieved_token_response->body());
 }
 
 // Performs an HTTP POST and prints the response
@@ -576,7 +571,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   } else {
     auto nonce = std::string(state_and_nonce->second.data(), state_and_nonce->second.size());
     auto token_response = parser_->Parse(idp_config_.client_id(), nonce, retrieve_token_response->body());
-    if (!token_response.has_value()) {
+    if (!token_response) {
       spdlog::info("{}: Invalid token response", __func__);
       return google::rpc::Code::INVALID_ARGUMENT;
     }
@@ -601,7 +596,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     session_store_->ClearRequestedURL(session_id);
 
     spdlog::info("{}: Saving token response to session store", __func__);
-    session_store_->SetTokenResponse(session_id, token_response.value());
+    session_store_->SetTokenResponse(session_id, token_response);
 
     SetRedirectHeaders(optional_originally_requested_url.value(), response);
     return google::rpc::Code::UNAUTHENTICATED;

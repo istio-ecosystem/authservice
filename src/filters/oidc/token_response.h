@@ -52,13 +52,12 @@ class TokenResponseParser {
    * @param raw the raw response to be parsed
    * @return either an empty result indicating an error or a TokenResponse.
    */
-  virtual absl::optional<TokenResponse> Parse(const std::string &client_id,
+  virtual std::shared_ptr<TokenResponse> Parse(const std::string &client_id,
                                               const std::string &nonce,
                                               const std::string &raw) const = 0;
 
-  virtual absl::optional<TokenResponse> ParseRefreshTokenResponse(
-      const TokenResponse existing_token_response,
-      const std::string &client_id,
+  virtual std::shared_ptr<TokenResponse> ParseRefreshTokenResponse(
+      const TokenResponse &existing_token_response,
       const std::string &raw_response_string) const = 0;
 };
 
@@ -85,13 +84,12 @@ class TokenResponseParserImpl final : public TokenResponseParser {
 
 public:
   TokenResponseParserImpl(google::jwt_verify::JwksPtr keys);
-  absl::optional<TokenResponse> Parse(const std::string &client_id,
+  std::shared_ptr<TokenResponse> Parse(const std::string &client_id,
                                       const std::string &nonce,
                                       const std::string &raw_response_string) const override;
 
-  absl::optional<TokenResponse> ParseRefreshTokenResponse(
-      const TokenResponse existing_token_response,
-      const std::string &client_id,
+  std::shared_ptr<TokenResponse> ParseRefreshTokenResponse(
+      const TokenResponse &existing_token_response,
       const std::string &raw_response_string) const override;
 };
 

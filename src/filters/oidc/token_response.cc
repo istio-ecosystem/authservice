@@ -69,7 +69,7 @@ TokenResponseParserImpl::TokenResponseParserImpl(
     : keys_(std::move(keys)) {}
 
 
-absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
+std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id,
     const std::string &nonce,
     const std::string &raw_response_string
@@ -83,22 +83,22 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   const auto status = ::google::protobuf::util::JsonStringToMessage(raw_string_piece, &message, options);
   if (!status.ok()) {
     spdlog::info("{}: JSON parsing error: {}", __func__, status.message().data());
-    return absl::nullopt;
+    return nullptr;
   }
 
   google::protobuf::Map<std::string, google::protobuf::Value> fields = message.fields();
 
   absl::optional<google::jwt_verify::Jwt> optional_id_token = ParseIDToken(fields);
   if (!optional_id_token.has_value()) {
-    return absl::nullopt;
+    return nullptr;
   }
 
   google::jwt_verify::Jwt &id_token = optional_id_token.value();
   if (IsIDTokenInvalid(client_id, nonce, id_token)) {
-    return absl::nullopt;
+    return nullptr;
   }
 
-  auto result = absl::make_optional<TokenResponse>(id_token);
+  auto result = std::make_shared<TokenResponse>(id_token);
 
   auto access_token_iter = fields.find(access_token_field);
   if (access_token_iter != fields.end()) {
@@ -116,15 +116,14 @@ absl::optional<TokenResponse> TokenResponseParserImpl::Parse(
   }
 
   if (IsInvalid(fields)) {
-    return absl::nullopt;
+    return nullptr;
   }
 
   return result;
 }
 
-absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse(
-    const TokenResponse existing_token_response,
-    const std::string &client_id,
+std::shared_ptr<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse(
+    const TokenResponse &existing_token_response,
     const std::string &raw_response_string
 ) const {
   ::google::protobuf::util::JsonParseOptions options;
@@ -136,17 +135,20 @@ absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse
   const auto status = ::google::protobuf::util::JsonStringToMessage(raw_string_piece, &message, options);
   if (!status.ok()) {
     spdlog::info("{}: JSON parsing error: {}", __func__, status.message().data());
-    return absl::nullopt;
+    return nullptr;
   }
 
   google::protobuf::Map<std::string, google::protobuf::Value> fields = message.fields();
 
+  std::shared_ptr<TokenResponse> result;
   const google::jwt_verify::Jwt &id_token = existing_token_response.IDToken();
-  auto result = absl::make_optional<TokenResponse>(id_token);
   auto new_id_token = ParseIDToken(fields);
+
   if (new_id_token.has_value()) {
     spdlog::info("{}: Updating id token.", __func__);
-    result = absl::make_optional<TokenResponse>(new_id_token.value());
+    result = std::make_shared<TokenResponse>(new_id_token.value());
+  } else {
+    result = std::make_shared<TokenResponse>(id_token);
   }
 
   auto access_token_iter = fields.find(access_token_field);
@@ -170,7 +172,7 @@ absl::optional<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse
   }
 
   if (IsInvalid(fields)) {
-    return absl::nullopt;
+    return nullptr;
   }
 
   return result;

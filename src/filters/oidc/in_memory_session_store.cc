@@ -7,7 +7,7 @@ namespace oidc {
 
 class Session {
 private:
-  absl::optional<TokenResponse> token_response_;
+  std::shared_ptr<TokenResponse> token_response_;
   absl::optional<std::string> requested_url_;
   uint32_t time_added_;
   uint32_t time_accessed_;
@@ -27,11 +27,11 @@ public:
     return time_accessed_;
   }
 
-  inline void SetTokenResponse(const TokenResponse &tokenResponse) {
+  inline void SetTokenResponse(const std::shared_ptr<TokenResponse> tokenResponse) {
     token_response_ = tokenResponse;
   }
 
-  inline absl::optional<TokenResponse> &GetTokenResponse() {
+  inline std::shared_ptr<TokenResponse> GetTokenResponse() {
     return token_response_;
   }
 
@@ -49,7 +49,7 @@ public:
 };
 
 Session::Session(uint32_t time_added)
-    : token_response_(absl::nullopt), requested_url_(absl::nullopt), time_added_(time_added),
+    : token_response_(nullptr), requested_url_(absl::nullopt), time_added_(time_added),
       time_accessed_(time_added) {}
 
 InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
@@ -59,7 +59,7 @@ InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::Ti
     max_absolute_session_timeout_in_seconds_(max_absolute_session_timeout_in_seconds),
     max_session_idle_timeout_in_seconds_(max_session_idle_timeout_in_seconds) {}
 
-void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) {
+void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) {
   synchronized(mutex_) {
     auto session_optional = FindSession(session_id);
     if (session_optional.has_value()) {
@@ -74,15 +74,15 @@ void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, TokenR
   }
 }
 
-absl::optional<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::string_view session_id) {
+std::shared_ptr<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::string_view session_id) {
   synchronized(mutex_) {
     auto session_optional = FindSession(session_id);
     if (!session_optional.has_value()) {
-      return absl::nullopt;
+      return nullptr;
     }
     auto session = session_optional.value();
     session->SetTimeMostRecentlyAccessed(time_service_->GetCurrentTimeInSecondsSinceEpoch());
-    return absl::optional<TokenResponse>(session->GetTokenResponse());
+    return session->GetTokenResponse();
   }
 }
 

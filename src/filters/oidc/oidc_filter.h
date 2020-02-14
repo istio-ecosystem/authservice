@@ -119,8 +119,8 @@ private:
       boost::asio::yield_context yield);
 
   /** @brief Refresh tokens from OIDC token endpoint */
-  absl::optional<TokenResponse> RefreshToken(
-      TokenResponse existing_token_response,
+  std::shared_ptr<TokenResponse> RefreshToken(
+      const TokenResponse &existing_token_response,
       const std::string &refresh_token,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield);
@@ -196,7 +196,7 @@ private:
   /** @brief get the query string from the request sans path */
   std::string RequestQueryString(const CheckRequest *request);
 
-  bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
+  bool RequiredTokensPresent(std::shared_ptr<TokenResponse> token_response);
 
   bool RequiredTokensExpired(TokenResponse &token_response);
 

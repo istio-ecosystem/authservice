@@ -26,13 +26,13 @@ public:
       uint32_t max_absolute_session_timeout_in_seconds,
       uint32_t max_session_idle_timeout_in_seconds);
 
-  virtual void SetTokenResponse(absl::string_view session_id, TokenResponse &token_response) override;
+  virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
 
   virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) override;
 
   virtual void ClearRequestedURL(absl::string_view session_id) override;
 
-  virtual absl::optional<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
+  virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
 
   virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) override;
 
