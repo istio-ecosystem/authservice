@@ -8,6 +8,7 @@
 #include "test/common/http/mocks.h"
 #include "test/common/session/mocks.h"
 #include "test/filters/oidc/mocks.h"
+#include "src/filters/oidc/in_memory_session_store.h"
 
 namespace envoy {
 namespace api {
@@ -66,6 +67,15 @@ class OidcFilterTest : public ::testing::Test {
  protected:
   authservice::config::oidc::OIDCConfig config_;
   std::string callback_host_;
+  std::shared_ptr<TokenResponseParserMock> parser_mock_;
+  std::shared_ptr<common::session::TokenEncryptorMock> cryptor_mock_;
+  std::shared_ptr<common::session::SessionIdGeneratorMock> session_id_generator_mock_;
+  std::shared_ptr<SessionStore> session_store_;
+  std::shared_ptr<TokenResponse> test_token_response_;
+
+  // id_token exp of Feb 2, 2062
+  const char* test_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MDYxMzkwMjJ9.jV2_EH7JB30wgg248x2AlCkZnIUH417I_7FPw3nr5BQ";
+  google::jwt_verify::Jwt test_id_token_jwt_;
 
   void SetUp() override {
     config_.mutable_authorization()->set_scheme("https");
@@ -97,70 +107,63 @@ class OidcFilterTest : public ::testing::Test {
     std::stringstream callback_host;
     callback_host << config_.callback().hostname() << ':' << std::dec << config_.callback().port();
     callback_host_ = callback_host.str();
+
+    parser_mock_ = std::make_shared<TokenResponseParserMock>();
+    cryptor_mock_ = std::make_shared<common::session::TokenEncryptorMock>();
+    session_id_generator_mock_ = std::make_shared<common::session::SessionIdGeneratorMock>();
+    session_store_ = std::static_pointer_cast<SessionStore>(std::make_shared<InMemorySessionStore>(
+        std::make_shared<common::utilities::TimeService>(), 1000, 1000)
+    );
+
+    auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
+    ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+    test_token_response_ = std::make_shared<TokenResponse>(test_id_token_jwt_);
+    test_token_response_->SetAccessToken("expected_access_token");
+    test_token_response_->SetAccessTokenExpiry(10000000000); // not expired, Sat 20 Nov 2286
   }
+
+  void RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request);
+
+  void EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig);
+
+  void SetExpiredAccessTokenResponseInSessionStore();
 };
 
 TEST_F(OidcFilterTest, Constructor) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
 }
 
 TEST_F(OidcFilterTest, Name) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ASSERT_EQ(filter.Name().compare("oidc"), 0);
 }
 
 TEST_F(OidcFilterTest, GetStateCookieName) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-
   config_.clear_cookie_name_prefix();
-  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ASSERT_EQ(filter1.GetStateCookieName(), "__Host-authservice-state-cookie");
 
   config_.set_cookie_name_prefix("my-prefix");
-  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ASSERT_EQ(filter2.GetStateCookieName(),
             "__Host-my-prefix-authservice-state-cookie");
 }
 
-TEST_F(OidcFilterTest, GetIdTokenCookieName) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-
+TEST_F(OidcFilterTest, GetSessionIdCookieName) {
   config_.clear_cookie_name_prefix();
-  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter1.GetIdTokenCookieName(),
-            "__Host-authservice-id-token-cookie");
+  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  ASSERT_EQ(filter1.GetSessionIdCookieName(),
+            "__Host-authservice-session-id-cookie");
 
   config_.set_cookie_name_prefix("my-prefix");
-  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter2.GetIdTokenCookieName(),
-            "__Host-my-prefix-authservice-id-token-cookie");
-}
-
-TEST_F(OidcFilterTest, GetAccessTokenCookieName) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-
-  config_.clear_cookie_name_prefix();
-  OidcFilter filter1(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter1.GetAccessTokenCookieName(),
-            "__Host-authservice-access-token-cookie");
-
-  config_.set_cookie_name_prefix("my-prefix");
-  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ASSERT_EQ(filter2.GetAccessTokenCookieName(),
-            "__Host-my-prefix-authservice-access-token-cookie");
+  OidcFilter filter2(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  ASSERT_EQ(filter2.GetSessionIdCookieName(),
+            "__Host-my-prefix-authservice-session-id-cookie");
 }
 
 TEST_F(OidcFilterTest, NoHttpHeader) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
 
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
@@ -179,16 +182,14 @@ TEST_F(OidcFilterTest, NoHttpSchema) {
  */
 
 TEST_F(OidcFilterTest, NoAuthorization) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encrypted"));
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session123"));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto httpRequest =
-      request.mutable_attributes()->mutable_request()->mutable_http();
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
+
   auto status = filter.Process(&request, &response);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response.denied_response().status().code(),
@@ -212,17 +213,21 @@ TEST_F(OidcFilterTest, NoAuthorization) {
         StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
               "HttpOnly; Max-Age=300; Path=/; "
               "SameSite=Lax; Secure")
+      },
+      {
+       common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-session-id-cookie=session123; "
+              "HttpOnly; Path=/; "
+              "SameSite=Lax; Secure")
       }
     })
   );
 }
 
-TEST_F(OidcFilterTest, InvalidCookies) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encrypted"));
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+TEST_F(OidcFilterTest, NoSessionCookie) {
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session123"));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -230,42 +235,6 @@ TEST_F(OidcFilterTest, InvalidCookies) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "invalid"});
-  auto status = filter.Process(&request, &response);
-  // We expect to be redirected to authenticate
-  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-
-  ASSERT_THAT(
-    response.denied_response().headers(),
-    ContainsHeaders({
-      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
-      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
-      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
-      {
-        common::http::headers::SetCookie,
-        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-              "HttpOnly; Max-Age=300; Path=/; "
-              "SameSite=Lax; Secure")
-      }
-    })
-  );
-}
-
-TEST_F(OidcFilterTest, InvalidIdToken) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encrypted"));
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
-  ::envoy::service::auth::v2::CheckRequest request;
-  ::envoy::service::auth::v2::CheckResponse response;
-  auto httpRequest =
-      request.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->set_scheme("https");
-  httpRequest->mutable_headers()->insert(
-      {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=invalid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
-      .WillOnce(Return(absl::nullopt));
 
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
@@ -282,15 +251,20 @@ TEST_F(OidcFilterTest, InvalidIdToken) {
         StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
               "HttpOnly; Max-Age=300; Path=/; "
               "SameSite=Lax; Secure")
+      },
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-session-id-cookie=session123; "
+              "HttpOnly; Path=/; "
+              "SameSite=Lax; Secure")
       }
     })
   );
 }
 
-TEST_F(OidcFilterTest, ValidIdToken) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+TEST_F(OidcFilterTest, AlreadyHasUnexpiredIdTokenShouldSendRequestToAppWithAuthorizationHeaderContainingIdToken) {
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  session_store_->Set("session123", *test_token_response_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -298,9 +272,7 @@ TEST_F(OidcFilterTest, ValidIdToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
-      .WillOnce(Return(absl::optional<std::string>("secret")));
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
   ASSERT_EQ(status, google::rpc::Code::OK);
@@ -308,18 +280,23 @@ TEST_F(OidcFilterTest, ValidIdToken) {
   ASSERT_THAT(
     response.ok_response().headers(),
     ContainsHeaders({
-      {common::http::headers::Authorization, StrEq("Bearer secret")},
+      {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))},
     })
   );
 }
 
-TEST_F(OidcFilterTest, MissingAccessToken) {
-  config_.mutable_access_token()->set_header("access_token");
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encrypted"));
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+TEST_F(OidcFilterTest, ShouldRedirectToIdpToAuthenticateAgain_WhenAccessTokenIsMissing_GivenTheAccessTokenHeaderHasBeenConfigured) {
+  EnableAccessTokens(config_);
+
+  TokenResponse token_response(test_id_token_jwt_);
+  token_response.SetAccessTokenExpiry(2906139022); //Feb 2, 2062
+  token_response.SetAccessToken(nullptr);
+  session_store_->Set("session123", token_response);
+
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -327,9 +304,7 @@ TEST_F(OidcFilterTest, MissingAccessToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
-      .WillOnce(Return(absl::optional<std::string>("secret")));
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
@@ -346,18 +321,27 @@ TEST_F(OidcFilterTest, MissingAccessToken) {
         StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
               "HttpOnly; Max-Age=300; Path=/; "
               "SameSite=Lax; Secure")
+      },
+      {
+        common::http::headers::SetCookie,
+        StrEq("__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")
       }
     })
   );
 }
 
-TEST_F(OidcFilterTest, InvalidAccessToken) {
-  config_.mutable_access_token()->set_header("access_token");
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encrypted"));
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain_WhenTheAccessTokenHeaderHasBeenConfigured_GivenThereIsNoRefreshToken) {
+  EnableAccessTokens(config_);
+
+  TokenResponse token_response(test_id_token_jwt_); // id token, not expired
+  token_response.SetAccessTokenExpiry(1); // already expired
+  token_response.SetAccessToken("fake_access_token");
+  session_store_->Set("session123", token_response);
+
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -365,38 +349,343 @@ TEST_F(OidcFilterTest, InvalidAccessToken) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=valid; "
-       "__Host-cookie-prefix-authservice-access-token-cookie=invalid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
-      .WillOnce(Return(absl::optional<std::string>("secret")));
-  EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
-      .WillOnce(Return(absl::nullopt));
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
 
   ASSERT_THAT(
-    response.denied_response().headers(),
-    ContainsHeaders({
-      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
-      {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
-      {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
-      {
-        common::http::headers::SetCookie,
-        StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
-              "HttpOnly; Max-Age=300; Path=/; "
-              "SameSite=Lax; Secure")
-      }
-    })
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
   );
 }
 
-TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
-  config_.mutable_access_token()->set_header("access_token");
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+// id token is unexpired, access token is expired, server returns only access token from refresh endpoint
+TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAccessTokenHeaderHasBeenConfigured_GivenThereIsRefreshToken) {
+  EnableAccessTokens(config_);
+
+  SetExpiredAccessTokenResponseInSessionStore();
+
+  auto mocked_http = new common::http::http_mock();
+  auto *pMessage = new beast::http::response<beast::http::string_body>();
+  auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
+  raw_http_token_response_from_idp->result(beast::http::status::ok);
+  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+
+  auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+  TokenResponse test_refresh_token_response(test_id_token_jwt_);
+  test_refresh_token_response.SetAccessToken("expected_refreshed_access_token");
+  test_refresh_token_response.SetAccessTokenExpiry(11000000000); // July 30, 2318
+  test_refresh_token_response.SetRefreshToken("expected_refreshed_refresh_token");
+
+  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _))
+      .WillOnce(::testing::Return(test_refresh_token_response));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_THAT(
+      response.ok_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))},
+                          {"access_token", StrEq("expected_refreshed_access_token")},
+                      })
+  );
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_TRUE(stored_token_response.has_value());
+  ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
+  ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_refreshed_access_token");
+  ASSERT_EQ(stored_token_response.value().GetAccessTokenExpiry(), 11000000000);
+  ASSERT_EQ(stored_token_response.value().RefreshToken(), "expected_refreshed_refresh_token");
+}
+
+TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessionId_WhenThereIsNoStoredTokenResponseAssociatedWithTheUsersSession) {
+  EnableAccessTokens(config_);
+
+  auto mocked_http = new common::http::http_mock();
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_FALSE(stored_token_response.has_value());
+}
+
+TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTheRefreshedTokenResponse) {
+  EnableAccessTokens(config_);
+
+  SetExpiredAccessTokenResponseInSessionStore();
+
+  auto mocked_http = new common::http::http_mock();
+  auto *pMessage = new beast::http::response<beast::http::string_body>();
+  auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
+  raw_http_token_response_from_idp->result(beast::http::status::ok);
+  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+
+  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _))
+      .WillOnce(::testing::Return(absl::nullopt));
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_FALSE(stored_token_response.has_value());
+}
+
+TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstablishHttpConnectionToIDP) {
+  EnableAccessTokens(config_);
+
+  SetExpiredAccessTokenResponseInSessionStore();
+
+  auto mocked_http = new common::http::http_mock();
+  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(nullptr)));
+
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_FALSE(stored_token_response.has_value());
+}
+
+TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsuccessfulHttpResponseCode) {
+  EnableAccessTokens(config_);
+
+  SetExpiredAccessTokenResponseInSessionStore();
+
+  auto mocked_http = new common::http::http_mock();
+  auto *pMessage = new beast::http::response<beast::http::string_body>();
+  auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
+  raw_http_token_response_from_idp->result(beast::http::status::bad_request);
+  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted")); // The redirect to IDP requires a state/nonce cookie.
+  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _, _)).Times(0); // we want the code to return before attempting to parse the bad response
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+
+  auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_FALSE(stored_token_response.has_value());
+}
+
+TEST_F(OidcFilterTest, Process_PermitsTheRequestToContinue_GivenTheAccessTokenIsExpired_ButGivenTheAccessTokenHeaderHasNotBeenConfigured) {
+  TokenResponse token_response(test_id_token_jwt_); // id token, not expired
+  token_response.SetAccessTokenExpiry(1); // access token, already expired
+  token_response.SetAccessToken("fake_access_token");
+  session_store_->Set("session123", token_response);
+
+  ::envoy::service::auth::v2::CheckRequest request;
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  ::envoy::service::auth::v2::CheckResponse response;
+
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_THAT(
+      response.ok_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))}
+                      })
+  );
+}
+
+TEST_F(OidcFilterTest, ShouldPermitTheRequestToContinue_WhenTokenResponseWithAccessTokenButNoExpiresInTime_GivenTheAccessTokenHeaderHasBeenConfigured) {
+  EnableAccessTokens(config_);
+
+  TokenResponse token_response(test_id_token_jwt_); // id token, not expired
+  token_response.SetAccessTokenExpiry(0);
+  token_response.SetAccessToken("fake_access_token");
+  session_store_->Set("session123", token_response);
+
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::OK);
+  ASSERT_THAT(
+      response.ok_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))},
+                          {"access_token", StrEq("fake_access_token")},
+                      })
+  );
+}
+
+TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenTheAccessTokenHeaderHasBeenConfigured) {
+  EnableAccessTokens(config_);
+
+  //ID Token with exp of Sep 22, 2017
+  const char* expired_id_token_jwt_string = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjE1MDYxMzkwMjJ9.nYUg1lKTjuuT5aD2HuoPzOUtWCgenscZXisuCEzho1s";
+  google::jwt_verify::Jwt expired_id_token_jwt;
+
+  auto jwt_status = expired_id_token_jwt.parseFromString(expired_id_token_jwt_string);
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+  TokenResponse token_response(expired_id_token_jwt);
+  token_response.SetAccessToken("expected_access_token");
+  token_response.SetAccessTokenExpiry(10000000000); // access token not expired, Sat 20 Nov 2286
+
+  session_store_->Set("session123", token_response);
+
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).WillOnce(Return("encrypted"));
+  EXPECT_CALL(*session_id_generator_mock_, Generate()).WillOnce(Return("session456"));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -404,13 +693,41 @@ TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=identity; "
-       "__Host-cookie-prefix-authservice-access-token-cookie=access"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("identity"))
-      .WillOnce(Return(absl::optional<std::string>("id_secret")));
-  EXPECT_CALL(*cryptor_mock, Decrypt("access"))
-      .WillOnce(
-          Return(absl::optional<std::string>("access_secret")));
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
+  auto status = filter.Process(&request, &response);
+  // We expect to be redirected to authenticate because the id_token is expired
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {
+                           common::http::headers::SetCookie,
+                              StrEq("__Host-cookie-prefix-authservice-state-cookie=encrypted; "
+                                    "HttpOnly; Max-Age=300; Path=/; "
+                                    "SameSite=Lax; Secure")
+                          },
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=session456; HttpOnly; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+}
+
+TEST_F(OidcFilterTest, AlreadyHasUnexpiredTokensShouldSendRequestToAppWithHeadersContainingBothTokensWhenTheAccessTokenHeaderHasBeenConfigured) {
+  EnableAccessTokens(config_);
+  session_store_->Set("session123", *test_token_response_);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
 
   auto status = filter.Process(&request, &response);
   ASSERT_EQ(status, google::rpc::Code::OK);
@@ -418,18 +735,17 @@ TEST_F(OidcFilterTest, ValidIdAndAccessTokens) {
   ASSERT_THAT(
     response.ok_response().headers(),
     ContainsHeaders({
-      {common::http::headers::Authorization, StrEq("Bearer id_secret")},
-      {"access_token", StrEq("access_secret")},
+      {common::http::headers::Authorization, StrEq("Bearer " + std::string(test_id_token_jwt_string_))},
+      {"access_token", StrEq("expected_access_token")},
     })
   );
 }
 
 TEST_F(OidcFilterTest, LogoutWithCookies) {
+  session_store_->Set("session123", *test_token_response_);
   config_.mutable_logout()->set_path("/logout");
   config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -437,13 +753,14 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
   httpRequest->set_scheme("https");
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-id-token-cookie=identity; "
-       "__Host-cookie-prefix-authservice-access-token-cookie=access; "
-       "__Host-cookie-prefix-authservice-state-cookie=state"
+       "__Host-cookie-prefix-authservice-state-cookie=state; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"
       });
   httpRequest->set_path("/logout");
 
   auto status = filter.Process(&request, &response);
+
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response.denied_response().status().code(),
@@ -456,51 +773,90 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
         {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
         {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
         {common::http::headers::SetCookie, StrEq(
-            "__Host-cookie-prefix-authservice-id-token-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
+            "__Host-cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
         {common::http::headers::SetCookie, StrEq(
-            "__Host-cookie-prefix-authservice-access-token-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
-        {common::http::headers::SetCookie, StrEq(
-            "__Host-cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")}
+            "__Host-cookie-prefix-authservice-session-id-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")}
     })
   );
 }
 
-void RetrieveTokenWithoutAccessToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request) {
-  google::jwt_verify::Jwt jwt = {};
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  auto token_response = absl::make_optional<TokenResponse>(jwt);
-  token_response->SetAccessToken("expected_access_token");
-  EXPECT_CALL(*parser_mock, Parse(oidcConfig.client_id(), ::testing::_, ::testing::_))
-      .WillOnce(::testing::Return(token_response));
+TEST_F(OidcFilterTest, LogoutWithNoCookies) {
+  config_.mutable_logout()->set_path("/logout");
+  config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
+  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v2::CheckResponse response;
+  auto httpRequest =
+      request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("https");
+  httpRequest->set_path("/logout");
+
+  auto status = filter.Process(&request, &response);
+
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response.denied_response().status().code(),
+            ::envoy::type::StatusCode::Found);
+
+  ASSERT_THAT(
+      response.denied_response().headers(),
+      ContainsHeaders({
+                          {common::http::headers::Location, StrEq("https://redirect-uri")},
+                          {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
+                          {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-state-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")},
+                          {common::http::headers::SetCookie, StrEq(
+                              "__Host-cookie-prefix-authservice-session-id-cookie=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")}
+                      })
+  );
+}
+
+void OidcFilterTest::SetExpiredAccessTokenResponseInSessionStore() {
+  TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
+  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
+  expired_token_response.SetAccessToken("fake_access_token");
+  expired_token_response.SetRefreshToken("fake_refresh_token");
+  session_store_->Set("session123", expired_token_response);
+}
+
+void OidcFilterTest::EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig) {
+  oidcConfig.mutable_access_token()->set_header("access_token");
+}
+
+void OidcFilterTest::RetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request) {
+  EXPECT_CALL(*parser_mock_, Parse(oidcConfig.client_id(), ::testing::_, ::testing::_))
+      .WillOnce(::testing::Return(*test_token_response_));
   auto mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto httpRequest =
-      request.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->set_scheme(
-      "");  // Seems like it should be "https", but in practice is empty
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("");  // Seems like it should be "https", but in practice is empty
   httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .WillOnce(Return("encryptedtoken"));
   std::vector<absl::string_view> parts = {oidcConfig.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
+
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
+
+  auto stored_token_response = session_store_->Get("session123");
+  ASSERT_TRUE(stored_token_response.has_value());
+  ASSERT_EQ(stored_token_response.value().IDToken().jwt_, test_id_token_jwt_string_);
+  ASSERT_EQ(stored_token_response.value().AccessToken(), "expected_access_token");
+  ASSERT_EQ(stored_token_response.value().GetAccessTokenExpiry(), 10000000000);
 
   ASSERT_THAT(
     response.denied_response().headers(),
@@ -508,12 +864,6 @@ void RetrieveTokenWithoutAccessToken(config::oidc::OIDCConfig &oidcConfig, std::
       {common::http::headers::Location, StartsWith(oidcConfig.landing_page())},
       {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
       {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
-      {
-        common::http::headers::SetCookie,
-        MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
-                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                     "Path=/; SameSite=Lax; Secure$"),
-      },
       {
         common::http::headers::SetCookie,
         StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
@@ -524,30 +874,28 @@ void RetrieveTokenWithoutAccessToken(config::oidc::OIDCConfig &oidcConfig, std::
   );
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessToken) {
-  RetrieveTokenWithoutAccessToken(config_, callback_host_);
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenHeaderNameConfigured) {
+  RetrieveToken(config_, callback_host_);
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpsPort) {
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpsPort) {
   config_.mutable_callback()->set_scheme("https");
   config_.mutable_callback()->set_port(443);
-  RetrieveTokenWithoutAccessToken(config_, config_.callback().hostname());
+  RetrieveToken(config_, config_.callback().hostname());
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpPort) {
+TEST_F(OidcFilterTest, RetrieveTokenWithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpPort) {
   config_.mutable_callback()->set_scheme("http");
   config_.mutable_callback()->set_port(80);
-  RetrieveTokenWithoutAccessToken(config_, config_.callback().hostname());
+  RetrieveToken(config_, config_.callback().hostname());
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
-  config_.mutable_access_token()->set_header("access_token");
+TEST_F(OidcFilterTest, RetrieveTokenWithAccessTokenHeaderNameConfigured) {
+  EnableAccessTokens(config_);
   google::jwt_verify::Jwt jwt = {};
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto token_response = absl::make_optional<TokenResponse>(jwt);
   token_response->SetAccessToken("expected_access_token");
-  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(token_response));
   auto mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
@@ -555,24 +903,19 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto httpRequest =
-      request.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->set_scheme(
-      "");  // Seems like it should be "https", but in practice is empty
+  auto httpRequest = request.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_scheme("");  // Seems like it should be "https", but in practice is empty
   httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
-  EXPECT_CALL(*cryptor_mock, Encrypt(_))
-      .Times(2)
-      .WillRepeatedly(Return("encryptedtoken"));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
@@ -587,18 +930,6 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
       {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
       {
         common::http::headers::SetCookie,
-        MatchesRegex("^__Host-cookie-prefix-authservice-id-token-"
-                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                     "Path=/; SameSite=Lax; Secure$"),
-      },
-      {
-        common::http::headers::SetCookie,
-        MatchesRegex("^__Host-cookie-prefix-authservice-access-token-"
-                     "cookie=encryptedtoken; HttpOnly; Max-Age=[0-9]+; "
-                     "Path=/; SameSite=Lax; Secure$")
-      },
-      {
-        common::http::headers::SetCookie,
         StrEq("__Host-cookie-prefix-authservice-state-cookie=deleted; "
               "HttpOnly; Max-Age=0; Path=/; SameSite=Lax; "
               "Secure")
@@ -607,13 +938,11 @@ TEST_F(OidcFilterTest, RetrieveTokenWithAccessToken) {
   );
 }
 
-TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
-  config_.mutable_access_token()->set_header("access_token");
+TEST_F(OidcFilterTest, RetrieveTokenWhenTokenResponseIsMissingAccessToken) {
+  EnableAccessTokens(config_);
   google::jwt_verify::Jwt jwt = {};
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto token_response = absl::make_optional<TokenResponse>(jwt);
-  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(token_response));
   auto mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
@@ -621,8 +950,8 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
   raw_http->result(beast::http::status::ok);
   EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -632,17 +961,19 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
   httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
-  EXPECT_CALL(*cryptor_mock, Encrypt(_)).Times(0);
+  EXPECT_CALL(*cryptor_mock_, Encrypt(_)).Times(0);
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
+  ASSERT_FALSE(session_store_->Get("session123").has_value());
   ASSERT_THAT(
     response.denied_response().headers(),
     ContainsHeaders({
@@ -659,17 +990,17 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingAccessToken) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
       request.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_scheme("https");
   httpRequest->set_host(callback_host_);
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
@@ -692,11 +1023,8 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingStateCookie) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -705,8 +1033,9 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
   httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=invalid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("invalid"))
+       "__Host-cookie-prefix-authservice-state-cookie=invalid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("invalid"))
       .WillOnce(Return(absl::nullopt));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=expectedstate"};
@@ -730,11 +1059,8 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookie) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto mocked_http = new common::http::http_mock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -743,8 +1069,9 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
   httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(
           Return(absl::optional<std::string>("invalidformat")));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
@@ -769,9 +1096,7 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidStateCookieFormat) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -782,6 +1107,10 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "key=value&state=expectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
@@ -801,9 +1130,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingCode) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -814,6 +1141,10 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
@@ -833,9 +1164,7 @@ TEST_F(OidcFilterTest, RetrieveTokenMissingState) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock, cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -846,6 +1175,10 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
                                           "code=value&state=unexpectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
+  httpRequest->mutable_headers()->insert(
+      {common::http::headers::Cookie,
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+
   auto code = filter.Process(&request, &response);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
@@ -865,14 +1198,11 @@ TEST_F(OidcFilterTest, RetrieveTokenUnexpectedState) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
   auto *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t();
   EXPECT_CALL(*http_mock, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -882,8 +1212,9 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
@@ -908,17 +1239,14 @@ TEST_F(OidcFilterTest, RetrieveTokenBrokenPipe) {
 }
 
 TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
-  auto parser_mock = std::make_shared<TokenResponseParserMock>();
-  auto cryptor_mock = std::make_shared<common::session::TokenEncryptorMock>();
-  EXPECT_CALL(*parser_mock, Parse(config_.client_id(), ::testing::_, ::testing::_))
+  EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), ::testing::_, ::testing::_))
       .WillOnce(::testing::Return(absl::nullopt));
   auto *http_mock = new common::http::http_mock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
   EXPECT_CALL(*http_mock, Post(_, _, _, _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock,
-                    cryptor_mock);
+  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock_, cryptor_mock_, session_id_generator_mock_, session_store_);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
   auto httpRequest =
@@ -928,8 +1256,9 @@ TEST_F(OidcFilterTest, RetrieveTokenInvalidResponse) {
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
-       "__Host-cookie-prefix-authservice-state-cookie=valid"});
-  EXPECT_CALL(*cryptor_mock, Decrypt("valid"))
+       "__Host-cookie-prefix-authservice-state-cookie=valid; "
+       "__Host-cookie-prefix-authservice-session-id-cookie=session123"});
+  EXPECT_CALL(*cryptor_mock_, Decrypt("valid"))
       .WillOnce(Return(
           absl::optional<std::string>("expectedstate;expectednonce")));
   std::vector<absl::string_view> parts = {config_.callback().path().c_str(),

@@ -26,6 +26,21 @@ xx_library(
 )
 
 xx_library(
+    name = "in_memory_session_store",
+    srcs = ["in_memory_session_store.cc"],
+    hdrs = ["in_memory_session_store.h", "session_store.h"],
+    deps = [
+        "//src/filters/oidc:token_response",
+        "//src/common/utilities:time_service",
+        "//src/common/utilities:synchronized",
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
+    ],
+)
+
+xx_library(
     name = "oidc_filter",
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],
@@ -33,9 +48,12 @@ xx_library(
         "//config/oidc:config_cc",
         "//src/common/http",
         "//src/common/session:token_encryptor",
+        "//src/common/session:session_id_generator",
         "//src/common/utilities:random",
         "//src/filters:filter",
         "//src/filters/oidc:state_cookie_codec",
+        "//src/filters/oidc:in_memory_session_store",
+        "//src/common/utilities:time_service",
         "//src/filters/oidc:token_response",
         "@boost//:all",
         "@com_github_abseil-cpp//absl/time:time",

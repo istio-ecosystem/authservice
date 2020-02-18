@@ -83,8 +83,11 @@ void CompleteState::Proceed() {
 }
 
 AsyncAuthServiceImpl::AsyncAuthServiceImpl(authservice::config::Config config)
-        : config_(std::move(config)), impl_(config_),
-          io_context_(std::make_shared<boost::asio::io_context>()) {
+    : config_(std::move(config)),
+      impl_(config_),
+      io_context_(std::make_shared<boost::asio::io_context>()),
+      interval_in_seconds_(60),
+      timer_(*io_context_, interval_in_seconds_) {
   grpc::ServerBuilder builder;
   builder.AddListeningPort(config::GetConfiguredAddress(config_), grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
@@ -95,6 +98,8 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(authservice::config::Config config)
 void AsyncAuthServiceImpl::Run() {
   // Add a work object to the IO service so it will not shut down when it has nothing left to do
   auto work = std::make_shared<boost::asio::io_context::work>(*io_context_);
+
+  SchedulePeriodicCleanupTask();
 
   // Spin up our worker threads
   // Config validation should have already ensured that the number of threads is > 0
@@ -160,6 +165,23 @@ void AsyncAuthServiceImpl::Run() {
   // Reset the work item for the IO service will terminate once it finishes any outstanding jobs
   work.reset();
   threadpool.join_all();
+}
+
+void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
+  timer_handler_function_ = [this](const boost::system::error_code &ec) {
+    spdlog::info("{}: Starting periodic cleanup (period of {} seconds)", __func__, interval_in_seconds_.count());
+
+    impl_.DoPeriodicCleanup();
+
+    // Reset the timer for some seconds in the future
+    timer_.expires_at(std::chrono::steady_clock::now() + interval_in_seconds_);
+
+    // Schedule the next invocation of this same handler on the same timer
+    timer_.async_wait(timer_handler_function_);
+  };
+
+  // Schedule the first invocation of the handler on the timer
+  timer_.async_wait(timer_handler_function_);
 }
 
 }

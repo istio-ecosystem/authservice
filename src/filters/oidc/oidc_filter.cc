@@ -2,15 +2,15 @@
 #include <sstream>
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
-#include "absl/time/time.h"
 #include "google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
 #include "src/common/utilities/random.h"
+#include "src/common/utilities/time_service.h"
 #include "state_cookie_codec.h"
-#include <limits>
 #include <algorithm>
+#include <chrono>
 
 namespace beast = boost::beast;    // from <boost/beast.hpp>
 namespace http = beast::http;      // from <boost/beast/http.hpp>
@@ -24,24 +24,143 @@ namespace oidc {
 namespace {
 const char *filter_name_ = "oidc";
 const char *mandatory_scope_ = "openid";
+const int64_t NO_TIMEOUT = -1;
 
 const std::map<const char *, const char *> standard_headers = {
-    {common::http::headers::CacheControl,
-     common::http::headers::CacheControlDirectives::NoCache},
-    {common::http::headers::Pragma,
-     common::http::headers::PragmaDirectives::NoCache},
+    {common::http::headers::CacheControl, common::http::headers::CacheControlDirectives::NoCache},
+    {common::http::headers::Pragma,       common::http::headers::PragmaDirectives::NoCache},
 };
 }  // namespace
 
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
                        const authservice::config::oidc::OIDCConfig &idp_config,
                        TokenResponseParserPtr parser,
-                       common::session::TokenEncryptorPtr cryptor)
+                       common::session::TokenEncryptorPtr cryptor,
+                       common::session::SessionIdGeneratorPtr session_id_generator,
+                       SessionStorePtr session_store)
     : http_ptr_(http_ptr),
       idp_config_(idp_config),
       parser_(parser),
-      cryptor_(cryptor) {
+      cryptor_(cryptor),
+      session_id_generator_(session_id_generator),
+      session_store_(session_store) {
   spdlog::trace("{}", __func__);
+}
+
+google::rpc::Code OidcFilter::Process(
+    const ::envoy::service::auth::v2::CheckRequest *request,
+    ::envoy::service::auth::v2::CheckResponse *response,
+    boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
+  spdlog::trace("{}", __func__);
+  spdlog::debug(
+      "Call from {}@{} to {}@{}", request->attributes().source().principal(),
+      request->attributes().source().address().socket_address().address(),
+      request->attributes().destination().principal(),
+      request->attributes().destination().address().socket_address().address());
+
+  if (!request->attributes().request().has_http()) {
+    spdlog::info("{}: missing http in request", __func__);
+    SetStandardResponseHeaders(response);
+    return google::rpc::Code::INVALID_ARGUMENT;
+  }
+
+  // Verify the request was via a secure scheme.
+  /* TODO: Reinstate
+  if (request->attributes().request().http().scheme() != https_scheme_) {
+    spdlog::info("invalid request scheme, wanted {}, got {}", https_scheme_,
+                 request->attributes().request().http().scheme());
+    return google::rpc::Code::INVALID_ARGUMENT;
+  }
+  */
+
+  auto headers = request->attributes().request().http().headers();
+  auto session_id_optional = GetSessionIdFromCookie(headers);
+
+  // If the request is for the configured logout path,
+  // then logout and redirect to the configured logout redirect uri.
+  if (MatchesLogoutRequest(request)) {
+    spdlog::info("{}: Handling logout", __func__);
+    if (session_id_optional.has_value()) {
+      spdlog::info("{}: Removing session info from session store during logout", __func__);
+      session_store_->Remove(session_id_optional.value());
+    }
+    SetLogoutHeaders(response);
+    spdlog::info("{}: Logout complete. Sending user to re-authenticate.", __func__);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  // If the id_token header already exists,
+  // then let request continue.
+  // (It is up to the downstream system to validate the header is valid.)
+  if (headers.contains(idp_config_.id_token().header())) {
+    spdlog::info("{}: ID Token header already present. Allowing request to proceed without adding any additional headers.", __func__);
+    return google::rpc::Code::OK;
+  }
+
+  // If the request does not have a session_id cookie,
+  // then generate a session id, put it in a header, and redirect for login.
+  if (!session_id_optional.has_value()) {
+    spdlog::info("{}: No session cookie detected. Generating new session and sending user to re-authenticate.", __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  auto session_id = session_id_optional.value();
+
+  // If the request path is the callback for receiving the authorization code,
+  // then exchange it for tokens.
+  if (MatchesCallbackRequest(request)) {
+    return RetrieveToken(request, response, session_id, ioc, yield);
+  }
+
+  auto token_response_optional = session_store_->Get(session_id);
+
+  // If the user has a session_id cookie but there are no entries in the session store associated with it,
+  // then redirect for login.
+  if (!RequiredTokensPresent(token_response_optional)) {
+    spdlog::info("{}: Required tokens are not present. Sending user to re-authenticate.", __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  auto token_response = token_response_optional.value();
+
+  // If both ID & Access token are still unexpired,
+  // then allow the request to proceed (no need to intervene).
+  if (!RequiredTokensExpired(token_response)) {
+    AddTokensToRequestHeaders(response, token_response);
+    spdlog::info("{}: Tokens not expired. Allowing request to proceed.", __func__);
+    return google::rpc::Code::OK;
+  }
+
+  // If there is no refresh token,
+  // then direct the request to the identity provider for authentication
+  const absl::optional<const std::string> &refresh_token_optional = token_response.RefreshToken();
+  if (!refresh_token_optional.has_value()) {
+    spdlog::info("{}: Session did not contain a refresh token. Sending user to re-authenticate.", __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
+
+  // If the user has an unexpired refresh token
+  // then use it to request a fresh token_response,
+  // then, if successful, allow the request to proceed.
+  auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
+  if (refreshed_token_response.has_value()) {
+    session_store_->Set(session_id, refreshed_token_response.value());
+    spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
+                 __func__);
+    AddTokensToRequestHeaders(response, refreshed_token_response.value());
+    return google::rpc::Code::OK;
+  } else {
+    session_store_->Remove(session_id);
+    spdlog::info(
+        "{}: Attempt to refresh access token did not yield refreshed token. Sending user to re-authenticate.",
+        __func__);
+    SetRedirectToIdPHeaders(response);
+    return google::rpc::Code::UNAUTHENTICATED;
+  }
 }
 
 void OidcFilter::SetHeader(
@@ -87,12 +206,8 @@ std::string OidcFilter::GetStateCookieName() const {
   return GetCookieName("state");
 }
 
-std::string OidcFilter::GetIdTokenCookieName() const {
-  return GetCookieName("id-token");
-}
-
-std::string OidcFilter::GetAccessTokenCookieName() const {
-  return GetCookieName("access-token");
+std::string OidcFilter::GetSessionIdCookieName() const {
+  return GetCookieName("session-id");
 }
 
 std::string OidcFilter::EncodeHeaderValue(const std::string &preamble,
@@ -132,15 +247,18 @@ void OidcFilter::DeleteCookie(
 }
 
 std::set<std::string> OidcFilter::GetCookieDirectives(int64_t timeout) {
-  std::string timeoutDirective = EncodeCookieTimeoutDirective(timeout);
   std::set<std::string> token_set_cookie_header_directives =
       {
           common::http::headers::SetCookieDirectives::HttpOnly,
           common::http::headers::SetCookieDirectives::SameSiteLax,
           common::http::headers::SetCookieDirectives::Secure,
-          "Path=/",
-          timeoutDirective
+          "Path=/"
       };
+
+  if (timeout != NO_TIMEOUT) {
+    std::string timeoutDirective = EncodeCookieTimeoutDirective(timeout);
+    token_set_cookie_header_directives.insert(timeoutDirective);
+  }
   return token_set_cookie_header_directives;
 }
 
@@ -162,8 +280,7 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
   return absl::nullopt;
 }
 
-google::rpc::Code OidcFilter::RedirectToIdP(
-    ::envoy::service::auth::v2::CheckResponse *response) {
+void OidcFilter::SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response) {
   common::utilities::RandomGenerator generator;
   auto state = generator.Generate(32).Str();
   auto nonce = generator.Generate(32).Str();
@@ -176,106 +293,81 @@ google::rpc::Code OidcFilter::RedirectToIdP(
   auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
-      {"scope", encoded_scopes},
-      {"client_id", idp_config_.client_id()},
-      {"nonce", nonce},
-      {"state", state},
-      {"redirect_uri", callback}};
+      {"scope",         encoded_scopes},
+      {"client_id",     idp_config_.client_id()},
+      {"nonce",         nonce},
+      {"state",         state},
+      {"redirect_uri",  callback}};
   auto query = common::http::http::EncodeQueryData(params);
 
-  // Set redirect
-  SetRedirectHeaders(
-      absl::StrJoin(
-          {common::http::http::ToUrl(idp_config_.authorization()), query}, "?"),
-      response);
+  SetStandardResponseHeaders(response);
+
+  auto redirect_location = absl::StrJoin({common::http::http::ToUrl(idp_config_.authorization()), query}, "?");
+  SetRedirectHeaders(redirect_location, response);
 
   // Create a secure state cookie that contains the state and nonce.
   StateCookieCodec codec;
   SetEncryptedCookie(response->mutable_denied_response()->mutable_headers(), GetStateCookieName(),
                      codec.Encode(state, nonce), idp_config_.timeout());
-  return google::rpc::Code::UNAUTHENTICATED;
+
+  // Set a fresh session id to alleviate Session fixation attack
+  SetSessionIdCookie(response);
 }
 
-google::rpc::Code OidcFilter::Process(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
-    boost::asio::io_context& ioc,
-    boost::asio::yield_context yield) {
-  spdlog::trace("{}", __func__);
-  spdlog::debug(
-      "Call from {}@{} to {}@{}", request->attributes().source().principal(),
-      request->attributes().source().address().socket_address().address(),
-      request->attributes().destination().principal(),
-      request->attributes().destination().address().socket_address().address());
-  if (!request->attributes().request().has_http()) {
-    spdlog::info("{}: missing http in request", __func__);
-    SetStandardResponseHeaders(response);
-    ::grpc::Status err(::grpc::StatusCode::INVALID_ARGUMENT,
-                       "missing http parameters");
-    return google::rpc::Code::INVALID_ARGUMENT;
-  }
-
-  // Verify the request was via a secure scheme.
-  /* TODO: Reinstate..
-  if (request->attributes().request().http().scheme() != https_scheme_) {
-    spdlog::info("invalid request scheme, wanted {}, got {}", https_scheme_,
-                 request->attributes().request().http().scheme());
-    ::grpc::Status err(::grpc::StatusCode::INVALID_ARGUMENT,
-                       "invalid request scheme");
-    return err;
-  }
-   */
-
-  auto path_parts = common::http::http::DecodePath(
-      request->attributes().request().http().path());
-
-  // If the request is for the configured logout path, then logout and redirect
-  // to the configured logout redirect uri
-  if (idp_config_.has_logout() && path_parts[0] == idp_config_.logout().path()) {
-    SetRedirectHeaders(idp_config_.logout().redirect_to_uri(), response);
-    SetStandardResponseHeaders(response);
-    auto responseHeaders = response->mutable_denied_response()->mutable_headers();
-    DeleteCookie(responseHeaders, GetStateCookieName());
-    DeleteCookie(responseHeaders, GetAccessTokenCookieName());
-    DeleteCookie(responseHeaders, GetIdTokenCookieName());
-    return google::rpc::Code::UNAUTHENTICATED;
-  }
-
-  // Check if an id_token header already exists. If so let request
-  // progress. It is up to the downstream system to validate the header is
-  // valid.
-  auto headers = request->attributes().request().http().headers();
-  if (headers.contains(idp_config_.id_token().header())) {
-    return google::rpc::Code::OK;
-  }
-
-  // Check if we have a valid id_token cookie and optionally an access token
-  // cookie, If not go through authentication redirection dance.
-  auto id_token = GetTokenFromCookie(headers, GetIdTokenCookieName());
-  auto access_token = GetTokenFromCookie(headers, GetAccessTokenCookieName());
-  if (id_token.has_value() && (!idp_config_.has_access_token() || access_token.has_value())) {
-    SetIdTokenHeader(response, id_token.value());
-    if (access_token.has_value()) {
-      SetAccessTokenHeader(response, access_token.value());
-    }
-    return google::rpc::Code::OK;
-  }
-
-  // Set standard headers
+void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
+  SetRedirectHeaders(idp_config_.logout().redirect_to_uri(), response);
   SetStandardResponseHeaders(response);
-  spdlog::trace("{}: checking handler for {}://{}{}", __func__,
-                request->attributes().request().http().scheme(),
-                request->attributes().request().http().host(),
-                request->attributes().request().http().path());
-
-  if (MatchesCallbackRequest(request->attributes().request().http().host(), path_parts)) {
-    return RetrieveToken(request, response, path_parts[1], ioc, yield);
-  }
-  return RedirectToIdP(response);
+  auto responseHeaders = response->mutable_denied_response()->mutable_headers();
+  DeleteCookie(responseHeaders, GetStateCookieName());
+  DeleteCookie(responseHeaders, GetSessionIdCookieName());
 }
 
-bool OidcFilter::MatchesCallbackRequest(const std::string &request_host,
-                                        const std::array<std::string, 3> &request_path_parts) {
+void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse) {
+  auto id_token = tokenResponse.IDToken().jwt_;
+  SetIdTokenHeader(response, id_token);
+  if (idp_config_.has_access_token() && tokenResponse.AccessToken().has_value()) {
+    SetAccessTokenHeader(response, tokenResponse.AccessToken().value());
+  }
+}
+
+bool OidcFilter::RequiredTokensPresent(absl::optional<TokenResponse> &token_response) {
+  return token_response.has_value() &&
+         (!idp_config_.has_access_token() || token_response.value().AccessToken().has_value());
+}
+
+bool OidcFilter::RequiredTokensExpired(TokenResponse &token_response) {
+  common::utilities::TimeService timeService;
+  int64_t now_seconds = timeService.GetCurrentTimeInSecondsSinceEpoch();
+
+  if (token_response.GetIDTokenExpiry() < now_seconds) {
+    return true;
+  }
+
+  // Don't require expires_in. Rely on presence of field to determine if check should be made.
+  //  The oauth spec does not require a expires_in https://tools.ietf.org/html/rfc6749#section-5.1
+  const absl::optional<int64_t> &accessTokenExpiry = token_response.GetAccessTokenExpiry();
+  return idp_config_.has_access_token() && accessTokenExpiry.has_value() && accessTokenExpiry.value() < now_seconds;
+}
+
+bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
+  return idp_config_.has_logout() && RequestPath(request) == idp_config_.logout().path();
+}
+
+std::string OidcFilter::RequestPath(const CheckRequest *request) {
+  return common::http::http::DecodePath(request->attributes().request().http().path())[0];
+}
+
+std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
+  return common::http::http::DecodePath(request->attributes().request().http().path())[1];
+}
+
+bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
+  auto path = request->attributes().request().http().path();
+  auto request_host = request->attributes().request().http().host();
+  auto scheme = request->attributes().request().http().scheme();
+  spdlog::trace("{}: checking handler for {}://{}{}", __func__, scheme, request_host, path);
+
+  auto request_path_parts = common::http::http::DecodePath(path);
   auto configured_port = idp_config_.callback().port();
   auto configured_hostname = idp_config_.callback().hostname();
   auto configured_scheme = idp_config_.callback().scheme();
@@ -295,43 +387,95 @@ bool OidcFilter::MatchesCallbackRequest(const std::string &request_host,
   return host_matches && path_matches;
 }
 
-absl::optional<std::string> OidcFilter::GetTokenFromCookie(const ::google::protobuf::Map<::std::string,
-    ::std::string> &headers, const std::string &cookie_name) {
-  auto token_cookie = CookieFromHeaders(headers, cookie_name);
-  if (token_cookie.has_value()) {
-    auto token = cryptor_->Decrypt(*token_cookie);
-    if (!token.has_value()) {
-      spdlog::info("{}: {} token cookie decryption failed", __func__, cookie_name);
-      return absl::nullopt;
-    } else {
-      return token.value();
-    }
+absl::optional<std::string> OidcFilter::GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
+    ::std::string> &headers) {
+  auto cookie_name = GetSessionIdCookieName();
+  auto cookie = CookieFromHeaders(headers, cookie_name);
+  if (cookie.has_value()) {
+    return cookie.value();
   } else {
-    spdlog::info("{}: {} token cookie missing", __func__, cookie_name);
+    spdlog::info("{}: {} session id cookie missing", __func__, cookie_name);
     return absl::nullopt;
   }
 }
 
 void OidcFilter::SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
-    const std::string &access_token) {
+                                      const std::string &access_token) {
   auto value = EncodeHeaderValue(idp_config_.access_token().preamble(), access_token);
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.access_token().header(), value);
 }
 
 void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
-    const std::string& id_token) {
+                                  const std::string &id_token) {
   auto value = EncodeHeaderValue(idp_config_.id_token().preamble(), id_token);
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
+}
+
+void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response) {
+  SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id_generator_->Generate(), NO_TIMEOUT);
+}
+
+// https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokens
+absl::optional<TokenResponse>
+OidcFilter::RefreshToken(
+    TokenResponse existing_token_response,
+    const std::string &refresh_token,
+    boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
+
+  std::map<absl::string_view, absl::string_view> headers = {
+      {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
+  };
+
+  auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
+  std::multimap<absl::string_view, absl::string_view> params = {
+      {"client_id",     idp_config_.client_id()},
+      {"client_secret", idp_config_.client_secret()},
+      {"grant_type",    "refresh_token"},
+      {"refresh_token", refresh_token},
+      // according to this link, omitting the `scope` param should return new
+      // tokens with the previously requested `scope`
+      // https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
+  };
+
+  spdlog::info("{}: POSTing to refresh access token", __func__);
+  auto retrieved_token_response = http_ptr_->Post(
+      idp_config_.token(),
+      headers,
+      common::http::http::EncodeFormData(params),
+      ioc,
+      yield);
+
+  if (retrieved_token_response == nullptr) {
+    spdlog::warn("{}: Received null pointer as response from identity provider.", __func__);
+    return absl::nullopt;
+  }
+
+  http::status status = retrieved_token_response->result();
+  if (status != boost::beast::http::status::ok) {
+    spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__, std::to_string(
+        static_cast<double>(status)));
+    return absl::nullopt;
+  }
+
+  return parser_->ParseRefreshTokenResponse(
+      std::move(existing_token_response),
+      idp_config_.client_id(),
+      retrieved_token_response->body()
+  );
 }
 
 // Performs an HTTP POST and prints the response
 google::rpc::Code OidcFilter::RetrieveToken(
     const ::envoy::service::auth::v2::CheckRequest *request,
     ::envoy::service::auth::v2::CheckResponse *response,
-    absl::string_view query,
-    boost::asio::io_context& ioc,
+    absl::string_view session_id,
+    boost::asio::io_context &ioc,
     boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
+
+  auto query = RequestQueryString(request);
+  SetStandardResponseHeaders(response);
 
   // Best effort at deleting state cookie for all cases.
   auto responseHeaders = response->mutable_denied_response()->mutable_headers();
@@ -342,23 +486,17 @@ google::rpc::Code OidcFilter::RetrieveToken(
       request->attributes().request().http().headers(), GetStateCookieName());
   if (!encrypted_state_cookie.has_value()) {
     spdlog::info("{}: missing state cookie", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   auto state_cookie = cryptor_->Decrypt(encrypted_state_cookie.value());
   if (!state_cookie.has_value()) {
     spdlog::info("{}: invalid state cookie", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   StateCookieCodec codec;
   auto state_and_nonce = codec.Decode(state_cookie.value());
   if (!state_and_nonce.has_value()) {
     spdlog::info("{}: invalid state cookie encoding", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
@@ -366,42 +504,32 @@ google::rpc::Code OidcFilter::RetrieveToken(
   auto query_data = common::http::http::DecodeQueryData(query);
   if (!query_data.has_value()) {
     spdlog::info("{}: form data is invalid", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   const auto state = query_data->find("state");
   const auto code = query_data->find("code");
   if (state == query_data->end() || code == query_data->end()) {
-    spdlog::info(
-        "{}: form data does not contain expected state and code parameters",
-        __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
+    spdlog::info("{}: form data does not contain expected state and code parameters", __func__);
     return google::rpc::Code::INVALID_ARGUMENT;
   }
   if (state->second != state_and_nonce->first) {
     spdlog::info("{}: mismatch state", __func__);
-    ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                         "OIDC protocol error");
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
   // Build headers
-  auto authorization = common::http::http::EncodeBasicAuth(
-      idp_config_.client_id(), idp_config_.client_secret());
+  auto authorization = common::http::http::EncodeBasicAuth(idp_config_.client_id(), idp_config_.client_secret());
   std::map<absl::string_view, absl::string_view> headers = {
-      {common::http::headers::ContentType,
-       common::http::headers::ContentTypeDirectives::FormUrlEncoded},
+      {common::http::headers::ContentType,   common::http::headers::ContentTypeDirectives::FormUrlEncoded},
       {common::http::headers::Authorization, authorization},
   };
 
   // Build body
   auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
-      {"code", code->second},
+      {"code",         code->second},
       {"redirect_uri", redirect_uri},
-      {"grant_type", "authorization_code"},
+      {"grant_type",   "authorization_code"},
   };
 
   auto retrieve_token_response = http_ptr_->Post(
@@ -409,41 +537,34 @@ google::rpc::Code OidcFilter::RetrieveToken(
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");
-    ::grpc::Status error(::grpc::StatusCode::INTERNAL, "IdP connection error");
     return google::rpc::Code::INTERNAL;
   }
   if (retrieve_token_response->result() != boost::beast::http::status::ok) {
     spdlog::info("{}: HTTP token response error: {}", __func__,
                  retrieve_token_response->result_int());
-    ::grpc::Status error(::grpc::StatusCode::UNKNOWN, "IdP connection error");
     return google::rpc::Code::UNKNOWN;
   } else {
-    auto token = parser_->Parse(idp_config_.client_id(),
-        std::string(state_and_nonce->second.data(), state_and_nonce->second.size()),
-        retrieve_token_response->body());
-    if (!token.has_value()) {
+    auto nonce = std::string(state_and_nonce->second.data(), state_and_nonce->second.size());
+    auto token_response = parser_->Parse(idp_config_.client_id(), nonce, retrieve_token_response->body());
+    if (!token_response.has_value()) {
       spdlog::info("{}: Invalid token response", __func__);
-      ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                           "Invalid token response");
       return google::rpc::Code::INVALID_ARGUMENT;
     }
-    auto expiry = token->Expiry();
-    auto timeout = expiry.has_value() ? *expiry : std::numeric_limits<int64_t>::max();
 
-    // Check whether access_token forwarding is configured and if it is we have
-    // an access token in our token response.
+    // If access_token forwarding is configured but there is not an access token in the token response
+    // then there is a problem
     if (idp_config_.has_access_token()) {
-      auto access_token = token->AccessToken();
+      auto access_token = token_response->AccessToken();
       if (!access_token.has_value()) {
         spdlog::info("{}: Missing expected access_token", __func__);
-        ::grpc::Status error(::grpc::StatusCode::INVALID_ARGUMENT,
-                             "Missing expected access_token");
         return google::rpc::Code::INVALID_ARGUMENT;
       }
-      SetEncryptedCookie(responseHeaders, GetAccessTokenCookieName(), access_token.value(), timeout);
     }
+
+    spdlog::info("{}: Saving token response to session store", __func__);
+    session_store_->Set(session_id, token_response.value());
+
     SetRedirectHeaders(idp_config_.landing_page(), response);
-    SetEncryptedCookie(responseHeaders, GetIdTokenCookieName(), token->IDToken().jwt_, timeout);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 }

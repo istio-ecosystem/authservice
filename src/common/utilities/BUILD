@@ -12,3 +12,18 @@ xx_library(
         "@com_googlesource_boringssl//:crypto",
     ],
 )
+
+xx_library(
+    name = "time_service",
+    srcs = ["time_service.cc"],
+    hdrs = ["time_service.h"],
+    deps = [
+    ],
+)
+
+xx_library(
+    name = "synchronized",
+    hdrs = ["synchronized.h"],
+    deps = [
+    ],
+)
