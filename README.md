@@ -23,12 +23,6 @@ See the [Makefile](Makefile) for common tasks.
 ## Roadmap
 See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)
 
-Features not yet implemented:
- - Token renewal via refresh token.
- - Start new flow to fetch new tokens when either the ID token or the access token has expired.
- - Support multiple IDPs for the same app.
- - Support adding ext_authz filter and using the `authservice` on the Istio ingress gateway.
-
 Additional features being considered:
  - A more Istio-integrated experience of deploying/configuring/enabling `authservice` 
  (e.g.: extending Istio Authentication Policy to include `authservice` configs).  
