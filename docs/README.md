@@ -90,8 +90,7 @@ The configuration of an OpenID Connect filter that can be used to retrieve ident
 | client_id | The OIDC client ID assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. | string |
 | client_secret | The OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. | string |
 | scopes | Optional additional scopes passed to the OIDC Provider in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here. Required, but an empty array is allowed. | (slice of) string |
-| landing_page | The URL to which the user's browser is redirected after successful authentication and token acquisition. Required. | string |
-| cryptor_secret | <!-- TODO: use [(validate.rules).string.uri_ref = true] when implemented for C/C++ --> A secret used to derive cryptographic material for protecting cookies and other data. Can be any string. Required. | string |
+| cryptor_secret | A secret used to derive cryptographic material for protecting cookies and other data. Can be any string. Required. | string |
 | cookie_name_prefix | A unique identifier of the authservice's browser cookies. Can be any string. Only needed when multiple services in the same domain are each protected by their own authservice, in which case each service's authservice should have a unique value to avoid cookie name conflicts. Optional. | string |
 | id_token | The configuration for adding ID Tokens as headers to requests forwarded to a service. Required. | TokenConfig |
 | access_token | The configuration for adding Access Tokens as headers to requests forwarded to a service. Optional. | TokenConfig |

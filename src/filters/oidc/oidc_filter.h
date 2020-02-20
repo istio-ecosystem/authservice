@@ -103,7 +103,12 @@ private:
    * Set IdP redirect parameters so that a requesting agent is forced to
    * authenticate the user.
    */
-  void SetRedirectToIdPHeaders(::envoy::service::auth::v2::CheckResponse *response);
+  void SetRedirectToIdpHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
+
+  google::rpc::Code RedirectToIdp(
+      CheckResponse *response,
+      const AttributeContext_HttpRequest &httpRequest,
+      absl::optional<std::string> old_session_id = absl::nullopt);
 
   /** @brief Retrieve tokens from OIDC token endpoint */
   google::rpc::Code RetrieveToken(
@@ -114,8 +119,8 @@ private:
       boost::asio::yield_context yield);
 
   /** @brief Refresh tokens from OIDC token endpoint */
-  absl::optional<TokenResponse> RefreshToken(
-      TokenResponse existing_token_response,
+  std::shared_ptr<TokenResponse> RefreshToken(
+      const TokenResponse &existing_token_response,
       const std::string &refresh_token,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield);
@@ -149,7 +154,7 @@ private:
    * @param response the outgoing response
    * @param session_id the session id
    */
-  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response);
+  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
   /**
    * @brief Retrieve and decrypt the sessionId from cookies
@@ -159,6 +164,14 @@ private:
    */
   absl::optional<std::string> GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
       ::std::string> &headers);
+
+  /**
+ * @brief Assemble a URL string from a request
+ *
+ * @param The http request
+ * @return The requested Url from the http request as a string
+ */
+  static std::string GetRequestUrl(const AttributeContext_HttpRequest &httpRequest);
 
   /**
    * @brief Get the directives that should be used when setting a cookie
@@ -183,7 +196,7 @@ private:
   /** @brief get the query string from the request sans path */
   std::string RequestQueryString(const CheckRequest *request);
 
-  bool RequiredTokensPresent(absl::optional<TokenResponse> &token_response);
+  bool RequiredTokensPresent(std::shared_ptr<TokenResponse> token_response);
 
   bool RequiredTokensExpired(TokenResponse &token_response);
 

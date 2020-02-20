@@ -102,48 +102,46 @@ class TokenResponseParserTest : public ::testing::Test {
     parser_ = std::make_shared<TokenResponseParserImpl>(std::move(jwks));
   }
 
-  TokenResponse ValidTokenResponse();
-  TokenResponse ValidTokenResponseWithRefreshToken();
+  std::shared_ptr<TokenResponse> ValidTokenResponse();
+  std::shared_ptr<TokenResponse> ValidTokenResponseWithRefreshToken();
 };
 
-TokenResponse TokenResponseParserTest::ValidTokenResponse() {
-  auto token_response = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
-  return token_response.value();
+std::shared_ptr<TokenResponse> TokenResponseParserTest::ValidTokenResponse() {
+  return parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
 }
 
-TokenResponse TokenResponseParserTest::ValidTokenResponseWithRefreshToken() {
-  auto token_response = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
-  return token_response.value();
+std::shared_ptr<TokenResponse> TokenResponseParserTest::ValidTokenResponseWithRefreshToken() {
+  return parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidJSON) {
   auto result = parser_->Parse(client_id, nonce, "invalid json");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseMissingTokenType) {
   auto result = parser_->Parse(client_id, nonce, R"({})");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidTokenType) {
   auto result = parser_->Parse(client_id, nonce, R"({"token_type":"NotBearer"})");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseMissingIdentityToken) {
   auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer"})");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidIdentityTokenType) {
   auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":1})");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidJwtEncoding) {
   auto result = parser_->Parse(client_id, nonce, R"({"token_type":"Bearer","id_token":"wrong"})");
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidJwtSignature) {
@@ -151,22 +149,22 @@ TEST_F(TokenResponseParserTest, ParseInvalidJwtSignature) {
   EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
   TokenResponseParserImpl parser(std::move(jwks));
   auto result = parser.Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseMissingAudience) {
   auto result = parser_->Parse("missing", nonce, valid_token_response_Bearer_without_access_token);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseInvalidNonce) {
   auto result = parser_->Parse(client_id, "invalid", valid_token_response_Bearer_without_access_token);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, InvalidExpiresInFieldValue) {
   auto result = parser_->Parse(client_id, nonce, invalid_expires_in_token_response);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBeBearer_IgnoringCase) {
@@ -175,7 +173,7 @@ TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBeBearer_IgnoringCase) 
                                     })";
 
   auto result = parser_->Parse(client_id, nonce, response_string);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeBearer_IgnoringCase) {
@@ -185,8 +183,8 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeB
                                     "access_token":"refreshed_access_token_value",
                                     "refresh_token":"refreshed_refresh_token_value"})";
 
-  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
-  ASSERT_FALSE(result.has_value());
+  auto result = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBePresent) {
@@ -194,12 +192,12 @@ TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBePresent) {
 
   auto result = parser_->Parse(client_id, nonce, response_string);
 
-  ASSERT_FALSE(result.has_value());
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, Parse) {
   auto result = parser_->Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
-  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result);
   auto access_token1 = result->AccessToken();
   ASSERT_FALSE(access_token1.has_value());
   auto refresh_token1 = result->RefreshToken();
@@ -210,7 +208,7 @@ TEST_F(TokenResponseParserTest, Parse) {
   ASSERT_EQ(2001001001, id_token_expiry);
 
   result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token);
-  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result);
   auto access_token2 = result->AccessToken();
   ASSERT_TRUE(access_token2.has_value());
   ASSERT_EQ(*access_token2, "access_token_value");
@@ -220,7 +218,7 @@ TEST_F(TokenResponseParserTest, Parse) {
   ASSERT_TRUE(access_token_expiry2.has_value());
 
   result = parser_->Parse(client_id, nonce, valid_token_response_bearer_with_access_token_and_refresh_token);
-  ASSERT_TRUE(result.has_value());
+  ASSERT_TRUE(result);
   auto access_token3 = result->AccessToken();
   ASSERT_TRUE(access_token3.has_value());
   ASSERT_EQ(*access_token3, "access_token_value");
@@ -237,8 +235,8 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeP
   const char *response_string = R"({"access_token":"refreshed_access_token_value",
                                     "refresh_token":"refreshed_refresh_token_value"})";
 
-  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
-  ASSERT_FALSE(result.has_value());
+  auto result = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest,
@@ -251,34 +249,32 @@ TEST_F(TokenResponseParserTest,
                                     "refresh_token":"refreshed_refresh_token_value",
                                     "expires_in": 0})";
 
-  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
-  ASSERT_FALSE(result.has_value());
+  auto result = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
+  ASSERT_FALSE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ConsidersResponseValid_WhenTheExpiresInFieldIsOmitted) {
   https://tools.ietf.org/html/rfc6749#section-5.1 The expires_in field is recommended and not required.
-  TokenResponse existing_token_response = ValidTokenResponse();
+  auto existing_token_response = ValidTokenResponse();
 
   const char *response_string = R"({"token_type":"bearer",
                                     "access_token":"refreshed_access_token_value",
                                     "refresh_token":"refreshed_refresh_token_value"})";
 
-  auto result = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
-  ASSERT_TRUE(result.has_value());
+  auto result = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
+  ASSERT_TRUE(result);
 }
 
 TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
   auto existing_token_response = ValidTokenResponse();
 
   const char *response_string = valid_refresh_token_response_bearer_with_access_token_and_refresh_token_no_id_token;
-  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response,
-                                                                   client_id,
-                                                                   response_string);
-  ASSERT_TRUE(refreshed_token_response.has_value());
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
+  ASSERT_TRUE(refreshed_token_response);
 
-  ASSERT_EQ(existing_token_response.IDToken().jwt_, refreshed_token_response->IDToken().jwt_);
+  ASSERT_EQ(existing_token_response->IDToken().jwt_, refreshed_token_response->IDToken().jwt_);
   auto refreshed_id_token_expiry = refreshed_token_response->GetIDTokenExpiry();
-  ASSERT_EQ(existing_token_response.GetIDTokenExpiry(), refreshed_id_token_expiry);
+  ASSERT_EQ(existing_token_response->GetIDTokenExpiry(), refreshed_id_token_expiry);
 
   auto refreshed_access_token = refreshed_token_response->AccessToken();
   ASSERT_TRUE(refreshed_access_token.has_value());
@@ -304,7 +300,7 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsRefreshedIdToke
 
 
 
-  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response, client_id, response_string);
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
 
   auto actual = refreshed_token_response->IDToken().jwt_;
   auto expected = test_refreshed_id_token_jwt_string_;
@@ -315,11 +311,9 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsExistingRefresh
   auto existing_token_response = ValidTokenResponseWithRefreshToken();
 
   const char *response_string = valid_token_response_bearer_with_access_token;
-  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(existing_token_response,
-                                                                   client_id,
-                                                                   response_string);
+  auto refreshed_token_response = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
 
-  ASSERT_TRUE(refreshed_token_response.has_value());
+  ASSERT_TRUE(refreshed_token_response);
 
   auto actual_refresh_token = refreshed_token_response->RefreshToken();
   ASSERT_TRUE(actual_refresh_token.has_value());

@@ -9,40 +9,16 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-class SessionData {
-private:
-  TokenResponse token_response_;
-  uint32_t time_added_;
-  uint32_t time_accessed_;
-
-public:
-  SessionData(TokenResponse &token_response, uint32_t time_added);
-
-  inline TokenResponse &GetTokenResponse() {
-    return token_response_;
-  }
-
-  inline uint32_t GetTimeAdded() {
-    return time_added_;
-  }
-
-  inline uint32_t GetTimeMostRecentlyAccessed() {
-    return time_accessed_;
-  }
-
-  inline void SetTimeMostRecentlyAccessed(uint32_t time_accessed) {
-    time_accessed_ = time_accessed;
-  }
-
-};
+class Session;
 
 class InMemorySessionStore : public SessionStore {
 private:
-  std::unordered_map<std::string, std::shared_ptr<SessionData>> map;
+  std::unordered_map<std::string, std::shared_ptr<Session>> session_map_;
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;
   std::recursive_mutex mutex_;
+  virtual absl::optional<std::shared_ptr<Session>> FindSession(absl::string_view session_id);
 
 public:
   InMemorySessionStore(
@@ -50,11 +26,17 @@ public:
       uint32_t max_absolute_session_timeout_in_seconds,
       uint32_t max_session_idle_timeout_in_seconds);
 
-  virtual void Set(absl::string_view session_id, TokenResponse &token_response) override;
+  virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
 
-  virtual absl::optional<TokenResponse> Get(absl::string_view session_id) override;
+  virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) override;
 
-  virtual void Remove(absl::string_view session_id) override;
+  virtual void ClearRequestedURL(absl::string_view session_id) override;
+
+  virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
+
+  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) override;
+
+  virtual void RemoveSession(absl::string_view session_id) override;
 
   virtual void RemoveAllExpired() override;
 };

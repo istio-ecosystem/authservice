@@ -42,7 +42,6 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.scopes().at(0), "scope");
   ASSERT_EQ(oidc.scopes().size(), 1);
 
-  ASSERT_EQ(oidc.landing_page(), "page");
   ASSERT_EQ(oidc.cryptor_secret(), "some-secret");
   ASSERT_EQ(oidc.cookie_name_prefix(), "my-app");
   ASSERT_EQ(oidc.timeout(), 300);

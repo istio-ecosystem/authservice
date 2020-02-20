@@ -14,11 +14,17 @@ typedef std::shared_ptr<SessionStore> SessionStorePtr;
 class SessionStore {
 public:
 
-  virtual void Set(absl::string_view session_id, TokenResponse &token_response) = 0;
+  virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) = 0;
 
-  virtual absl::optional<TokenResponse> Get(absl::string_view session_id) = 0;
+  virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) = 0;
 
-  virtual void Remove(absl::string_view session_id) = 0;
+  virtual void ClearRequestedURL(absl::string_view session_id) = 0;
+
+  virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) = 0;
+
+  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) = 0;
+
+  virtual void RemoveSession(absl::string_view session_id) = 0;
 
   virtual void RemoveAllExpired() = 0;
 };
