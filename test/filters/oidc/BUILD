@@ -7,17 +7,6 @@ cc_library(
 )
 
 cc_test(
-    name = "state_cookie_codec_test",
-    srcs = ["state_cookie_codec_test.cc"],
-    deps = [
-        "//src/filters/oidc:state_cookie_codec",
-        "@com_github_grpc_grpc//:grpc++",
-        "@com_google_googletest//:gtest_main",
-    ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
-)
-
-cc_test(
     name = "token_response_test",
     srcs = ["token_response_test.cc"],
     deps = [

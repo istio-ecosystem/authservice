@@ -3,16 +3,6 @@ load("//bazel:bazel.bzl", "xx_library")
 package(default_visibility = ["//visibility:public"])
 
 xx_library(
-    name = "state_cookie_codec",
-    srcs = ["state_cookie_codec.cc"],
-    hdrs = ["state_cookie_codec.h"],
-    deps = [
-        "@com_github_abseil-cpp//absl/strings:strings",
-        "@com_github_abseil-cpp//absl/types:optional",
-    ],
-)
-
-xx_library(
     name = "token_response",
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
@@ -47,11 +37,9 @@ xx_library(
     deps = [
         "//config/oidc:config_cc",
         "//src/common/http",
-        "//src/common/session:token_encryptor",
-        "//src/common/session:session_id_generator",
+        "//src/common/session:session_string_generator",
         "//src/common/utilities:random",
         "//src/filters:filter",
-        "//src/filters/oidc:state_cookie_codec",
         "//src/filters/oidc:in_memory_session_store",
         "//src/common/utilities:time_service",
         "//src/filters/oidc:token_response",

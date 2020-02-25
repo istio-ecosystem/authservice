@@ -53,12 +53,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
             google::jwt_verify::Jwks::createFrom(
                 filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
 
-    auto token_encryptor = common::session::TokenEncryptor::Create(
-        filter.oidc().cryptor_secret(),
-        common::session::EncryptionAlg::AES256GCM,
-        common::session::HKDFHash::SHA512);
-
-    auto session_id_generator = std::make_shared<common::session::SessionIdGenerator>();
+    auto session_string_generator = std::make_shared<common::session::SessionStringGenerator>();
 
     auto http = common::http::ptr_t(new common::http::http_impl);
 
@@ -76,7 +71,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     }
 
     result->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
-        http, filter.oidc(), token_request_parser, token_encryptor, session_id_generator, oidc_session_store_)));
+        http, filter.oidc(), token_request_parser, session_string_generator, oidc_session_store_)));
   }
   return result;
 }

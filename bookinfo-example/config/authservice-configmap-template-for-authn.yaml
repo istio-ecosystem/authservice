@@ -46,13 +46,11 @@ data:
                 "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
                 "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
                 "scopes": [],
-                "cryptor_secret": "xxx_CHANGE_ME",
                 "cookie_name_prefix": "productpage",
                 "id_token": {
                   "preamble": "Bearer",
                   "header": "Authorization"
                 },
-                "timeout": 300,
                 "logout": {
                   "path": "/authservice_logout",
                   "redirect_to_uri": "https://<demo.example.change.me>/some/logout/path"

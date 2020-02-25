@@ -21,9 +21,6 @@ TEST(Random, Rand) {
     // Test comparators
     ASSERT_EQ(random_value, parsed_back);
     ASSERT_FALSE(random_value != *parsed_back);
-
-    // Test values
-    ASSERT_TRUE(std::equal(random_value.Begin(), random_value.End(), parsed_back->Begin()));
   }
 }
 

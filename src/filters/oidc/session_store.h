@@ -11,18 +11,42 @@ class SessionStore;
 
 typedef std::shared_ptr<SessionStore> SessionStorePtr;
 
+class AuthorizationState {
+private:
+  std::string state_;
+  std::string nonce_;
+  std::string requested_url_;
+
+public:
+  AuthorizationState(absl::string_view state, absl::string_view nonce, absl::string_view requestedUrl) :
+      state_(state.data()), nonce_(nonce.data()), requested_url_(requestedUrl.data()) {}
+
+public:
+  inline std::string &GetState() {
+    return state_;
+  }
+
+  inline std::string &GetNonce() {
+    return nonce_;
+  }
+
+  inline std::string &GetRequestedUrl() {
+    return requested_url_;
+  }
+};
+
 class SessionStore {
 public:
 
   virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) = 0;
 
-  virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) = 0;
-
-  virtual void ClearRequestedURL(absl::string_view session_id) = 0;
-
   virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) = 0;
 
-  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) = 0;
+  virtual void SetAuthorizationState(absl::string_view session_id, std::shared_ptr<AuthorizationState> authorization_state) = 0;
+
+  virtual std::shared_ptr<AuthorizationState> GetAuthorizationState(absl::string_view session_id) = 0;
+
+  virtual void ClearAuthorizationState(absl::string_view session_id) = 0;
 
   virtual void RemoveSession(absl::string_view session_id) = 0;
 
