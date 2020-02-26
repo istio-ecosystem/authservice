@@ -259,12 +259,12 @@ TEST_F(OidcFilterTest, ShouldRedirectToIdpToAuthenticateAgain_WhenAccessTokenIsM
   auto state = "some-state";
   auto nonce = "some-nonce";
   MockSessionGenerator(new_session_id, state, nonce);
-  
+
   TokenResponse token_response(test_id_token_jwt_);
   token_response.SetAccessTokenExpiry(2906139022); //Feb 2, 2062
   token_response.SetAccessToken(nullptr);
   session_store_->SetTokenResponse(old_session_id, std::make_shared<TokenResponse>(token_response));
-  
+
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -750,7 +750,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCann
   httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
-  std::vector<absl::string_view> parts = {oidcConfig.callback().path().c_str(), "code=value&state=some-state-value"};
+  std::vector<std::string> parts = {oidcConfig.callback().path(), "code=value&state=some-state-value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
   auto code = filter.Process(&request_, &response_);
@@ -784,7 +784,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAcce
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
 
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(), "code=value&state=" + state};
+  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
@@ -813,7 +813,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingCode) {
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(), "key=value&state=" + state};
+  std::vector<std::string> parts = {config_.callback().path(), "key=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
@@ -836,8 +836,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingState) {
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(),
-                                          "code=value"};
+  std::vector<std::string> parts = {config_.callback().path().c_str(), "code=value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie,
@@ -868,7 +867,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenUnexpectedState) {
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
   httpRequest->set_path(config_.callback().path());
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(), "code=value&state=unexpectedstate"};
+  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=unexpectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
@@ -904,7 +903,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(), "code=value&state=" + state};
+  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INTERNAL);
@@ -940,7 +939,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
   httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
-  std::vector<absl::string_view> parts = {config_.callback().path().c_str(), "code=value&state=" + state};
+  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
@@ -1002,7 +1001,7 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, s
   httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert(
       {common::http::headers::Cookie, "__Host-cookie-prefix-authservice-session-id-cookie=" + session_id});
-  std::vector<absl::string_view> parts = {oidcConfig.callback().path().c_str(), "code=value&state=" + state};
+  std::vector<std::string> parts = {oidcConfig.callback().path(), "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
   auto code = filter.Process(&request_, &response_);

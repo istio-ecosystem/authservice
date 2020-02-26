@@ -1,6 +1,5 @@
 #include <thread>
 #include <include/gmock/gmock-actions.h>
-#include <spdlog/spdlog.h>
 #include "gtest/gtest.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 #include "test/common/utilities/mocks.h"

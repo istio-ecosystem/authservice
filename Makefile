@@ -39,7 +39,14 @@ run:
 	bazel run $(BAZEL_FLAGS) $(TARGET)
 
 test:
-	bazel test $(BAZEL_FLAGS) --strategy=TestRunner=standalone --test_output=all //test/...
+	bazel test $(BAZEL_FLAGS) --strategy=TestRunner=standalone --test_output=all --cache_test_results=no //test/...
+
+# Only run tests whose name matches a filter
+# Usage examples:
+#   make filter-test FILTER=*RetrieveToken*
+#   make filter-test FILTER=OidcFilterTest.*
+filter-test:
+	bazel test $(BAZEL_FLAGS) --strategy=TestRunner=standalone --test_output=all --cache_test_results=no //test/... --test_arg='--gtest_filter=$(FILTER)'
 
 coverage:
 	bazel coverage $(BAZEL_FLAGS) --instrumentation_filter=//src/ //...
