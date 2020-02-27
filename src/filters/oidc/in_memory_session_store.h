@@ -18,7 +18,10 @@ private:
   uint32_t max_absolute_session_timeout_in_seconds_;
   uint32_t max_session_idle_timeout_in_seconds_;
   std::recursive_mutex mutex_;
+
   virtual absl::optional<std::shared_ptr<Session>> FindSession(absl::string_view session_id);
+
+  virtual void Set(absl::string_view session_id, std::function<void(Session &session)> &lambda);
 
 public:
   InMemorySessionStore(
@@ -28,13 +31,13 @@ public:
 
   virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
 
-  virtual void SetRequestedURL(absl::string_view session_id, absl::string_view requested_url) override;
-
-  virtual void ClearRequestedURL(absl::string_view session_id) override;
-
   virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
 
-  virtual absl::optional<std::string> GetRequestedURL(absl::string_view session_id) override;
+  virtual void SetAuthorizationState(absl::string_view session_id, std::shared_ptr<AuthorizationState> authorization_state) override;
+
+  virtual std::shared_ptr<AuthorizationState> GetAuthorizationState(absl::string_view session_id) override;
+
+  virtual void ClearAuthorizationState(absl::string_view session_id) override;
 
   virtual void RemoveSession(absl::string_view session_id) override;
 

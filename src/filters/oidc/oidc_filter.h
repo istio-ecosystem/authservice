@@ -4,11 +4,10 @@
 #include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/common/http/http.h"
-#include "src/common/session/token_encryptor.h"
 #include "src/filters/filter.h"
 #include "src/filters/oidc/token_response.h"
 #include "src/common/utilities/random.h"
-#include "src/common/session/session_id_generator.h"
+#include "src/common/session/session_string_generator.h"
 #include "src/filters/oidc/session_store.h"
 #include <ctime>
 
@@ -28,8 +27,7 @@ private:
   common::http::ptr_t http_ptr_;
   const authservice::config::oidc::OIDCConfig idp_config_;
   TokenResponseParserPtr parser_;
-  common::session::TokenEncryptorPtr cryptor_;
-  common::session::SessionIdGeneratorPtr session_id_generator_;
+  common::session::SessionStringGeneratorPtr session_string_generator_;
   SessionStorePtr session_store_;
 
   /**
@@ -77,17 +75,6 @@ private:
   void SetCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
                  const std::string &cookie_name, absl::string_view value, int64_t timeout);
 
-  /** @brief Set cookie.
-   *
-   * @param responseHeaders The headers to add to.
-   * @param cookie_name The key name of the cookie to be set.
-   * @param value_to_be_encrypted The value of the cookie, which will be encrypted in the cookie.
-   * @param timeout The lifetime in seconds the cookie is valid for before browsers should not honor this cookie.
-   */
-  void SetEncryptedCookie(
-      ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
-      const std::string &cookie_name, absl::string_view value_to_be_encrypted, int64_t timeout);
-
   /** @brief Extract the requested cookie from the given headers
    *
    * @param headers the headers to extract the cookies from
@@ -97,13 +84,6 @@ private:
   static absl::optional<std::string> CookieFromHeaders(
       const ::google::protobuf::Map<::std::string, ::std::string> &headers,
       const std::string &cookie);
-
-  /** @brief Set IdP redirect parameters
-   *
-   * Set IdP redirect parameters so that a requesting agent is forced to
-   * authenticate the user.
-   */
-  void SetRedirectToIdpHeaders(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
 
   google::rpc::Code RedirectToIdp(
       CheckResponse *response,
@@ -206,8 +186,7 @@ public:
   OidcFilter(common::http::ptr_t http_ptr,
              const authservice::config::oidc::OIDCConfig &idp_config,
              TokenResponseParserPtr parser,
-             common::session::TokenEncryptorPtr cryptor,
-             common::session::SessionIdGeneratorPtr session_id_generator,
+             common::session::SessionStringGeneratorPtr session_string_generator,
              SessionStorePtr session_store);
 
   google::rpc::Code Process(
@@ -220,9 +199,6 @@ public:
   using filters::Filter::Process;
 
   absl::string_view Name() const override;
-
-  /** @brief Get state cookie name. */
-  std::string GetStateCookieName() const;
 
   /** @brief Get sessionID cookie name */
   std::string GetSessionIdCookieName() const;

@@ -38,16 +38,6 @@ class Random {
   size_t Size() const;
 
   /**
-   * An iterator to the first item of the internal buffer.
-   * @return A const iterator
-   */
-  std::vector<uint8_t>::const_iterator Begin() const;
-  /**
-   * An iterator to indicate an iterator has completed or is not valid.
-   * @return A const iterator
-   */
-  std::vector<uint8_t>::const_iterator End() const;
-  /**
    * Encode a representation to string suitable for use in HTTP requests.
    * or unique state index.
    * @return a hex string.

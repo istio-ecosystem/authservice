@@ -1,6 +1,5 @@
 #include <thread>
 #include <include/gmock/gmock-actions.h>
-#include <spdlog/spdlog.h>
 #include "gtest/gtest.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 #include "test/common/utilities/mocks.h"
@@ -73,51 +72,71 @@ TEST_F(InMemorySessionStoreTest, SetTokenResponseAndGetTokenResponse) {
   ASSERT_EQ(result->GetAccessTokenExpiry(), 99);
 }
 
-TEST_F(InMemorySessionStoreTest, SetRequestedURLAndClearRequestedURLAndGetRequestedURL) {
+TEST_F(InMemorySessionStoreTest, SetAuthorizationStateAndClearAuthorizationStateAndGetAuthorizationState) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
-  auto session_id = std::string("fake_session_id");
-  auto other_session_id = "other_session_id";
-  auto requested_url = "https://example.com";
+  std::string session_id = "fake_session_id";
+  std::string other_session_id = "other_session_id";
+  std::string state = "some-state";
+  std::string original_state(state);
+  std::string nonce = "some-nonce";
+  std::string original_nonce(nonce);
+  std::string requested_url = "https://example.com";
+  std::string original_requested_url(requested_url);
+  auto authorization_state = std::make_shared<AuthorizationState>(state, nonce, requested_url);
 
-  auto result = in_memory_session_store.GetRequestedURL(session_id);
-  ASSERT_FALSE(result.has_value());
+  auto result = in_memory_session_store.GetAuthorizationState(session_id);
+  ASSERT_FALSE(result);
 
-  in_memory_session_store.ClearRequestedURL(session_id); // does not crash
-  ASSERT_FALSE(result.has_value());
+  in_memory_session_store.ClearAuthorizationState(session_id); // does not crash
+  ASSERT_FALSE(result);
 
-  in_memory_session_store.SetRequestedURL(session_id, requested_url);
-  // mutate the original to make sure that on the get() we're getting back a copy of the original made at the time of SetRequestedURL()
-  requested_url = "https://example2.com";
+  in_memory_session_store.SetAuthorizationState(session_id, authorization_state);
 
-  result = in_memory_session_store.GetRequestedURL(other_session_id);
-  ASSERT_FALSE(result.has_value());
+  result = in_memory_session_store.GetAuthorizationState(other_session_id);
+  ASSERT_FALSE(result);
 
-  result = in_memory_session_store.GetRequestedURL(session_id);
-  ASSERT_TRUE(result.has_value());
-  ASSERT_EQ(result, "https://example.com");
+  // mutate original strings that were passed to AuthorizationState constructor, make sure it doesn't change AuthorizationState
+  nonce += "-modified";
+  state += "-modified";
+  requested_url += "/modified";
+  result = in_memory_session_store.GetAuthorizationState(session_id);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result->GetRequestedUrl(), original_requested_url);
+  ASSERT_EQ(result->GetState(), original_state);
+  ASSERT_EQ(result->GetNonce(), original_nonce);
 
-  in_memory_session_store.SetRequestedURL(session_id, requested_url); // overwrite
+  std::string another_state = "some-other-state";
+  std::string another_nonce = "some-other-nonce";
+  std::string another_requested_url = "https://other.example.com";
+  auto another_authorization_state = std::make_shared<AuthorizationState>(another_state, another_nonce,
+                                                                          another_requested_url);
+  in_memory_session_store.SetAuthorizationState(session_id, another_authorization_state); // overwrite
 
-  result = in_memory_session_store.GetRequestedURL(session_id);
-  ASSERT_TRUE(result.has_value());
-  ASSERT_EQ(result, "https://example2.com");
+  result = in_memory_session_store.GetAuthorizationState(session_id);
+  ASSERT_TRUE(result);
+  ASSERT_EQ(result->GetRequestedUrl(), another_requested_url);
+  ASSERT_EQ(result->GetState(), another_state);
+  ASSERT_EQ(result->GetNonce(), another_nonce);
 
-  in_memory_session_store.ClearRequestedURL(session_id);
-  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id).has_value());
+  in_memory_session_store.ClearAuthorizationState(session_id);
+  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id));
 }
 
 TEST_F(InMemorySessionStoreTest, Remove) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
   auto session_id = std::string("fake_session_id");
   auto token_response = CreateTokenResponse();
+  auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
 
-  in_memory_session_store.SetRequestedURL(session_id, "some-url");
+  in_memory_session_store.SetAuthorizationState(session_id, authorization_state);
   in_memory_session_store.SetTokenResponse(session_id, token_response);
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id));
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id));
+
   in_memory_session_store.RemoveSession(session_id);
+
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id));
-  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id).has_value());
+  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id));
 
   in_memory_session_store.RemoveSession("other-session-id"); // ignore non-existent keys without error
 }
@@ -286,62 +305,64 @@ TEST_F(InMemorySessionStoreTest, RemoveAllExpired_UpdatingTokenResponseKeepsSess
   ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id_active)); // last active 40 seconds ago
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_UpdatingRequestedUrlKeepsSessionActive) {
+TEST_F(InMemorySessionStoreTest, RemoveAllExpired_UpdatingAuthorizationStateKeepsSessionActive) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 500, 50);
+  auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
 
   // Create two sessions
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_idle = std::string("fake_session_id_idle");
-  in_memory_session_store.SetRequestedURL(session_id_idle, "https://example.com");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_idle, authorization_state);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_idle));
   auto session_id_active = std::string("fake_session_id_active");
-  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_active, authorization_state);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active));
 
   // Access both at time 30
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
   in_memory_session_store.RemoveAllExpired();
-  in_memory_session_store.SetRequestedURL(session_id_idle, "https://example.com"); // last active 25 seconds ago
-  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com"); // last active 25 seconds ago
+  in_memory_session_store.SetAuthorizationState(session_id_idle, authorization_state); // last active 25 seconds ago
+  in_memory_session_store.SetAuthorizationState(session_id_active, authorization_state); // last active 25 seconds ago
 
   // Access only one of two at time 50
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
-  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com"); // accessing at time 50
+  in_memory_session_store.SetAuthorizationState(session_id_active, authorization_state); // accessing at time 50
 
   // The idle session should be removed at time 90
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value()); // last active 60 seconds ago
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // last active 40 seconds ago
+  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id_idle)); // last active 60 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active)); // last active 40 seconds ago
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_ClearRequestedURLKeepsSessionActive) {
+TEST_F(InMemorySessionStoreTest, RemoveAllExpired_ClearAuthorizationStateKeepsSessionActive) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 500, 50);
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
+  auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
 
   // Create a session
   auto session_id_idle = std::string("fake_session_id_idle");
-  in_memory_session_store.SetRequestedURL(session_id_idle, "https://example.com");
+  in_memory_session_store.SetAuthorizationState(session_id_idle, authorization_state);
   auto token_response_idle = CreateTokenResponse();
   in_memory_session_store.SetTokenResponse(session_id_idle, token_response_idle);
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_idle));
 
   // Create another session
   auto session_id_active = std::string("fake_session_id_active");
-  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com");
+  in_memory_session_store.SetAuthorizationState(session_id_active, authorization_state);
   auto token_response_active = CreateTokenResponse();
   in_memory_session_store.SetTokenResponse(session_id_active, token_response_active);
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value());
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active));
 
   // Access both at time 30
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
   in_memory_session_store.RemoveAllExpired();
-  in_memory_session_store.ClearRequestedURL(session_id_idle); // last active 25 seconds ago
-  in_memory_session_store.ClearRequestedURL(session_id_active); // last active 25 seconds ago
+  in_memory_session_store.ClearAuthorizationState(session_id_idle); // last active 25 seconds ago
+  in_memory_session_store.ClearAuthorizationState(session_id_active); // last active 25 seconds ago
 
   // Access only one of two at time 50
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
-  in_memory_session_store.ClearRequestedURL(session_id_active); // accessing at time 50
+  in_memory_session_store.ClearAuthorizationState(session_id_active); // accessing at time 50
 
   // The idle session should be removed at time 90
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
@@ -364,69 +385,71 @@ TEST_F(InMemorySessionStoreTest,
   ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id_idle));
 }
 
-TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsOfRequestedURLWhichHaveExceededTheAbsoluteTimeout) {
+TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesAuthorizationStatesWhichHaveExceededTheAbsoluteTimeout) {
   int max_absolute_session_timeout_in_seconds = 190;
   int max_session_idle_timeout_in_seconds = 0;
+  auto authorization_state1 = std::make_shared<AuthorizationState>("state1", "nonce1", "requested_url1");
+  auto authorization_state2 = std::make_shared<AuthorizationState>("state2", "nonce2", "requested_url2");
   InMemorySessionStore in_memory_session_store(time_service_mock_, max_absolute_session_timeout_in_seconds,
                                                max_session_idle_timeout_in_seconds);
 
-  // Create session of requested URL that will expire
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_will_expire = std::string("fake_session_id_1");
-  in_memory_session_store.SetRequestedURL(session_id_will_expire, "https://example1.com");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_will_expire).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_will_expire, authorization_state1);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_will_expire));
 
-  // Create session of requested URL that will not expire
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(20));
   auto session_id_will_not_expire = std::string("fake_session_id_2");
-  in_memory_session_store.SetRequestedURL(session_id_will_not_expire, "https://example2.com");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_will_not_expire).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_will_not_expire, authorization_state2);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_will_not_expire));
 
   // After 30 seconds, neither should have been cleaned up
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
   in_memory_session_store.RemoveAllExpired();
   ASSERT_TRUE(
-      in_memory_session_store.GetRequestedURL(session_id_will_expire).has_value()); // has been in for 25 seconds
+      in_memory_session_store.GetAuthorizationState(session_id_will_expire)); // has been in for 25 seconds
   ASSERT_TRUE(
-      in_memory_session_store.GetRequestedURL(session_id_will_not_expire).has_value()); // has been in for 10 seconds
+      in_memory_session_store.GetAuthorizationState(session_id_will_not_expire)); // has been in for 10 seconds
 
   // After 200 seconds, the older session is cleaned up but the younger one is not
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(200));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(
-      session_id_will_expire).has_value()); // has been in 195 seconds, evicted
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(
-      session_id_will_not_expire).has_value()); // has been in for 180 seconds, not evicted
+  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(
+      session_id_will_expire)); // has been in 195 seconds, evicted
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(
+      session_id_will_not_expire)); // has been in for 180 seconds, not evicted
 }
 
 TEST_F(InMemorySessionStoreTest,
-       RemoveAllExpired_RemovesSessionsOfRequestedUrlsWhichHaveExceededTheMaxIdleSessionTimeout) {
+       RemoveAllExpired_RemovesAuthorizationStatesWhichHaveExceededTheMaxIdleSessionTimeout) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 500, 50);
+  auto authorization_state_idle = std::make_shared<AuthorizationState>("state1", "nonce1", "requested_url1");
+  auto authorization_state_active = std::make_shared<AuthorizationState>("state2", "nonce2", "requested_url2");
 
   // Create two sessions
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_idle = std::string("fake_session_id_idle");
-  in_memory_session_store.SetRequestedURL(session_id_idle, "https://example.com?1");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_idle, authorization_state_idle);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_idle));
   auto session_id_active = std::string("fake_session_id_active");
-  in_memory_session_store.SetRequestedURL(session_id_active, "https://example.com?2");
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value());
+  in_memory_session_store.SetAuthorizationState(session_id_active, authorization_state_active);
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active));
 
   // Access both at time 30
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(30));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value()); // last active 25 seconds ago
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // last active 25 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_idle)); // last active 25 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active)); // last active 25 seconds ago
 
   // Access only one of two at time 50
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(50));
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // accessing at time 50
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active)); // accessing at time 50
 
   // The idle session should be removed at time 90
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(90));
   in_memory_session_store.RemoveAllExpired();
-  ASSERT_FALSE(in_memory_session_store.GetRequestedURL(session_id_idle).has_value()); // last active 60 seconds ago
-  ASSERT_TRUE(in_memory_session_store.GetRequestedURL(session_id_active).has_value()); // last active 40 seconds ago
+  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id_idle)); // last active 60 seconds ago
+  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id_active)); // last active 40 seconds ago
 }
 
 // When the concurrency code is incorrect, this test will occasionally fail.
@@ -485,7 +508,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForTokenResponseOperations) {
 
 // When the concurrency code is incorrect, this test will occasionally fail.
 // If it fails, there is definitely something wrong with the concurrency code.
-TEST_F(InMemorySessionStoreTest, ThreadSafetyForClearRequestedURL) {
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForClearAuthorizationState) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
   std::vector<std::thread> threads;
 
@@ -498,8 +521,9 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForClearRequestedURL) {
   for (int i = 0; i < thread_count; ++i) {
     threads.emplace_back([iterations, &in_memory_session_store]() {
       for (int j = 1; j < iterations + 1; ++j) {
-        in_memory_session_store.SetRequestedURL("session_id", "https://foo.com");
-        in_memory_session_store.ClearRequestedURL("session_id");
+        auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
+        in_memory_session_store.SetAuthorizationState("session_id", authorization_state);
+        in_memory_session_store.ClearAuthorizationState("session_id");
       }
     });
   }
@@ -518,7 +542,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForClearRequestedURL) {
 
 // When the concurrency code is incorrect, this test will occasionally fail.
 // If it fails, there is definitely something wrong with the concurrency code.
-TEST_F(InMemorySessionStoreTest, ThreadSafetyForGetRequestedURL) {
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForGetAuthorizationState) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
   std::vector<std::thread> threads;
 
@@ -531,8 +555,9 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForGetRequestedURL) {
   for (int i = 0; i < thread_count; ++i) {
     threads.emplace_back([iterations, &in_memory_session_store]() {
       for (int j = 1; j < iterations + 1; ++j) {
-        in_memory_session_store.SetRequestedURL("session_id", "https://foo.com");
-        in_memory_session_store.GetRequestedURL("session_id");
+        auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
+        in_memory_session_store.SetAuthorizationState("session_id", authorization_state);
+        in_memory_session_store.GetAuthorizationState("session_id");
       }
     });
   }
@@ -551,7 +576,7 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForGetRequestedURL) {
 
 // When the concurrency code is incorrect, this test will occasionally fail.
 // If it fails, there is definitely something wrong with the concurrency code.
-TEST_F(InMemorySessionStoreTest, ThreadSafetyForSetRequestedURL) {
+TEST_F(InMemorySessionStoreTest, ThreadSafetyForSetAuthorizationState) {
   InMemorySessionStore in_memory_session_store(time_service_mock_, 0, 0);
   std::vector<std::thread> threads;
 
@@ -567,12 +592,13 @@ TEST_F(InMemorySessionStoreTest, ThreadSafetyForSetRequestedURL) {
         int unique_number = (i * iterations) + j;
         auto key = std::string("session_id_") + std::to_string(unique_number);
         auto unique_url = std::string("https://example.com") + std::to_string(unique_number);
+        auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", unique_url);
 
-        in_memory_session_store.SetRequestedURL(key, unique_url);
+        in_memory_session_store.SetAuthorizationState(key, authorization_state);
 
-        auto retrieved_optional_url = in_memory_session_store.GetRequestedURL(key);
-        ASSERT_TRUE(retrieved_optional_url.has_value());
-        ASSERT_EQ(retrieved_optional_url.value(), unique_url);
+        auto retrieved_optional_authorization_state = in_memory_session_store.GetAuthorizationState(key);
+        ASSERT_TRUE(retrieved_optional_authorization_state);
+        ASSERT_EQ(retrieved_optional_authorization_state->GetRequestedUrl(), unique_url);
       }
     });
   }

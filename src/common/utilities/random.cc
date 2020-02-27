@@ -25,14 +25,6 @@ bool Random::operator!=(const Random &rhs) const { return !(*this == rhs); }
 
 size_t Random::Size() const { return internal_buffer_.size(); }
 
-std::vector<uint8_t>::const_iterator Random::Begin() const {
-  return internal_buffer_.cbegin();
-}
-
-std::vector<uint8_t>::const_iterator Random::End() const {
-  return internal_buffer_.cend();
-}
-
 std::string Random::Str() const {
   return absl::WebSafeBase64Escape(
       absl::string_view(reinterpret_cast<const char *>(internal_buffer_.data()),

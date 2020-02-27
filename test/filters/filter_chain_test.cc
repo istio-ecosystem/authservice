@@ -63,7 +63,6 @@ TEST(FilterChainTest, New) {
   auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
-  filter_config->mutable_oidc()->set_cryptor_secret("some-secret");
 
   FilterChainImpl chain(*configuration);
   auto instance = chain.New();

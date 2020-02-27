@@ -42,7 +42,6 @@
             "scopes": [
               "scope"
             ],
-            "cryptor_secret": "some-secret",
             "cookie_name_prefix": "my-app",
             "id_token": {
               "preamble": "Bearer",
@@ -51,7 +50,6 @@
             "access_token": {
               "header": "x-access-token"
             },
-            "timeout": 300,
             "logout": {
               "path": "/logout",
               "redirect_to_uri": "https://logout-redirect"
