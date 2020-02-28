@@ -350,11 +350,12 @@ response_t http_impl::Post(
 }
 
 response_t http_impl::Post(
-        const authservice::config::common::Endpoint &endpoint,
-        const std::map<absl::string_view, absl::string_view> &headers,
-        absl::string_view body,
-        boost::asio::io_context& ioc,
-        boost::asio::yield_context yield) const {
+    const authservice::config::common::Endpoint &endpoint,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    absl::string_view body,
+    boost::asio::io_context& ioc,
+    boost::asio::yield_context yield,
+    absl::string_view ca_cert) const {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;
@@ -362,6 +363,16 @@ response_t http_impl::Post(
     ssl::context ctx(ssl::context::tlsv12_client);
     ctx.set_verify_mode(ssl::verify_peer);
     ctx.set_default_verify_paths();
+
+    if(!ca_cert.empty()) {
+      spdlog::info("{}: Trusting the provided certificate authority", __func__);
+      beast::error_code ca_ec;
+      ctx.add_certificate_authority(
+          boost::asio::buffer(ca_cert.data(), ca_cert.size()), ca_ec);
+      if (ca_ec) {
+        throw boost::system::system_error{ca_ec};
+      }
+    }
 
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
@@ -400,11 +411,25 @@ response_t http_impl::Post(
     boost::system::error_code ec;
     stream.async_shutdown(yield[ec]);
 
-    // not_connected happens sometimes so don't bother reporting it.
-    if (ec && ec != beast::errc::not_connected) {
-      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-      return response_t();
+    if (ec) {
+      // when trusted CA is not configured
+      // not_connected happens sometimes so don't bother reporting it.
+      if (ec != beast::errc::not_connected) {
+        if (ca_cert.empty()) {
+          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+          return response_t();
+        }
+
+        // when trusted CA is configured
+        // stream_truncated also happen sometime and we choose to ignore the stream_truncated error,
+        // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
+        else if (ec != boost::asio::ssl::error::stream_truncated) {
+          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+          return response_t();
+        }
+      }
     }
+
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {

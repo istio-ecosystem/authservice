@@ -448,7 +448,8 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
       headers,
       common::http::http::EncodeFormData(params),
       ioc,
-      yield);
+      yield,
+      idp_config_.trusted_certificate_authority());
 
   if (retrieved_token_response == nullptr) {
     spdlog::warn("{}: Received null pointer as response from identity provider.", __func__);
@@ -519,7 +520,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   auto retrieve_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::http::EncodeFormData(params), ioc, yield);
+      idp_config_.token(), headers, common::http::http::EncodeFormData(params),
+      ioc, yield, idp_config_.trusted_certificate_authority());
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");
