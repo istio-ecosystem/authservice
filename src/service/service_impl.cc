@@ -50,7 +50,7 @@ AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
         }
       }
     }
-    // No matching filter chain found. Allow request to continue,
+    // No matching filter chain found. Allow request to continue.
     spdlog::debug("{}: no matching filter chain for request to {}://{}{} ", __func__, request->attributes().request().http().scheme(), request->attributes().request().http().host(), request->attributes().request().http().path());
     return ::grpc::Status::OK;
   } catch (const std::exception &exception) {
