@@ -1,5 +1,6 @@
 #ifndef AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
 #define AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
+
 #include <array>
 #include <boost/beast.hpp>
 #include <boost/asio/spawn.hpp>
@@ -11,6 +12,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "config/common/config.pb.h"
+
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
 namespace authservice {
@@ -18,12 +20,13 @@ namespace common {
 namespace http {
 
 class http;
+
 typedef std::shared_ptr<http> ptr_t;
 typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
 
 class http {
- public:
+public:
   /**
    *
    * encode the given url for use e.g. in an http query field.
@@ -32,6 +35,7 @@ class http {
    * @return the encoded url.
    */
   static std::string UrlSafeEncode(absl::string_view url);
+
   /**
    *
    * decode the given url
@@ -40,6 +44,7 @@ class http {
    * @return the decoded url.
    */
   static absl::optional<std::string> UrlSafeDecode(absl::string_view url);
+
   /** @brief encode query data.
    *
    * @param data the data to encode.
@@ -47,6 +52,7 @@ class http {
    */
   static std::string EncodeQueryData(
       const std::multimap<absl::string_view, absl::string_view> &data);
+
   /**
    * @brief decode query data.
    *
@@ -55,6 +61,7 @@ class http {
    */
   static absl::optional<std::multimap<std::string, std::string>>
   DecodeQueryData(absl::string_view query);
+
   /** @brief encode form data.
    *
    * @param data the data to encode.
@@ -62,6 +69,7 @@ class http {
    */
   static std::string EncodeFormData(
       const std::multimap<absl::string_view, absl::string_view> &data);
+
   /** @brief Parse form-encoded data.
    *
    * @param form the form-encoded data to parse.
@@ -121,18 +129,6 @@ class http {
    */
   virtual ~http() = default;
 
-  /** @brief Send a Post http message.
-   *
-   * @param endpoint the endpoint to call
-   * @param headers the http headers
-   * @param body the http request body
-   * @return http response.
-   */
-  virtual response_t Post(
-      const authservice::config::common::Endpoint &endpoint,
-      const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body) const = 0;
-
   /** @brief Asynchronously send a Post http message with a certificate authority.
    * To be used inside a Boost co-routine.
    * @param endpoint the endpoint to call
@@ -142,30 +138,26 @@ class http {
    * @return http response.
    */
   virtual response_t Post(
-          const authservice::config::common::Endpoint &endpoint,
-          const std::map<absl::string_view, absl::string_view> &headers,
-          absl::string_view body,
-          boost::asio::io_context& ioc,
-          boost::asio::yield_context yield,
-          absl::string_view ca_cert) const = 0;
+      const authservice::config::common::Endpoint &endpoint,
+      const std::map<absl::string_view, absl::string_view> &headers,
+      absl::string_view body,
+      absl::string_view ca_cert,
+      boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const = 0;
 };
 
 /**
  * HTTP request implementation
  */
 class http_impl : public http {
- public:
-  response_t Post(const authservice::config::common::Endpoint &Endpoint,
-                  const std::map<absl::string_view, absl::string_view> &headers,
-                  absl::string_view body) const override;
-
+public:
   response_t Post(
-          const authservice::config::common::Endpoint &endpoint,
-          const std::map<absl::string_view, absl::string_view> &headers,
-          absl::string_view body,
-          boost::asio::io_context& ioc,
-          boost::asio::yield_context yield,
-          absl::string_view ca_cert) const override;
+      const authservice::config::common::Endpoint &endpoint,
+      const std::map<absl::string_view, absl::string_view> &headers,
+      absl::string_view body,
+      absl::string_view ca_cert,
+      boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const override;
 };
 
 }  // namespace http
