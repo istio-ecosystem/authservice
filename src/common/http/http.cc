@@ -5,9 +5,7 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
-#include <iomanip>
 #include <ios>
-#include <iostream>
 #include <sstream>
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_join.h"
@@ -286,75 +284,10 @@ std::string http::ToUrl(const authservice::config::common::Endpoint &endpoint) {
   return builder.str();
 }
 
-response_t http_impl::Post(
-    const authservice::config::common::Endpoint &endpoint,
-    const std::map<absl::string_view, absl::string_view> &headers,
-    absl::string_view body) const {
-  spdlog::trace("{}", __func__);
-  try {
-    int version = 11;
-    beast::error_code ec;
-
-    // The io_context is required for all I/O
-    net::io_context ioc;
-    ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
-    ctx.set_default_verify_paths();
-
-    tcp::resolver resolver(ioc);
-    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
-    if (!SSL_set_tlsext_host_name(stream.native_handle(),
-                                  endpoint.hostname().c_str())) {
-      boost::system::error_code ec{static_cast<int>(::ERR_get_error()),
-                                   boost::asio::error::get_ssl_category()};
-      throw boost::system::system_error{ec};
-    }
-    const auto results =
-        resolver.resolve(endpoint.hostname(), std::to_string(endpoint.port()));
-    beast::get_lowest_layer(stream).connect(results);
-    stream.handshake(ssl::stream_base::client);
-    // Set up an HTTP POST request message
-    beast::http::request<beast::http::string_body> req{
-        beast::http::verb::post, endpoint.path(), version};
-    req.set(beast::http::field::host, endpoint.hostname());
-    for (auto header : headers) {
-      req.set(boost::beast::string_view(header.first.data()),
-              boost::beast::string_view(header.second.data()));
-    }
-    auto &req_body = req.body();
-    req_body.reserve(body.size());
-    req_body.append(body.begin(), body.end());
-    req.prepare_payload();
-    // Send the HTTP request to the remote host
-    beast::http::write(stream, req);
-
-    // Read response
-    beast::flat_buffer buffer;
-    response_t res(new beast::http::response<beast::http::string_body>);
-    beast::http::read(stream, buffer, *res);
-
-    // Gracefully close the socket
-    stream.shutdown(ec);
-    // not_connected happens sometimes
-    // so don't bother reporting it.
-    if (ec && ec != beast::errc::not_connected) {
-      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-      return response_t();
-    }
-    return res;
-    // If we get here then the connection is closed gracefully
-  } catch (std::exception const &e) {
-    spdlog::info("{}: unexpected exception: {}", __func__, e.what());
-    return response_t();
-  }
-}
-
-response_t http_impl::Post(
-        const authservice::config::common::Endpoint &endpoint,
-        const std::map<absl::string_view, absl::string_view> &headers,
-        absl::string_view body,
-        boost::asio::io_context& ioc,
-        boost::asio::yield_context yield) const {
+response_t http_impl::Post(const authservice::config::common::Endpoint &endpoint,
+                           const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
+                           absl::string_view ca_cert, boost::asio::io_context &ioc,
+                           boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;
@@ -362,6 +295,16 @@ response_t http_impl::Post(
     ssl::context ctx(ssl::context::tlsv12_client);
     ctx.set_verify_mode(ssl::verify_peer);
     ctx.set_default_verify_paths();
+
+    if(!ca_cert.empty()) {
+      spdlog::info("{}: Trusting the provided certificate authority", __func__);
+      beast::error_code ca_ec;
+      ctx.add_certificate_authority(
+          boost::asio::buffer(ca_cert.data(), ca_cert.size()), ca_ec);
+      if (ca_ec) {
+        throw boost::system::system_error{ca_ec};
+      }
+    }
 
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
@@ -400,11 +343,25 @@ response_t http_impl::Post(
     boost::system::error_code ec;
     stream.async_shutdown(yield[ec]);
 
-    // not_connected happens sometimes so don't bother reporting it.
-    if (ec && ec != beast::errc::not_connected) {
-      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-      return response_t();
+    if (ec) {
+      // when trusted CA is not configured
+      // not_connected happens sometimes so don't bother reporting it.
+      if (ec != beast::errc::not_connected) {
+        if (ca_cert.empty()) {
+          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+          return response_t();
+        }
+
+        // when trusted CA is configured
+        // stream_truncated also happen sometime and we choose to ignore the stream_truncated error,
+        // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
+        else if (ec != boost::asio::ssl::error::stream_truncated) {
+          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+          return response_t();
+        }
+      }
     }
+
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {

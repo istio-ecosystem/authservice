@@ -102,6 +102,7 @@ class OidcFilterTest : public ::testing::Test {
     config_.set_cookie_name_prefix("cookie-prefix");
     config_.mutable_id_token()->set_header("authorization");
     config_.mutable_id_token()->set_preamble("Bearer");
+    config_.set_trusted_certificate_authority("some-ca");
 
     std::stringstream callback_host;
     callback_host << config_.callback().hostname() << ':' << std::dec << config_.callback().port();
@@ -346,7 +347,7 @@ TEST_F(OidcFilterTest, ExpiredAccessTokenShouldRefreshTheTokenResponse_WhenTheAc
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
   ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
@@ -427,7 +428,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _)).WillOnce(::testing::Return(nullptr));
 
@@ -468,7 +469,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
   SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::http_mock();
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(nullptr)));
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(nullptr)));
 
   auto old_session_id = std::string("session123");
   auto new_session_id = std::string("session456");
@@ -509,7 +510,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::bad_request);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _)).Times(0); // we want the code to return before attempting to parse the bad response
 
@@ -774,7 +775,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAcce
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_, session_store_);
@@ -892,11 +893,11 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
   auto authorization_state = std::make_shared<AuthorizationState>(state, nonce, requested_url);
   session_store_->SetAuthorizationState(session_id, authorization_state);
 
-  auto *http_mock = new common::http::http_mock();
+  auto *mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t();
-  EXPECT_CALL(*http_mock, Post(_, _, _, _, _))
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock_, session_string_generator_mock_, session_store_);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -927,12 +928,12 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
 
   EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), nonce, ::testing::_))
       .WillOnce(::testing::Return(nullptr));
-  auto *http_mock = new common::http::http_mock();
+  auto *mocked_http = new common::http::http_mock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
-  EXPECT_CALL(*http_mock, Post(_, _, _, _, _))
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
-  OidcFilter filter(common::http::ptr_t(http_mock), config_, parser_mock_, session_string_generator_mock_, session_store_);
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -994,7 +995,7 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, s
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, _, _))
+  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
