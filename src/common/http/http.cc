@@ -107,15 +107,15 @@ absl::optional<std::string> SafeDecode(absl::string_view in,
 
 }  // namespace
 
-std::string http::UrlSafeEncode(absl::string_view url) {
+std::string Http::UrlSafeEncode(absl::string_view url) {
   return SafeEncode(url, IsUrlSafeCharacter);
 }
 
-absl::optional<std::string> http::UrlSafeDecode(absl::string_view url) {
+absl::optional<std::string> Http::UrlSafeDecode(absl::string_view url) {
   return SafeDecode(url, IsUrlSafeCharacter);
 }
 
-std::string http::EncodeQueryData(
+std::string Http::EncodeQueryData(
     const std::multimap<absl::string_view, absl::string_view> &data) {
   std::stringstream builder;
   auto pair = data.cbegin();
@@ -133,7 +133,7 @@ std::string http::EncodeQueryData(
   return builder.str();
 }
 
-absl::optional<std::multimap<std::string, std::string>> http::DecodeQueryData(
+absl::optional<std::multimap<std::string, std::string>> Http::DecodeQueryData(
     absl::string_view query) {
   std::multimap<std::string, std::string> result;
   std::vector<std::string> parts;
@@ -157,7 +157,7 @@ absl::optional<std::multimap<std::string, std::string>> http::DecodeQueryData(
   return result;
 }
 
-std::string http::EncodeFormData(
+std::string Http::EncodeFormData(
     const std::multimap<absl::string_view, absl::string_view> &data) {
   std::stringstream builder;
   auto pair = data.cbegin();
@@ -175,7 +175,7 @@ std::string http::EncodeFormData(
   return builder.str();
 }
 
-absl::optional<std::multimap<std::string, std::string>> http::DecodeFormData(
+absl::optional<std::multimap<std::string, std::string>> Http::DecodeFormData(
     absl::string_view form) {
   std::multimap<std::string, std::string> result;
   std::vector<std::string> parts;
@@ -201,13 +201,13 @@ absl::optional<std::multimap<std::string, std::string>> http::DecodeFormData(
   return result;
 }
 
-std::string http::EncodeBasicAuth(absl::string_view username,
+std::string Http::EncodeBasicAuth(absl::string_view username,
                                   absl::string_view password) {
   return absl::StrCat(
       "Basic", " ", absl::Base64Escape(absl::StrCat(username, ":", password)));
 }
 
-std::string http::EncodeSetCookie(
+std::string Http::EncodeSetCookie(
     absl::string_view name, absl::string_view value,
     const std::set<absl::string_view> &directives) {
   std::stringstream builder;
@@ -218,7 +218,7 @@ std::string http::EncodeSetCookie(
   return builder.str();
 }
 
-absl::optional<std::map<std::string, std::string>> http::DecodeCookies(
+absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
     absl::string_view cookies) {
   // https://tools.ietf.org/html/rfc6265#section-5.4
   std::map<std::string, std::string> result;
@@ -235,7 +235,7 @@ absl::optional<std::map<std::string, std::string>> http::DecodeCookies(
   return result;
 }
 
-std::array<std::string, 3> http::DecodePath(absl::string_view path) {
+std::array<std::string, 3> Http::DecodePath(absl::string_view path) {
   // See https://tools.ietf.org/html/rfc3986#section-3.4 and
   // https://tools.ietf.org/html/rfc3986#section-3.5
   std::array<std::string, 3> result;
@@ -274,7 +274,7 @@ std::array<std::string, 3> http::DecodePath(absl::string_view path) {
   return result;
 }
 
-std::string http::ToUrl(const config::common::Endpoint &endpoint) {
+std::string Http::ToUrl(const config::common::Endpoint &endpoint) {
   std::stringstream builder;
   builder << endpoint.scheme() << "://" << endpoint.hostname();
   if (endpoint.port() != 80 && endpoint.port() != 443) {
@@ -284,10 +284,10 @@ std::string http::ToUrl(const config::common::Endpoint &endpoint) {
   return builder.str();
 }
 
-response_t http_impl::Post(const config::common::Endpoint &endpoint,
-                           const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
-                           absl::string_view ca_cert, boost::asio::io_context &ioc,
-                           boost::asio::yield_context yield) const {
+response_t HttpImpl::Post(const config::common::Endpoint &endpoint,
+                          const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
+                          absl::string_view ca_cert, boost::asio::io_context &ioc,
+                          boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;

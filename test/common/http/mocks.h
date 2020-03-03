@@ -7,7 +7,7 @@
 namespace authservice {
 namespace common {
 namespace http {
-class http_mock : public http {
+class http_mock : public Http {
 public:
   MOCK_CONST_METHOD6(Post, response_t(
       const config::common::Endpoint &endpoint,

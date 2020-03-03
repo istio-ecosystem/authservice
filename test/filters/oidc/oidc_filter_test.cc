@@ -282,7 +282,7 @@ TEST_F(OidcFilterTest, ShouldRedirectToIdpToAuthenticateAgain_WhenAccessTokenIsM
   ASSERT_THAT(
     response_.denied_response().headers(),
     ContainsHeaders({
-      {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+      {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
       {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
       {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
       {
@@ -328,7 +328,7 @@ TEST_F(OidcFilterTest, ExpiredAccessToken_ShouldRedirectToIdpToAuthenticateAgain
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(
@@ -410,7 +410,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessi
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(
@@ -452,7 +452,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(
@@ -490,7 +490,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(
@@ -536,7 +536,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(
@@ -631,7 +631,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {common::http::headers::Location, StartsWith(common::http::http::ToUrl(config_.authorization()))},
+                          {common::http::headers::Location, StartsWith(common::http::Http::ToUrl(config_.authorization()))},
                           {common::http::headers::CacheControl, StrEq(common::http::headers::CacheControlDirectives::NoCache)},
                           {common::http::headers::Pragma, StrEq(common::http::headers::PragmaDirectives::NoCache)},
                           {common::http::headers::SetCookie, StrEq(

@@ -19,13 +19,13 @@ namespace authservice {
 namespace common {
 namespace http {
 
-class http;
+class Http;
 
-typedef std::shared_ptr<http> ptr_t;
+typedef std::shared_ptr<Http> ptr_t;
 typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
 
-class http {
+class Http {
 public:
   /**
    *
@@ -127,7 +127,7 @@ public:
   /**
    * Virtual destructor
    */
-  virtual ~http() = default;
+  virtual ~Http() = default;
 
   /** @brief Asynchronously send a Post http message with a certificate authority.
    * To be used inside a Boost co-routine.
@@ -149,7 +149,7 @@ public:
 /**
  * HTTP request implementation
  */
-class http_impl : public http {
+class HttpImpl : public Http {
 public:
   response_t Post(
       const config::common::Endpoint &endpoint,

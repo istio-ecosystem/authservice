@@ -55,7 +55,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
 
     auto session_string_generator = std::make_shared<common::session::SessionStringGenerator>();
 
-    auto http = common::http::ptr_t(new common::http::http_impl);
+    auto http = common::http::ptr_t(new common::http::HttpImpl);
 
     if (oidc_session_store_ == nullptr) {
       // Note that each incoming request gets a new instance of Filter to handle it,

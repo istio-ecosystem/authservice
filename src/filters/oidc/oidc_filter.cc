@@ -178,7 +178,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
     scopes.insert(scope);
   }
 
-  auto callback = common::http::http::ToUrl(idp_config_.callback());
+  auto callback = common::http::Http::ToUrl(idp_config_.callback());
   auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
@@ -187,11 +187,11 @@ google::rpc::Code OidcFilter::RedirectToIdp(
       {"nonce",         nonce},
       {"state",         state},
       {"redirect_uri",  callback}};
-  auto query = common::http::http::EncodeQueryData(params);
+  auto query = common::http::Http::EncodeQueryData(params);
 
   SetStandardResponseHeaders(response);
 
-  auto redirect_location = absl::StrJoin({common::http::http::ToUrl(idp_config_.authorization()), query}, "?");
+  auto redirect_location = absl::StrJoin({common::http::Http::ToUrl(idp_config_.authorization()), query}, "?");
   SetRedirectHeaders(redirect_location, response);
 
   session_store_->SetAuthorizationState(session_id.data(),
@@ -210,10 +210,10 @@ std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &httpRe
   requested_url_endpoint.set_port(443);
 
   if (httpRequest.query().empty()) {
-    return common::http::http::ToUrl(requested_url_endpoint);
+    return common::http::Http::ToUrl(requested_url_endpoint);
   }
 
-  return absl::StrJoin({common::http::http::ToUrl(requested_url_endpoint), httpRequest.query()}, "?");
+  return absl::StrJoin({common::http::Http::ToUrl(requested_url_endpoint), httpRequest.query()}, "?");
 }
 
 void OidcFilter::SetHeader(
@@ -275,7 +275,7 @@ void OidcFilter::SetCookie(
 ) {
   std::set<std::string> cookie_directives = GetCookieDirectives(timeout);
   std::set<absl::string_view> cookie_directives_string_view(cookie_directives.begin(), cookie_directives.end());
-  auto cookie_header = common::http::http::EncodeSetCookie(cookie_name, value, cookie_directives_string_view);
+  auto cookie_header = common::http::Http::EncodeSetCookie(cookie_name, value, cookie_directives_string_view);
   SetHeader(responseHeaders, common::http::headers::SetCookie, cookie_header);
 }
 
@@ -309,7 +309,7 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
   if (cookie_header_value == headers.cend()) {
     return absl::nullopt;
   }
-  auto cookies = common::http::http::DecodeCookies(cookie_header_value->second);
+  auto cookies = common::http::Http::DecodeCookies(cookie_header_value->second);
   if (!cookies.has_value()) {
     return absl::nullopt;
   }
@@ -359,11 +359,11 @@ bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckReq
 }
 
 std::string OidcFilter::RequestPath(const CheckRequest *request) {
-  return common::http::http::DecodePath(request->attributes().request().http().path())[0];
+  return common::http::Http::DecodePath(request->attributes().request().http().path())[0];
 }
 
 std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
-  return common::http::http::DecodePath(request->attributes().request().http().path())[1];
+  return common::http::Http::DecodePath(request->attributes().request().http().path())[1];
 }
 
 bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
@@ -372,7 +372,7 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   auto scheme = request->attributes().request().http().scheme();
   spdlog::trace("{}: checking handler for {}://{}{}", __func__, scheme, request_host, path);
 
-  auto request_path_parts = common::http::http::DecodePath(path);
+  auto request_path_parts = common::http::Http::DecodePath(path);
   auto configured_port = idp_config_.callback().port();
   auto configured_hostname = idp_config_.callback().hostname();
   auto configured_scheme = idp_config_.callback().scheme();
@@ -431,7 +431,7 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
       {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
   };
 
-  auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
+  auto redirect_uri = common::http::Http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"client_id",     idp_config_.client_id()},
       {"client_secret", idp_config_.client_secret()},
@@ -444,7 +444,7 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
 
   spdlog::info("{}: POSTing to refresh access token", __func__);
   auto retrieved_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::http::EncodeFormData(params),
+      idp_config_.token(), headers, common::http::Http::EncodeFormData(params),
       idp_config_.trusted_certificate_authority(), ioc, yield);
 
   if (retrieved_token_response == nullptr) {
@@ -476,7 +476,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   // Extract expected state and authorization code from request
   auto query = RequestQueryString(request);
-  auto query_data = common::http::http::DecodeQueryData(query);
+  auto query_data = common::http::Http::DecodeQueryData(query);
   if (!query_data.has_value()) {
     spdlog::info("{}: form data is invalid", __func__);
     return google::rpc::Code::INVALID_ARGUMENT;
@@ -501,14 +501,14 @@ google::rpc::Code OidcFilter::RetrieveToken(
   }
 
   // Build headers
-  auto authorization = common::http::http::EncodeBasicAuth(idp_config_.client_id(), idp_config_.client_secret());
+  auto authorization = common::http::Http::EncodeBasicAuth(idp_config_.client_id(), idp_config_.client_secret());
   std::map<absl::string_view, absl::string_view> headers = {
       {common::http::headers::ContentType,   common::http::headers::ContentTypeDirectives::FormUrlEncoded},
       {common::http::headers::Authorization, authorization},
   };
 
   // Build body
-  auto redirect_uri = common::http::http::ToUrl(idp_config_.callback());
+  auto redirect_uri = common::http::Http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"code",         code_from_request->second},
       {"redirect_uri", redirect_uri},
@@ -516,7 +516,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   auto retrieve_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::http::EncodeFormData(params),
+      idp_config_.token(), headers, common::http::Http::EncodeFormData(params),
       idp_config_.trusted_certificate_authority(), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,

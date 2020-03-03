@@ -78,30 +78,30 @@ TEST(Http, ToUrl) {
     e.set_hostname(test.endpoint.hostname);
     e.set_port(test.endpoint.port);
     e.set_path(test.endpoint.path);
-    auto url = http::ToUrl(e);
+    auto url = Http::ToUrl(e);
     ASSERT_STREQ(url.c_str(), test.url);
   }
 }
 
 TEST(Http, UrlSafeEncode) {
-  std::string encoded = http::UrlSafeEncode(hex_test_case.raw);
+  std::string encoded = Http::UrlSafeEncode(hex_test_case.raw);
 
   ASSERT_STREQ(hex_test_case.encoded, encoded.c_str());
 }
 
 TEST(Http, UrlSafeDecode) {
   absl::optional<std::string> decoded =
-      http::UrlSafeDecode(hex_test_case.encoded);
+      Http::UrlSafeDecode(hex_test_case.encoded);
 
   EXPECT_TRUE(decoded.has_value());
   ASSERT_EQ(hex_test_case.raw, *decoded);
 }
 
 TEST(Http, EncodeQueryData) {
-  auto result = http::EncodeQueryData(query_test_case.encoded);
+  auto result = Http::EncodeQueryData(query_test_case.encoded);
   std::string expectedResult = query_test_case.raw;
   ASSERT_EQ(expectedResult, result);
-  auto decoded = http::DecodeQueryData(result);
+  auto decoded = Http::DecodeQueryData(result);
   ASSERT_TRUE(decoded.has_value());
   ASSERT_EQ(query_test_case.encoded.size(), decoded->size());
   for (auto val : query_test_case.encoded) {
@@ -112,7 +112,7 @@ TEST(Http, EncodeQueryData) {
 }
 
 TEST(Http, DecodeFormData) {
-  auto result = http::DecodeFormData(form_test_case.raw);
+  auto result = Http::DecodeFormData(form_test_case.raw);
   EXPECT_TRUE(result.has_value());
   ASSERT_EQ(form_test_case.encoded.size(), result->size());
   for (auto val : form_test_case.encoded) {
@@ -123,8 +123,8 @@ TEST(Http, DecodeFormData) {
 }
 
 TEST(Http, EncodeFormData) {
-  auto result = http::EncodeFormData(form_test_case.encoded);
-  auto decoded = http::DecodeFormData(result);
+  auto result = Http::EncodeFormData(form_test_case.encoded);
+  auto decoded = Http::DecodeFormData(result);
   EXPECT_TRUE(decoded.has_value());
   ASSERT_EQ(form_test_case.encoded.size(), decoded->size());
   for (auto val : form_test_case.encoded) {
@@ -136,7 +136,7 @@ TEST(Http, EncodeFormData) {
 
 TEST(Http, EncodeBasicAuth) {
   // Known-answer extracted from https://tools.ietf.org/html/rfc7617#section-2 .
-  auto result = http::EncodeBasicAuth("Aladdin", "open sesame");
+  auto result = Http::EncodeBasicAuth("Aladdin", "open sesame");
   ASSERT_STREQ("Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==", result.c_str());
 }
 
@@ -145,19 +145,19 @@ TEST(Http, EncodeSetCookie) {
       headers::SetCookieDirectives::HttpOnly,
       headers::SetCookieDirectives::SameSiteStrict,
       headers::SetCookieDirectives::Secure};
-  auto result = http::EncodeSetCookie("name", "value", directives);
+  auto result = Http::EncodeSetCookie("name", "value", directives);
   ASSERT_STREQ("name=value; HttpOnly; SameSite=Strict; Secure", result.c_str());
 }
 
 TEST(Http, EncodeCookies) {
   auto cookies1 = "name=value";
-  auto result = http::DecodeCookies(cookies1);
+  auto result = Http::DecodeCookies(cookies1);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result->size(), 1);
   ASSERT_STREQ((*result)["name"].c_str(), "value");
 
   auto cookies2 = "first=1; second=2; third=3";
-  result = http::DecodeCookies(cookies2);
+  result = Http::DecodeCookies(cookies2);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result->size(), 3);
   ASSERT_STREQ((*result)["first"].c_str(), "1");
@@ -165,37 +165,37 @@ TEST(Http, EncodeCookies) {
   ASSERT_STREQ((*result)["third"].c_str(), "3");
 
   auto cookies3 = "name";
-  result = http::DecodeCookies(cookies3);
+  result = Http::DecodeCookies(cookies3);
   ASSERT_FALSE(result.has_value());
 
   auto cookies4 = "first=1;second=2";
-  result = http::DecodeCookies(cookies4);
+  result = Http::DecodeCookies(cookies4);
   ASSERT_FALSE(result.has_value());
 }
 
 TEST(Http, DecodePath) {
-  auto result1 = http::DecodePath("/path?query#fragment");
+  auto result1 = Http::DecodePath("/path?query#fragment");
   ASSERT_EQ("/path", std::string(result1[0].data(), result1[0].size()));
   ASSERT_EQ("query", std::string(result1[1].data(), result1[1].size()));
   ASSERT_STREQ("query", result1[1].data());
   ASSERT_STREQ("fragment", result1[2].data());
 
-  auto result2 = http::DecodePath("/path?query");
+  auto result2 = Http::DecodePath("/path?query");
   ASSERT_STREQ("/path", result2[0].data());
   ASSERT_STREQ("query", result2[1].data());
   ASSERT_STREQ("", result2[2].data());
 
-  auto result3 = http::DecodePath("/path#fragment");
+  auto result3 = Http::DecodePath("/path#fragment");
   ASSERT_STREQ("/path", result3[0].data());
   ASSERT_STREQ("", result3[1].data());
   ASSERT_STREQ("fragment", result3[2].data());
 
-  auto result4 = http::DecodePath("/path");
+  auto result4 = Http::DecodePath("/path");
   ASSERT_STREQ("/path", result4[0].data());
   ASSERT_STREQ("", result4[1].data());
   ASSERT_STREQ("", result4[2].data());
 
-  auto result5 = http::DecodePath("/?#");
+  auto result5 = Http::DecodePath("/?#");
   ASSERT_STREQ("/", result5[0].data());
   ASSERT_STREQ("", result5[1].data());
   ASSERT_STREQ("", result5[2].data());
