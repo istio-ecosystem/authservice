@@ -8,7 +8,7 @@
 namespace authservice {
 namespace filters {
 
-FilterChainImpl::FilterChainImpl(authservice::config::FilterChain config) :
+FilterChainImpl::FilterChainImpl(config::FilterChain config) :
     config_(std::move(config)), oidc_session_store_(nullptr) {}
 
 const std::string &FilterChainImpl::Name() const {
@@ -21,9 +21,9 @@ bool FilterChainImpl::Matches(const ::envoy::service::auth::v2::CheckRequest *re
     auto matched = request->attributes().request().http().headers().find(config_.match().header());
     if (matched != request->attributes().request().http().headers().cend()) {
       switch (config_.match().criteria_case()) {
-        case authservice::config::Match::kPrefix:
+        case config::Match::kPrefix:
           return absl::StartsWith(matched->second, config_.match().prefix());
-        case authservice::config::Match::kEquality:
+        case config::Match::kEquality:
           return matched->second == config_.match().equality();
         default:
           throw std::runtime_error("invalid FilterChain match type"); // This should never happen.
@@ -62,15 +62,15 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
       // so here we ensure that each instance returned by New() shares the same session store.
       auto absolute_session_timeout = filter.oidc().absolute_session_timeout();
       auto idle_session_timeout = filter.oidc().idle_session_timeout();
-      oidc_session_store_ = std::static_pointer_cast<filters::oidc::SessionStore>(
-          std::make_shared<filters::oidc::InMemorySessionStore>(
+      oidc_session_store_ = std::static_pointer_cast<oidc::SessionStore>(
+          std::make_shared<oidc::InMemorySessionStore>(
               std::make_shared<common::utilities::TimeService>(),
               absolute_session_timeout,
               idle_session_timeout)
       );
     }
 
-    result->AddFilter(filters::FilterPtr(new filters::oidc::OidcFilter(
+    result->AddFilter(FilterPtr(new oidc::OidcFilter(
         http, filter.oidc(), token_request_parser, session_string_generator, oidc_session_store_)));
   }
   return result;

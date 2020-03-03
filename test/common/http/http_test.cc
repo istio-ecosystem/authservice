@@ -73,7 +73,7 @@ TEST(Http, ToUrl) {
       },
   };
   for (auto test : test_cases) {
-    authservice::config::common::Endpoint e;
+    config::common::Endpoint e;
     e.set_scheme(test.endpoint.scheme);
     e.set_hostname(test.endpoint.hostname);
     e.set_port(test.endpoint.port);

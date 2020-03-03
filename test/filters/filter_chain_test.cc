@@ -6,21 +6,21 @@ namespace authservice {
 namespace filters {
 
 TEST(FilterChainTest, Name) {
-  auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+  auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
   configuration->set_name("expected");
   FilterChainImpl chain1(*configuration);
   ASSERT_EQ(chain1.Name(), "expected");
 }
 
 TEST(FilterChainTest, MatchesWithoutMatchField) {
-  auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+  auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
   ::envoy::service::auth::v2::CheckRequest request1;
   FilterChainImpl chain1(*configuration);
   ASSERT_TRUE(chain1.Matches(&request1));
 }
 
 TEST(FilterChainTest, MatchesPrefix) {
-  auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+  auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
   configuration->mutable_match()->set_header("x-prefix-header");
   configuration->mutable_match()->set_prefix("prefixed-");
 
@@ -40,7 +40,7 @@ TEST(FilterChainTest, MatchesPrefix) {
 }
 
 TEST(FilterChainTest, MatchesEquality) {
-  auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+  auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
   configuration->mutable_match()->set_header("x-equality-header");
   configuration->mutable_match()->set_equality("exact-value");
 
@@ -60,7 +60,7 @@ TEST(FilterChainTest, MatchesEquality) {
 }
 
 TEST(FilterChainTest, New) {
-  auto configuration = std::unique_ptr<authservice::config::FilterChain>(new authservice::config::FilterChain);
+  auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
 

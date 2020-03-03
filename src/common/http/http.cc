@@ -274,7 +274,7 @@ std::array<std::string, 3> http::DecodePath(absl::string_view path) {
   return result;
 }
 
-std::string http::ToUrl(const authservice::config::common::Endpoint &endpoint) {
+std::string http::ToUrl(const config::common::Endpoint &endpoint) {
   std::stringstream builder;
   builder << endpoint.scheme() << "://" << endpoint.hostname();
   if (endpoint.port() != 80 && endpoint.port() != 443) {
@@ -284,7 +284,7 @@ std::string http::ToUrl(const authservice::config::common::Endpoint &endpoint) {
   return builder.str();
 }
 
-response_t http_impl::Post(const authservice::config::common::Endpoint &endpoint,
+response_t http_impl::Post(const config::common::Endpoint &endpoint,
                            const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
                            absl::string_view ca_cert, boost::asio::io_context &ioc,
                            boost::asio::yield_context yield) const {

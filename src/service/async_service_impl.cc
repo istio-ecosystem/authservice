@@ -2,7 +2,6 @@
 #include "src/config/get_config.h"
 #include <boost/asio.hpp>
 #include <boost/thread/thread.hpp>
-#include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
 
 namespace authservice {
@@ -30,7 +29,7 @@ private:
 
 class ProcessingState : public ServiceState {
 public:
-  ProcessingState(authservice::service::AuthServiceImpl& impl, Authorization::AsyncService &service,
+  ProcessingState(AuthServiceImpl& impl, Authorization::AsyncService &service,
                   grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context)
           : service_(service), cq_(cq), responder_(&ctx_), io_context_(io_context), impl_(impl) {
     spdlog::trace("Creating processor state");
@@ -72,7 +71,7 @@ private:
   // Boost::ASIO I/O service
   boost::asio::io_context &io_context_;
 
-  authservice::service::AuthServiceImpl& impl_;
+  AuthServiceImpl& impl_;
 };
 
 void CompleteState::Proceed() {
@@ -82,7 +81,7 @@ void CompleteState::Proceed() {
   delete this;
 }
 
-AsyncAuthServiceImpl::AsyncAuthServiceImpl(authservice::config::Config config)
+AsyncAuthServiceImpl::AsyncAuthServiceImpl(config::Config config)
     : config_(std::move(config)),
       impl_(config_),
       io_context_(std::make_shared<boost::asio::io_context>()),

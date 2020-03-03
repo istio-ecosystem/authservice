@@ -43,11 +43,11 @@ public:
 
 class FilterChainImpl : public FilterChain {
 private:
-  authservice::config::FilterChain config_;
-  std::shared_ptr<filters::oidc::SessionStore> oidc_session_store_;
+  config::FilterChain config_;
+  std::shared_ptr<oidc::SessionStore> oidc_session_store_;
 
 public:
-  explicit FilterChainImpl(authservice::config::FilterChain config);
+  explicit FilterChainImpl(config::FilterChain config);
 
   const std::string &Name() const override;
 

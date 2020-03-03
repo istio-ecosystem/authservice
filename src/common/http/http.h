@@ -122,7 +122,7 @@ public:
    * @return A url.
    */
   static std::string ToUrl(
-      const authservice::config::common::Endpoint &endpoint);
+      const config::common::Endpoint &endpoint);
 
   /**
    * Virtual destructor
@@ -138,7 +138,7 @@ public:
    * @return http response.
    */
   virtual response_t Post(
-      const authservice::config::common::Endpoint &endpoint,
+      const config::common::Endpoint &endpoint,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,
@@ -152,7 +152,7 @@ public:
 class http_impl : public http {
 public:
   response_t Post(
-      const authservice::config::common::Endpoint &endpoint,
+      const config::common::Endpoint &endpoint,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,

@@ -8,10 +8,13 @@
 #include "src/config/get_config.h"
 #include "src/service/async_service_impl.h"
 
+using namespace authservice::config;
+using namespace authservice::service;
+
 namespace authservice {
 namespace service {
 
-void RunServer(const authservice::config::Config& config) {
+void RunServer(const config::Config &config) {
   AsyncAuthServiceImpl service(config);
   service.Run();
 }
@@ -22,7 +25,7 @@ void RunServer(const authservice::config::Config& config) {
 ABSL_FLAG(std::string, filter_config, "/etc/authservice/config.json",
           "path to filter config");
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   absl::SetProgramUsageMessage(absl::StrCat("run an auth server:\n", argv[0]));
   absl::ParseCommandLine(argc, argv);
 
@@ -30,12 +33,10 @@ int main(int argc, char** argv) {
   spdlog::set_default_logger(console);
 
   try {
-    auto config =
-        authservice::config::GetConfig(absl::GetFlag(FLAGS_filter_config));
-    console->set_level(
-        authservice::config::GetConfiguredLogLevel(*config));
-    authservice::service::RunServer(*config);
-  } catch (const std::exception& e) {
+    auto config = GetConfig(absl::GetFlag(FLAGS_filter_config));
+    console->set_level(GetConfiguredLogLevel(*config));
+    RunServer(*config);
+  } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
     return EXIT_FAILURE;
   }

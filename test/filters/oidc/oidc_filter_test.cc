@@ -65,7 +65,7 @@ ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::strin
 
 class OidcFilterTest : public ::testing::Test {
  protected:
-  authservice::config::oidc::OIDCConfig config_;
+  config::oidc::OIDCConfig config_;
   std::string callback_host_;
   std::shared_ptr<TokenResponseParserMock> parser_mock_;
   std::shared_ptr<common::session::SessionStringGeneratorMock> session_string_generator_mock_;

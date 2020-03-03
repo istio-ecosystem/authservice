@@ -9,12 +9,11 @@
 
 using namespace std;
 using namespace google::protobuf::util;
-using namespace authservice::config;
 
 namespace authservice {
 namespace config {
 
-unique_ptr<authservice::config::Config> GetConfig(
+unique_ptr<Config> GetConfig(
     const string &configFileName) {
   ifstream configFile(configFileName);
   if (!configFile) {
@@ -38,7 +37,7 @@ unique_ptr<authservice::config::Config> GetConfig(
   return config;
 }
 
-spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Config& config) {
+spdlog::level::level_enum GetConfiguredLogLevel(const Config& config) {
   auto log_level_string = config.log_level();
   spdlog::level::level_enum level;
 
@@ -61,7 +60,7 @@ spdlog::level::level_enum GetConfiguredLogLevel(const authservice::config::Confi
   return level;
 }
 
-std::string GetConfiguredAddress(const authservice::config::Config& config) {
+std::string GetConfiguredAddress(const Config& config) {
   std::stringstream address_string_builder;
 
   address_string_builder << config.listen_address() << ":" << std::dec

@@ -31,7 +31,7 @@ const std::map<const char *, const char *> standard_headers = {
 }  // namespace
 
 OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
-                       const authservice::config::oidc::OIDCConfig &idp_config,
+                       const config::oidc::OIDCConfig &idp_config,
                        TokenResponseParserPtr parser,
                        common::session::SessionStringGeneratorPtr session_string_generator,
                        SessionStorePtr session_store)
