@@ -17,3 +17,13 @@ cc_test(
     ],
     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
+
+cc_test(
+    name = "trigger_rules_test",
+    srcs = ["trigger_rules_test.cc"],
+    deps = [
+        "//src/common/utilities:trigger_rules",
+        "@com_google_googletest//:gtest_main",
+    ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+)

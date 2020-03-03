@@ -101,7 +101,7 @@ message OIDCConfig {
     // Required.
     string client_secret = 7 [(validate.rules).string.min_len = 1];
 
-    // Optional additional scopes passed to the OIDC Provider in the
+    // Additional scopes passed to the OIDC Provider in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here.
     // Required, but an empty array is allowed.
@@ -136,6 +136,7 @@ message OIDCConfig {
     // that it was started, but can still timeout due to being idle.
     // When both `max_absolute_session_timeout` and `max_session_idle_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
+    // Optional.
     uint32 max_absolute_session_timeout = 13;
 
     // The Authservice associates obtained OIDC tokens with a session ID in a session store.
@@ -147,6 +148,7 @@ message OIDCConfig {
     // but can still consider timeout based on maximum absolute time since added.
     // When both `max_absolute_session_timeout` and `max_session_idle_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
+    // Optional.
     uint32 max_session_idle_timeout = 14;
 
     // When specified, the Authservice will trust the specified Certificate Authority when performing HTTPS calls to
