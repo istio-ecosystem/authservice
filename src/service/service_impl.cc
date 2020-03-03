@@ -2,11 +2,14 @@
 #include <grpcpp/grpcpp.h>
 #include <memory>
 #include "spdlog/spdlog.h"
+#include "src/common/http/http.h"
+#include "src/common/utilities/trigger_rules.h"
 
 namespace authservice {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
+AuthServiceImpl::AuthServiceImpl(const config::Config &config)
+    : trigger_rules_config_(config.trigger_rules()) {
   for (const auto &chain_config : config.chains()) {
     std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
     chains_.push_back(std::move(chain));
@@ -19,10 +22,22 @@ AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
     ::envoy::service::auth::v2::CheckResponse *response) {
   spdlog::trace("{}", __func__);
   try {
+    auto request_path = common::http::http::DecodePath(request->attributes().request().http().path())[0];
+    if (!common::utilities::trigger_rules::TriggerRuleMatchesPath(request_path, trigger_rules_config_)) {
+      spdlog::debug(
+          "{}: no matching trigger rule, so allowing request to proceed without any authservice functionality {}://{}{} ",
+          __func__,
+          request->attributes().request().http().scheme(), request->attributes().request().http().host(),
+          request->attributes().request().http().path());
+      return ::grpc::Status::OK;
+    }
+
     // Find a configured processing chain.
     for (auto &chain : chains_) {
       if (chain->Matches(request)) {
-        spdlog::debug("{}: processing request {}://{}{} with filter chain {}", __func__, request->attributes().request().http().scheme(), request->attributes().request().http().host(), request->attributes().request().http().path(), chain->Name());
+        spdlog::debug("{}: processing request {}://{}{} with filter chain {}", __func__,
+                      request->attributes().request().http().scheme(), request->attributes().request().http().host(),
+                      request->attributes().request().http().path(), chain->Name());
         // Create a new instance of a processor.
         auto processor = chain->New();
         auto status = processor->Process(request, response);
@@ -50,8 +65,11 @@ AuthServiceImpl::AuthServiceImpl(const config::Config& config) {
         }
       }
     }
+
     // No matching filter chain found. Allow request to continue.
-    spdlog::debug("{}: no matching filter chain for request to {}://{}{} ", __func__, request->attributes().request().http().scheme(), request->attributes().request().http().host(), request->attributes().request().http().path());
+    spdlog::debug("{}: no matching filter chain for request to {}://{}{} ", __func__,
+                  request->attributes().request().http().scheme(), request->attributes().request().http().host(),
+                  request->attributes().request().http().path());
     return ::grpc::Status::OK;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());

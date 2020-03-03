@@ -8,19 +8,16 @@ namespace service {
 
 using ::testing::HasSubstr;
 
-TEST(ServiceImplTest, CheckUnmatchedRequest) {
+TEST(ServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesPath) {
   AuthServiceImpl service(
           *config::GetConfig("test/fixtures/valid-config.json"));
 
   ::envoy::service::auth::v2::CheckResponse response;
   ::envoy::service::auth::v2::CheckRequest request;
 
-  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(
-      "https");
-  auto request_headers = request.mutable_attributes()
-                             ->mutable_request()
-                             ->mutable_http()
-                             ->mutable_headers();
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo#some-fragment"); // this is a matching path for trigger_rules
+  auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   request_headers->insert({"x-tenant-identifier", "unknown-tenant"});
 
   ::grpc::Status status = service.Check(nullptr, &request, &response);
@@ -28,19 +25,33 @@ TEST(ServiceImplTest, CheckUnmatchedRequest) {
   EXPECT_FALSE(response.has_denied_response()); // request allowed to proceed (not redirected for auth)
 }
 
-TEST(ServiceImplTest, CheckMatchedRequest) {
+TEST(ServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRulesPath) {
+  AuthServiceImpl service(
+      *config::GetConfig("test/fixtures/valid-config.json"));
+
+  ::envoy::service::auth::v2::CheckResponse response;
+  ::envoy::service::auth::v2::CheckRequest request;
+
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/version?some-query"); // this is a non-matching path for trigger_rules
+  auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+  request_headers->insert({"x-tenant-identifier", "tenant1"});
+
+  ::grpc::Status status = service.Check(nullptr, &request, &response);
+  EXPECT_TRUE(status.ok());
+  EXPECT_FALSE(response.has_denied_response()); // request allowed to proceed (not redirected for auth)
+}
+
+TEST(ServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPath) {
   AuthServiceImpl service(
           *config::GetConfig("test/fixtures/valid-config.json"));
 
   ::envoy::service::auth::v2::CheckResponse response;
   ::envoy::service::auth::v2::CheckRequest request;
 
-  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(
-      "https");
-  auto request_headers = request.mutable_attributes()
-      ->mutable_request()
-      ->mutable_http()
-      ->mutable_headers();
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo?some-query"); // this is a matching path for trigger_rules
+  auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   request_headers->insert({"x-tenant-identifier", "tenant1"});
 
   ::grpc::Status status = service.Check(nullptr, &request, &response);

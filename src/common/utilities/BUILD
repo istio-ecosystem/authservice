@@ -27,3 +27,13 @@ xx_library(
     deps = [
     ],
 )
+
+xx_library(
+    name = "trigger_rules",
+    srcs = ["trigger_rules.cc"],
+    hdrs = ["trigger_rules.h"],
+    deps = [
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "//config:config_cc",
+    ],
+)

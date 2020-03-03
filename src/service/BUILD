@@ -14,6 +14,8 @@ cc_library(
         "//config:config_cc",
         "//src/config",
         "//src/filters:filter_chain",
+        "//src/common/http",
+        "//src/common/utilities:trigger_rules",
         "@boost//:thread",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_grpc_grpc//:grpc++",

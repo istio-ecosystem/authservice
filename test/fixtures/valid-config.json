@@ -3,6 +3,20 @@
   "listen_port": "10003",
   "log_level": "trace",
   "threads": 8,
+  "trigger_rules": [
+    {
+      "excluded_paths": [
+        {
+          "exact": "/status/version"
+        }
+      ],
+      "included_paths": [
+        {
+          "prefix": "/status/"
+        }
+      ]
+    }
+  ],
   "chains": [
     {
       "name": "test-chain",
