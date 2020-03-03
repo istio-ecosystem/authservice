@@ -110,6 +110,7 @@ http_archive(
     strip_prefix = "boost_1_70_0",
     urls = [
         "https://dl.bintray.com/boostorg/release/1.70.0/source/boost_1_70_0.tar.gz",
+        "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz",
     ],
     sha256 = "882b48708d211a5f48e60b0124cf5863c1534cd544ecd0664bb534a4b5d506e9",
 )
