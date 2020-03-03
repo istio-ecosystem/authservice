@@ -15,8 +15,8 @@ class InMemorySessionStore : public SessionStore {
 private:
   std::unordered_map<std::string, std::shared_ptr<Session>> session_map_;
   std::shared_ptr<common::utilities::TimeService> time_service_;
-  uint32_t max_absolute_session_timeout_in_seconds_;
-  uint32_t max_session_idle_timeout_in_seconds_;
+  uint32_t absolute_session_timeout_in_seconds_;
+  uint32_t idle_session_timeout_in_seconds_;
   std::recursive_mutex mutex_;
 
   virtual absl::optional<std::shared_ptr<Session>> FindSession(absl::string_view session_id);
@@ -26,8 +26,8 @@ private:
 public:
   InMemorySessionStore(
       std::shared_ptr<common::utilities::TimeService> time_service,
-      uint32_t max_absolute_session_timeout_in_seconds,
-      uint32_t max_session_idle_timeout_in_seconds);
+      uint32_t absolute_session_timeout_in_seconds,
+      uint32_t idle_session_timeout_in_seconds);
 
   virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
 

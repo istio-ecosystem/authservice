@@ -142,10 +142,10 @@ TEST_F(InMemorySessionStoreTest, Remove) {
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesSessionsWhichHaveExceededTheMaxAbsoluteSessionTimeout) {
-  int max_absolute_session_timeout_in_seconds = 190;
-  int max_session_idle_timeout_in_seconds = 1000;
-  InMemorySessionStore in_memory_session_store(time_service_mock_, max_absolute_session_timeout_in_seconds,
-                                               max_session_idle_timeout_in_seconds);
+  int absolute_session_timeout_in_seconds = 190;
+  int idle_session_timeout_in_seconds = 1000;
+  InMemorySessionStore in_memory_session_store(time_service_mock_, absolute_session_timeout_in_seconds,
+                                               idle_session_timeout_in_seconds);
 
   // Create session that will expire
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
@@ -386,12 +386,12 @@ TEST_F(InMemorySessionStoreTest,
 }
 
 TEST_F(InMemorySessionStoreTest, RemoveAllExpired_RemovesAuthorizationStatesWhichHaveExceededTheAbsoluteTimeout) {
-  int max_absolute_session_timeout_in_seconds = 190;
-  int max_session_idle_timeout_in_seconds = 0;
+  int absolute_session_timeout_in_seconds = 190;
+  int idle_session_timeout_in_seconds = 0;
   auto authorization_state1 = std::make_shared<AuthorizationState>("state1", "nonce1", "requested_url1");
   auto authorization_state2 = std::make_shared<AuthorizationState>("state2", "nonce2", "requested_url2");
-  InMemorySessionStore in_memory_session_store(time_service_mock_, max_absolute_session_timeout_in_seconds,
-                                               max_session_idle_timeout_in_seconds);
+  InMemorySessionStore in_memory_session_store(time_service_mock_, absolute_session_timeout_in_seconds,
+                                               idle_session_timeout_in_seconds);
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(5));
   auto session_id_will_expire = std::string("fake_session_id_1");

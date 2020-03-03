@@ -53,11 +53,11 @@ Session::Session(uint32_t time_added)
       time_accessed_(time_added) {}
 
 InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
-                                           uint32_t max_absolute_session_timeout_in_seconds,
-                                           uint32_t max_session_idle_timeout_in_seconds) :
+                                           uint32_t absolute_session_timeout_in_seconds,
+                                           uint32_t idle_session_timeout_in_seconds) :
     time_service_(time_service),
-    max_absolute_session_timeout_in_seconds_(max_absolute_session_timeout_in_seconds),
-    max_session_idle_timeout_in_seconds_(max_session_idle_timeout_in_seconds) {}
+    absolute_session_timeout_in_seconds_(absolute_session_timeout_in_seconds),
+    idle_session_timeout_in_seconds_(idle_session_timeout_in_seconds) {}
 
 void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) {
   std::function<void(Session &)> token_response_setter = [&token_response](Session &session) {
@@ -80,12 +80,12 @@ std::shared_ptr<TokenResponse> InMemorySessionStore::GetTokenResponse(absl::stri
 
 void InMemorySessionStore::RemoveAllExpired() {
   auto earliest_time_added_to_keep =
-      time_service_->GetCurrentTimeInSecondsSinceEpoch() - max_absolute_session_timeout_in_seconds_;
+      time_service_->GetCurrentTimeInSecondsSinceEpoch() - absolute_session_timeout_in_seconds_;
   auto earliest_time_idle_to_keep =
-      time_service_->GetCurrentTimeInSecondsSinceEpoch() - max_session_idle_timeout_in_seconds_;
+      time_service_->GetCurrentTimeInSecondsSinceEpoch() - idle_session_timeout_in_seconds_;
 
-  bool should_check_absolute_timeout = max_absolute_session_timeout_in_seconds_ > 0;
-  bool should_check_idle_timeout = max_session_idle_timeout_in_seconds_ > 0;
+  bool should_check_absolute_timeout = absolute_session_timeout_in_seconds_ > 0;
+  bool should_check_idle_timeout = idle_session_timeout_in_seconds_ > 0;
 
   synchronized(mutex_) {
     auto itr = session_map_.begin();

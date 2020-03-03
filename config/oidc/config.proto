@@ -134,10 +134,10 @@ message OIDCConfig {
     // until that session should expire.
     // When configured to `0`, which is the default value, the session will never timeout based on the time
     // that it was started, but can still timeout due to being idle.
-    // When both `max_absolute_session_timeout` and `max_session_idle_timeout` are zero, then sessions will never
+    // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
     // Optional.
-    uint32 max_absolute_session_timeout = 13;
+    uint32 absolute_session_timeout = 13;
 
     // The Authservice associates obtained OIDC tokens with a session ID in a session store.
     // It also stores some temporary information during the login process into the session store,
@@ -146,10 +146,10 @@ message OIDCConfig {
     // until the user's session with the Authservice should expire.
     // When configured to `0`, which is the default value, session expiration will not consider idle time,
     // but can still consider timeout based on maximum absolute time since added.
-    // When both `max_absolute_session_timeout` and `max_session_idle_timeout` are zero, then sessions will never
+    // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
     // Optional.
-    uint32 max_session_idle_timeout = 14;
+    uint32 idle_session_timeout = 14;
 
     // When specified, the Authservice will trust the specified Certificate Authority when performing HTTPS calls to
     // the Token Endpoint of the OIDC Identity Provider.

@@ -68,8 +68,8 @@
               "path": "/logout",
               "redirect_to_uri": "https://logout-redirect"
             },
-            "max_absolute_session_timeout": 3600,
-            "max_session_idle_timeout": 600,
+            "absolute_session_timeout": 3600,
+            "idle_session_timeout": 600,
             "trusted_certificate_authority": "ca_placeholder"
           }
         }

@@ -55,8 +55,8 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.logout().path(), "/logout");
   ASSERT_EQ(oidc.logout().redirect_to_uri(), "https://logout-redirect");
 
-  ASSERT_EQ(oidc.max_absolute_session_timeout(), 3600);
-  ASSERT_EQ(oidc.max_session_idle_timeout(), 600);
+  ASSERT_EQ(oidc.absolute_session_timeout(), 3600);
+  ASSERT_EQ(oidc.idle_session_timeout(), 600);
 
   ASSERT_EQ(oidc.trusted_certificate_authority(), "ca_placeholder");
 }
