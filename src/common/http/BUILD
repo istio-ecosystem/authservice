@@ -10,7 +10,6 @@ xx_library(
         "http.h",
     ],
     deps = [
-        "//config/common:config_cc",
         "@boost//:all",
         "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",

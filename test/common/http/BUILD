@@ -13,6 +13,7 @@ cc_test(
     srcs = ["http_test.cc"],
     deps = [
         "//src/common/http",
+        "//test/shared:shared_test_helpers",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],

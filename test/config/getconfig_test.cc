@@ -19,25 +19,10 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(config->trigger_rules(0).excluded_paths(0).exact(), "/status/version");
   ASSERT_EQ(config->trigger_rules(0).included_paths(0).prefix(), "/status/");
 
-  ASSERT_EQ(oidc.authorization().scheme(), "https");
-  ASSERT_EQ(oidc.authorization().hostname(), "google3");
-  ASSERT_EQ(oidc.authorization().path(), "/path3");
-  ASSERT_EQ(oidc.authorization().port(), 443);
-
-  ASSERT_EQ(oidc.token().scheme(), "https");
-  ASSERT_EQ(oidc.token().hostname(), "google2");
-  ASSERT_EQ(oidc.token().path(), "/path2");
-  ASSERT_EQ(oidc.token().port(), 443);
-
-  ASSERT_EQ(oidc.jwks_uri().scheme(), "https");
-  ASSERT_EQ(oidc.jwks_uri().hostname(), "google1");
-  ASSERT_EQ(oidc.jwks_uri().path(), "/path1");
-  ASSERT_EQ(oidc.jwks_uri().port(), 443);
-
-  ASSERT_EQ(oidc.callback().scheme(), "https");
-  ASSERT_EQ(oidc.callback().hostname(), "google4");
-  ASSERT_EQ(oidc.callback().path(), "/path4");
-  ASSERT_EQ(oidc.callback().port(), 443);
+  ASSERT_EQ(oidc.authorization_uri(), "https://google3/path3");
+  ASSERT_EQ(oidc.token_uri(), "https://google2/path2");
+  ASSERT_EQ(oidc.callback_uri(), "https://google4/path4");
+  ASSERT_EQ(oidc.jwks(), "jwks_placeholder");
 
   ASSERT_EQ(oidc.client_id(), "foo");
   ASSERT_EQ(oidc.client_secret(), "bar");
@@ -53,7 +38,7 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.access_token().header(), "x-access-token");
 
   ASSERT_EQ(oidc.logout().path(), "/logout");
-  ASSERT_EQ(oidc.logout().redirect_to_uri(), "https://logout-redirect");
+  ASSERT_EQ(oidc.logout().redirect_uri(), "https://logout-redirect");
 
   ASSERT_EQ(oidc.absolute_session_timeout(), 3600);
   ASSERT_EQ(oidc.idle_session_timeout(), 600);

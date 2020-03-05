@@ -69,6 +69,7 @@ class OidcFilterTest : public ::testing::Test {
 protected:
   config::oidc::OIDCConfig config_;
   std::string callback_host_;
+  std::string callback_path_;
   std::shared_ptr<TokenResponseParserMock> parser_mock_;
   std::shared_ptr<common::session::SessionStringGeneratorMock> session_string_generator_mock_;
   std::shared_ptr<SessionStore> session_store_;
@@ -81,25 +82,12 @@ protected:
   const std::string requested_url_ = "https://example.com/summary?foo=bar";
   google::jwt_verify::Jwt test_id_token_jwt_;
   const std::string expected_session_cookie_name = "__Host-cookie-prefix-authservice-session-id-cookie";
+  const std::string token_uri = "https://acme-idp.tld/token";
 
   void SetUp() override {
-    config_.mutable_authorization()->set_scheme("https");
-    config_.mutable_authorization()->set_hostname("acme-idp.tld");
-    config_.mutable_authorization()->set_port(443);
-    config_.mutable_authorization()->set_path("/authorization");
-    config_.mutable_token()->set_scheme("https");
-    config_.mutable_token()->set_hostname("acme-idp.tld");
-    config_.mutable_token()->set_port(443);
-    config_.mutable_token()->set_path("/token");
-    config_.mutable_jwks_uri()->set_scheme("https");
-    config_.mutable_jwks_uri()->set_hostname("acme-idp.tld");
-    config_.mutable_jwks_uri()->set_port(443);
-    config_.mutable_jwks_uri()->set_path("/token");
+    config_.set_authorization_uri("https://acme-idp.tld/authorization");
+    config_.set_token_uri(token_uri);
     config_.set_jwks("some-jwks");
-    config_.mutable_callback()->set_scheme("https");
-    config_.mutable_callback()->set_hostname("me.tld");
-    config_.mutable_callback()->set_port(443);
-    config_.mutable_callback()->set_path("/callback");
     config_.set_client_id("example-app");
     config_.set_client_secret("ZXhhbXBsZS1hcHAtc2VjcmV0");
     config_.set_cookie_name_prefix("cookie-prefix");
@@ -107,9 +95,9 @@ protected:
     config_.mutable_id_token()->set_preamble("Bearer");
     config_.set_trusted_certificate_authority("some-ca");
 
-    std::stringstream callback_host;
-    callback_host << config_.callback().hostname() << ':' << std::dec << config_.callback().port();
-    callback_host_ = callback_host.str();
+    config_.set_callback_uri("https://me.tld/callback");
+    callback_host_ = "me.tld:443";
+    callback_path_ = "/callback";
 
     parser_mock_ = std::make_shared<TokenResponseParserMock>();
     session_string_generator_mock_ = std::make_shared<common::session::SessionStringGeneratorMock>();
@@ -283,7 +271,7 @@ TEST_F(OidcFilterTest,
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -327,7 +315,7 @@ TEST_F(OidcFilterTest,
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -343,11 +331,11 @@ TEST_F(OidcFilterTest,
 
   SetExpiredAccessTokenResponseInSessionStore();
 
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _)).WillOnce(
       Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
@@ -389,7 +377,7 @@ TEST_F(OidcFilterTest,
        Process_RedirectsUsersToAuthenticate_AndGeneratesNewSessionId_WhenThereIsNoStoredTokenResponseAssociatedWithTheUsersSession) {
   EnableAccessTokens(config_);
 
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto old_session_id = std::string("session123");
   auto new_session_id = std::string("session456");
   auto state = "some-state";
@@ -412,7 +400,7 @@ TEST_F(OidcFilterTest,
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -426,11 +414,11 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
 
   SetExpiredAccessTokenResponseInSessionStore();
 
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _)).WillOnce(
       Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _)).WillOnce(::testing::Return(nullptr));
@@ -455,7 +443,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -471,8 +459,8 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
 
   SetExpiredAccessTokenResponseInSessionStore();
 
-  auto mocked_http = new common::http::http_mock();
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(nullptr)));
+  auto mocked_http = new common::http::HttpMock();
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _)).WillOnce(Return(ByMove(nullptr)));
 
   auto old_session_id = std::string("session123");
   auto new_session_id = std::string("session456");
@@ -493,7 +481,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -509,11 +497,11 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
 
   SetExpiredAccessTokenResponseInSessionStore();
 
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::bad_request);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _)).WillOnce(
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _)).WillOnce(
       Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   // we want the code to return before attempting to parse the bad response
@@ -541,7 +529,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -634,7 +622,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
   ASSERT_THAT(
       response_.denied_response().headers(),
       ContainsHeaders({
-                          {Location,     StartsWith(common::http::Http::ToUrl(config_.authorization()))},
+                          {Location,     StartsWith(config_.authorization_uri())},
                           {CacheControl, StrEq(CacheControlDirectives::NoCache)},
                           {Pragma,       StrEq(PragmaDirectives::NoCache)},
                           {SetCookie,    StrEq(expected_session_cookie_name + "=" + new_session_id +
@@ -666,7 +654,7 @@ TEST_F(OidcFilterTest,
 TEST_F(OidcFilterTest, LogoutWithCookies) {
   session_store_->SetTokenResponse("session123", test_token_response_);
   config_.mutable_logout()->set_path("/logout");
-  config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
+  config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -695,7 +683,7 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
 
 TEST_F(OidcFilterTest, LogoutWithNoCookies) {
   config_.mutable_logout()->set_path("/logout");
-  config_.mutable_logout()->set_redirect_to_uri("https://redirect-uri");
+  config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_path("/logout");
@@ -719,40 +707,39 @@ TEST_F(OidcFilterTest, LogoutWithNoCookies) {
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_RedirectsUser_WithoutAccessTokenHeaderNameConfigured) {
-  AssertRetrieveToken(config_, callback_host_);
+  config_.set_callback_uri("https://me.tld/callback");
+  AssertRetrieveToken(config_, "me.tld:443");
 }
 
 TEST_F(OidcFilterTest,
-       RetrieveToken_RedirectsUser_WithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpsPort) {
-  config_.mutable_callback()->set_scheme("https");
-  config_.mutable_callback()->set_port(443);
-  AssertRetrieveToken(config_, config_.callback().hostname());
+       RetrieveToken_RedirectsUser_WithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsExplicitlyTheDefaultHttpsPort) {
+  config_.set_callback_uri("https://me.tld:443/callback");
+  AssertRetrieveToken(config_, "me.tld");
 }
 
 TEST_F(OidcFilterTest,
-       RetrieveToken_RedirectsUser_WithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsTheDefaultHttpPort) {
-  config_.mutable_callback()->set_scheme("http");
-  config_.mutable_callback()->set_port(80);
-  AssertRetrieveToken(config_, config_.callback().hostname());
+       RetrieveToken_RedirectsUser_WithoutAccessTokenHeaderNameConfiguredWhenThePortIsNotInTheRequestHostnameAndTheConfiguredCallbackIsImplicitlyTheDefaultHttpsPort) {
+  config_.set_callback_uri("https://me.tld/callback");
+  AssertRetrieveToken(config_, "me.tld");
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_RedirectsUser_WithAccessTokenHeaderNameConfigured) {
   EnableAccessTokens(config_);
-  AssertRetrieveToken(config_, config_.callback().hostname());
+  AssertRetrieveToken(config_, "me.tld");
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCannotBeFoundInSession) {
   std::string session_id = "session123";
   auto oidcConfig = config_;
   auto callback_host_on_request = callback_host_;
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_, session_string_generator_mock_,
                     session_store_);
 
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
-  std::vector<std::string> parts = {oidcConfig.callback().path(), "code=value&state=some-state-value"};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=some-state-value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
   auto code = filter.Process(&request_, &response_);
@@ -772,11 +759,11 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAcce
   auto token_response = std::make_shared<TokenResponse>(jwt);
   EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), nonce, ::testing::_))
       .WillOnce(::testing::Return(token_response));
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
@@ -786,7 +773,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAcce
   httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
 
-  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
@@ -814,8 +801,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingCode) {
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
-  httpRequest->set_path(config_.callback().path());
-  std::vector<std::string> parts = {config_.callback().path(), "key=value&state=" + state};
+  std::vector<std::string> parts = {callback_path_, "key=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
 
@@ -836,8 +822,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingState) {
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
-  httpRequest->set_path(config_.callback().path());
-  std::vector<std::string> parts = {config_.callback().path().c_str(), "code=value"};
+  std::vector<std::string> parts = {callback_path_.c_str(), "code=value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
@@ -865,8 +850,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenUnexpectedState) {
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
-  httpRequest->set_path(config_.callback().path());
-  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=unexpectedstate"};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=unexpectedstate"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
 
@@ -890,18 +874,17 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
   auto authorization_state = std::make_shared<AuthorizationState>(state, nonce, requested_url);
   session_store_->SetAuthorizationState(session_id, authorization_state);
 
-  auto *mocked_http = new common::http::http_mock();
+  auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t();
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
                     session_store_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
-  httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
-  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INTERNAL);
@@ -925,19 +908,18 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
 
   EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), nonce, ::testing::_))
       .WillOnce(::testing::Return(nullptr));
-  auto *mocked_http = new common::http::http_mock();
+  auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
                     session_store_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
-  httpRequest->set_path(config_.callback().path());
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
-  std::vector<std::string> parts = {config_.callback().path(), "code=value&state=" + state};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   auto code = filter.Process(&request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
@@ -992,18 +974,18 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, s
 
   EXPECT_CALL(*parser_mock_, Parse(oidcConfig.client_id(), nonce, ::testing::_))
       .WillOnce(::testing::Return(test_token_response_));
-  auto mocked_http = new common::http::http_mock();
+  auto mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(_, _, _, Eq("some-ca"), _, _))
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_, session_string_generator_mock_,
                     session_store_);
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_on_request);
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
-  std::vector<std::string> parts = {oidcConfig.callback().path(), "code=value&state=" + state};
+  std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
   auto code = filter.Process(&request_, &response_);

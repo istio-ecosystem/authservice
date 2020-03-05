@@ -1,7 +1,7 @@
 #include "src/common/http/http.h"
-#include "config/common/config.pb.h"
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"
+#include "test/shared/assertions.h"
 
 namespace authservice {
 namespace common {
@@ -35,53 +35,7 @@ struct {
                     }};
 }  // namespace
 
-TEST(Http, ToUrl) {
-  struct {
-    struct {
-      const char *scheme;
-      const char *hostname;
-      int port;
-      const char *path;
-    } endpoint;
-    const char *url;
-  } test_cases[] = {
-      {
-          .endpoint = {.scheme = "https",
-                       .hostname = "foo",
-                       .port = 443,
-                       .path = "/bar"},
-          .url = "https://foo/bar",
-      },
-      {
-          .endpoint =
-              {.scheme = "http", .hostname = "foo", .port = 80, .path = "/bar"},
-          .url = "http://foo/bar",
-      },
-      {
-          .endpoint = {.scheme = "https",
-                       .hostname = "foo",
-                       .port = 8443,
-                       .path = "/bar"},
-          .url = "https://foo:8443/bar",
-      },
-      {
-          .endpoint = {.scheme = "http",
-                       .hostname = "foo",
-                       .port = 8080,
-                       .path = "/bar"},
-          .url = "http://foo:8080/bar",
-      },
-  };
-  for (auto test : test_cases) {
-    config::common::Endpoint e;
-    e.set_scheme(test.endpoint.scheme);
-    e.set_hostname(test.endpoint.hostname);
-    e.set_port(test.endpoint.port);
-    e.set_path(test.endpoint.path);
-    auto url = Http::ToUrl(e);
-    ASSERT_STREQ(url.c_str(), test.url);
-  }
-}
+using test_helpers::ASSERT_THROWS_STD_RUNTIME_ERROR;
 
 TEST(Http, UrlSafeEncode) {
   std::string encoded = Http::UrlSafeEncode(hex_test_case.raw);
@@ -171,6 +125,53 @@ TEST(Http, EncodeCookies) {
   auto cookies4 = "first=1;second=2";
   result = Http::DecodeCookies(cookies4);
   ASSERT_FALSE(result.has_value());
+}
+
+TEST(Http, ParseUri) {
+  auto result1 = Http::ParseUri("https://example.com/path");
+  ASSERT_EQ(result1.Scheme(), "https");
+  ASSERT_EQ(result1.Host(), "example.com");
+  ASSERT_EQ(result1.Port(), 443);
+  ASSERT_EQ(result1.PathQueryFragment(), "/path");
+
+  auto result2 = Http::ParseUri("https://example/path?query#fragment");
+  ASSERT_EQ(result2.Scheme(), "https");
+  ASSERT_EQ(result2.Host(), "example");
+  ASSERT_EQ(result2.Port(), 443);
+  ASSERT_EQ(result2.PathQueryFragment(), "/path?query#fragment");
+
+  auto result3 = Http::ParseUri("https://www.example.com:1234");
+  ASSERT_EQ(result3.Scheme(), "https");
+  ASSERT_EQ(result3.Host(), "www.example.com");
+  ASSERT_EQ(result3.Port(), 1234);
+  ASSERT_EQ(result3.PathQueryFragment(), "/");
+
+  auto result4 = Http::ParseUri("https://www.example.com:1234/path");
+  ASSERT_EQ(result4.Scheme(), "https");
+  ASSERT_EQ(result4.Host(), "www.example.com");
+  ASSERT_EQ(result4.Port(), 1234);
+  ASSERT_EQ(result4.PathQueryFragment(), "/path");
+
+  auto result5 = Http::ParseUri("https://example.com");
+  ASSERT_EQ(result5.Scheme(), "https");
+  ASSERT_EQ(result5.Host(), "example.com");
+  ASSERT_EQ(result5.Port(), 443);
+  ASSERT_EQ(result5.PathQueryFragment(), "/");
+
+  auto result6 = Http::ParseUri("https://www.example.com:65535/path");
+  ASSERT_EQ(result6.Scheme(), "https");
+  ASSERT_EQ(result6.Host(), "www.example.com");
+  ASSERT_EQ(result6.Port(), 65535);
+  ASSERT_EQ(result6.PathQueryFragment(), "/path");
+
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("noscheme"); }, "uri must be https scheme: noscheme");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("not_https://host"); }, "uri must be https scheme: not_https://host");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://"); }, "no host in uri: https://"); // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://:80/path"); }, "no host in uri: https://:80/path"); // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://host:/path"); }, "port not valid in uri: https://host:/path"); // colon, but no port
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://host:a8/path"); }, "port not valid in uri: https://host:a8/path"); // port not an int
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://host:65536/path"); }, "port value must be between 0 and 65535: https://host:65536/path"); // port int too large
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("https://host:-1/path"); }, "port value must be between 0 and 65535: https://host:-1/path"); // port int too small
 }
 
 TEST(Http, DecodePath) {

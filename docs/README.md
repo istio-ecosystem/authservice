@@ -16,19 +16,6 @@ The top-level configuration object. For a simple example, see the [sample JSON i
 
 
 
-##### message `Endpoint` (config/common/config.proto)
-
-A URI definition.
-
-| Field | Description | Type |
-| ----- | ----------- | ---- |
-| scheme | The scheme, which must be set to `https`. Required. | string |
-| hostname | The hostname. Required. | string |
-| port | The port number. Required. | int32 |
-| path | The path, which must begin with a forward slash (i.e. `/`). Required. | string |
-
-
-
 ##### message `Filter` (config/config.proto)
 
 A filter configuration.
@@ -58,8 +45,8 @@ When specified, the authservice will destroy the authservice session when a requ
 
 | Field | Description | Type |
 | ----- | ----------- | ---- |
-| path | A http request path that the authservice matches against to initiate logout. Whenever a request is made to that path, the authservice will remove the authservice-specific cookies and respond with a redirect to the configured `redirect_to_uri`. Removing the cookies causes the user to be unauthenticated in future requests. If the service application has its own logout controller, then it may be desirable to have its logout controller redirect to this path. If the service application does not need its own logout controller, then the application's logout button/link's href can GET or POST directly to this path. Required. | string |
-| redirect_to_uri | A URI specifying the destination to which the authservice will redirect any request made to the logout `path`. For example, it may be desirable to redirect the logged out user to the homepage of the service application, or to the [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout). As with all redirects, the user's browser will perform a GET to this URI. Required. | string |
+| path | A http request path that the authservice matches against to initiate logout. Whenever a request is made to that path, the authservice will remove the authservice-specific cookies and respond with a redirect to the configured `redirect_uri`. Removing the cookies causes the user to be unauthenticated in future requests. If the service application has its own logout controller, then it may be desirable to have its logout controller redirect to this path. If the service application does not need its own logout controller, then the application's logout button/link's href can GET or POST directly to this path. Required. | string |
+| redirect_uri | A URI specifying the destination to which the authservice will redirect any request made to the logout `path`. For example, it may be desirable to redirect the logged out user to the homepage of the service application, or to the [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout). As with all redirects, the user's browser will perform a GET to this URI. Required. | string |
 
 
 
@@ -82,12 +69,10 @@ The configuration of an OpenID Connect filter that can be used to retrieve ident
 
 | Field | Description | Type |
 | ----- | ----------- | ---- |
-| authorization | The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint). Required. | common.Endpoint |
-| token | The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint). Required. | common.Endpoint |
-| jwks_config | The OIDC Provider's JWKS configuration used during `id_token` verification. Use either `jwks_uri` or `jwks` (see below). Required. | oneof |
-| jwks_uri | *This is currently ignored.* In a future version it will be the URL of the OIDC provider’s public key set to validate signature of the JWT. See [OpenID Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata). This should match the `jwksUri` value of [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/). | common.Endpoint |
-| jwks | The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in the OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). Note that this JSON value must be escaped when embedded in a json configmap (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)). | string |
-| callback | This value will be used as the `redirect_uri` param of the authorization code grant [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider. Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to the service so that the authservice can intercept the request and handle it (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)). Required. | common.Endpoint |
+| authorization_uri | The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint). Required. | string |
+| token_uri | The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint). Required. | string |
+| callback_uri | This value will be used as the `redirect_uri` param of the authorization code grant [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider. Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to the service so that the authservice can intercept the request and handle it (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)). Required. | string |
+| jwks | The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in the OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). Note that this JSON value must be escaped when embedded in a json configmap (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)). Used during token verification. Required. | string |
 | client_id | The OIDC client ID assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. | string |
 | client_secret | The OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. | string |
 | scopes | Additional scopes passed to the OIDC Provider in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here. Required, but an empty array is allowed. | (slice of) string |

@@ -27,30 +27,10 @@
       "filters": [
         {
           "oidc": {
-            "authorization": {
-              "scheme": "https",
-              "hostname": "google3",
-              "path": "/path3",
-              "port": 443
-            },
-            "token": {
-              "scheme": "https",
-              "hostname": "google2",
-              "path": "/path2",
-              "port": 443
-            },
-            "jwks_uri": {
-              "scheme": "https",
-              "hostname": "google1",
-              "path": "/path1",
-              "port": 443
-            },
-            "callback": {
-              "scheme": "https",
-              "hostname": "google4",
-              "path": "/path4",
-              "port": 443
-            },
+            "authorization_uri": "https://google3/path3",
+            "token_uri": "https://google2/path2",
+            "callback_uri": "https://google4/path4",
+            "jwks": "jwks_placeholder",
             "client_id": "foo",
             "client_secret": "bar",
             "scopes": [
@@ -66,7 +46,7 @@
             },
             "logout": {
               "path": "/logout",
-              "redirect_to_uri": "https://logout-redirect"
+              "redirect_uri": "https://logout-redirect"
             },
             "absolute_session_timeout": 3600,
             "idle_session_timeout": 600,

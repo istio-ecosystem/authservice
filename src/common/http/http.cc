@@ -235,6 +235,49 @@ absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
   return result;
 }
 
+Uri::Uri(absl::string_view uri) {
+  if (uri.find(https_prefix_) != 0) { // must start with https://
+    throw std::runtime_error(absl::StrCat("uri must be https scheme: ", uri));
+  }
+  if (uri.length() == https_prefix_.length()) {
+    throw std::runtime_error(absl::StrCat("no host in uri: ", uri));
+  }
+  auto uri_without_scheme = uri.substr(https_prefix_.length());
+
+  std::string host_and_port;
+  auto path_position = uri_without_scheme.find('/');
+  if (path_position != absl::string_view::npos) {
+    host_and_port = std::string(uri_without_scheme.substr(0, path_position).data(), path_position);
+    pathQueryFragment_ = std::string(uri_without_scheme.substr(path_position).data());
+  } else {
+    host_and_port = std::string(uri_without_scheme.data());
+    pathQueryFragment_ = "/";
+  }
+
+  auto colon_position = host_and_port.find(':');
+  if (colon_position == 0) {
+    throw std::runtime_error(absl::StrCat("no host in uri: ", uri));
+  }
+  if (colon_position != absl::string_view::npos) {
+    auto port = host_and_port.substr(colon_position + 1);
+    try {
+      port_ = std::stoi(port);
+    } catch (const std::exception &e) {
+      throw std::runtime_error(absl::StrCat("port not valid in uri: ", uri));
+    }
+    if (port_ > 65535 || port_ < 0) {
+      throw std::runtime_error(absl::StrCat("port value must be between 0 and 65535: ", uri));
+    }
+    host_ = std::string(host_and_port.substr(0, colon_position).data(), colon_position);
+  } else {
+    host_ = host_and_port;
+  }
+}
+
+Uri Http::ParseUri(absl::string_view uri) {
+  return Uri(uri);
+}
+
 std::array<std::string, 3> Http::DecodePath(absl::string_view path) {
   // See https://tools.ietf.org/html/rfc3986#section-3.4 and
   // https://tools.ietf.org/html/rfc3986#section-3.5
@@ -274,17 +317,7 @@ std::array<std::string, 3> Http::DecodePath(absl::string_view path) {
   return result;
 }
 
-std::string Http::ToUrl(const config::common::Endpoint &endpoint) {
-  std::stringstream builder;
-  builder << endpoint.scheme() << "://" << endpoint.hostname();
-  if (endpoint.port() != 80 && endpoint.port() != 443) {
-    builder << ":" << std::to_string(endpoint.port());
-  }
-  builder << endpoint.path();
-  return builder.str();
-}
-
-response_t HttpImpl::Post(const config::common::Endpoint &endpoint,
+response_t HttpImpl::Post(absl::string_view uri,
                           const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
                           absl::string_view ca_cert, boost::asio::io_context &ioc,
                           boost::asio::yield_context yield) const {
@@ -306,21 +339,23 @@ response_t HttpImpl::Post(const config::common::Endpoint &endpoint,
       }
     }
 
+    auto parsed_uri = http::Http::ParseUri(uri);
+
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
     if (!SSL_set_tlsext_host_name(stream.native_handle(),
-                                  endpoint.hostname().c_str())) {
+                                  parsed_uri.Host().c_str())) {
       throw boost::system::error_code{static_cast<int>(::ERR_get_error()),
                                       boost::asio::error::get_ssl_category()};
     }
     const auto results =
-            resolver.async_resolve(endpoint.hostname(), std::to_string(endpoint.port()), yield);
+            resolver.async_resolve(parsed_uri.Host(), std::to_string(parsed_uri.Port()), yield);
     beast::get_lowest_layer(stream).async_connect(results, yield);
     stream.async_handshake(ssl::stream_base::client, yield);
     // Set up an HTTP POST request message
     beast::http::request<beast::http::string_body> req{
-            beast::http::verb::post, endpoint.path(), version};
-    req.set(beast::http::field::host, endpoint.hostname());
+            beast::http::verb::post, parsed_uri.PathQueryFragment(), version};
+    req.set(beast::http::field::host, parsed_uri.Host());
     for (auto header : headers) {
       req.set(boost::beast::string_view(header.first.data()),
               boost::beast::string_view(header.second.data()));

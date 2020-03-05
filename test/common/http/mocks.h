@@ -7,10 +7,10 @@
 namespace authservice {
 namespace common {
 namespace http {
-class http_mock : public Http {
+class HttpMock : public Http {
 public:
   MOCK_CONST_METHOD6(Post, response_t(
-      const config::common::Endpoint &endpoint,
+      absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,
