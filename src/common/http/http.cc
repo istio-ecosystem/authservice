@@ -5,8 +5,8 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
-#include <ios>
 #include <sstream>
+#include "absl/strings/match.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -38,6 +38,7 @@ const uint8_t reverse_alphabet[] = {
 };
 
 typedef bool (*SafeCharacterFunc)(const char);
+
 bool IsUrlSafeCharacter(const char character) {
   return ((character >= 'A' && character <= 'Z') ||
           (character >= 'a' && character <= 'z') ||
@@ -245,13 +246,19 @@ Uri::Uri(absl::string_view uri) {
   auto uri_without_scheme = uri.substr(https_prefix_.length());
 
   std::string host_and_port;
-  auto path_position = uri_without_scheme.find('/');
-  if (path_position != absl::string_view::npos) {
-    host_and_port = std::string(uri_without_scheme.substr(0, path_position).data(), path_position);
-    pathQueryFragment_ = std::string(uri_without_scheme.substr(path_position).data());
-  } else {
-    host_and_port = std::string(uri_without_scheme.data());
-    pathQueryFragment_ = "/";
+  auto positions = {uri_without_scheme.find('/'), uri_without_scheme.find('?'), uri_without_scheme.find('#')};
+  absl::string_view::size_type end_of_host_and_port_index = uri_without_scheme.length();
+  for (auto ptr = positions.begin(); ptr < positions.end(); ptr++) {
+    if (*ptr == absl::string_view::npos) {
+      continue;
+    }
+    end_of_host_and_port_index = std::min(end_of_host_and_port_index, *ptr);
+  }
+  host_and_port = std::string(uri_without_scheme.substr(0, end_of_host_and_port_index).data(),
+                              end_of_host_and_port_index);
+  pathQueryFragment_ = std::string(uri_without_scheme.substr(end_of_host_and_port_index).data());
+  if (!absl::StartsWith(pathQueryFragment_, "/")) {
+    pathQueryFragment_ = "/" + pathQueryFragment_;
   }
 
   auto colon_position = host_and_port.find(':');
@@ -274,44 +281,44 @@ Uri::Uri(absl::string_view uri) {
   }
 }
 
+void Uri::operator=(Uri &&uri) {
+  host_ = uri.host_;
+  port_ = uri.port_;
+  pathQueryFragment_ = uri.pathQueryFragment_;
+}
+
+Uri::Uri(const Uri &uri) {
+  host_ = uri.host_;
+  port_ = uri.port_;
+  pathQueryFragment_ = uri.pathQueryFragment_;
+}
+
 Uri Http::ParseUri(absl::string_view uri) {
   return Uri(uri);
 }
 
 std::array<std::string, 3> Http::DecodePath(absl::string_view path) {
-  // See https://tools.ietf.org/html/rfc3986#section-3.4 and
-  // https://tools.ietf.org/html/rfc3986#section-3.5
+  // See https://tools.ietf.org/html/rfc3986#section-3.4 and https://tools.ietf.org/html/rfc3986#section-3.5
   std::array<std::string, 3> result;
-  auto tmp = path;
-  auto query_position = tmp.find("?");
-  if (query_position != absl::string_view::npos) {
-    // We have a query.
-    tmp = tmp.substr(query_position + 1);
-  }
-  auto fragment_position = tmp.find("#");
-  if (fragment_position != absl::string_view::npos) {
-    // we have a frament
-    if (query_position != absl::string_view::npos) {
-      result[0] =
-          std::string(path.substr(0, query_position).data(), query_position);
-      result[1] = std::string(tmp.substr(0, fragment_position).data(),
-                              fragment_position);
-    } else {
-      result[0] = std::string(tmp.substr(0, fragment_position).data(),
-                              fragment_position);
-    }
-    if (fragment_position + 1 < path.size()) {
-      result[2] = std::string(tmp.substr(fragment_position + 1).data());
-    }
+  auto question_mark_position = path.find('?');
+  auto hashtag_position = path.find("#");
+  if (question_mark_position == absl::string_view::npos && hashtag_position == absl::string_view::npos) {
+    result[0] = std::string(path.data());
+  } else if (question_mark_position == absl::string_view::npos) {
+    result[0] = std::string(path.substr(0, hashtag_position).data(), hashtag_position);
+    result[2] = std::string(path.substr(hashtag_position + 1).data());
+  } else if (hashtag_position == absl::string_view::npos) {
+    result[0] = std::string(path.substr(0, question_mark_position).data(), question_mark_position);
+    result[1] = std::string(path.substr(question_mark_position + 1).data());
   } else {
-    if (query_position != absl::string_view::npos) {
-      result[0] =
-          std::string(path.substr(0, query_position).data(), query_position);
-      if (query_position + 1 < path.size()) {
-        result[1] = std::string(path.substr(query_position + 1));
-      }
+    if (question_mark_position < hashtag_position) {
+      auto query_length = hashtag_position - question_mark_position - 1;
+      result[0] = std::string(path.substr(0, question_mark_position).data(), question_mark_position);
+      result[1] = std::string(path.substr(question_mark_position + 1, query_length).data(), query_length);
+      result[2] = std::string(path.substr(hashtag_position + 1).data());
     } else {
-      result[0] = std::string(path.data());
+      result[0] = std::string(path.substr(0, hashtag_position).data(), hashtag_position);
+      result[2] = std::string(path.substr(hashtag_position + 1).data());
     }
   }
   return result;
@@ -329,7 +336,7 @@ response_t HttpImpl::Post(absl::string_view uri,
     ctx.set_verify_mode(ssl::verify_peer);
     ctx.set_default_verify_paths();
 
-    if(!ca_cert.empty()) {
+    if (!ca_cert.empty()) {
       spdlog::info("{}: Trusting the provided certificate authority", __func__);
       beast::error_code ca_ec;
       ctx.add_certificate_authority(
@@ -349,12 +356,12 @@ response_t HttpImpl::Post(absl::string_view uri,
                                       boost::asio::error::get_ssl_category()};
     }
     const auto results =
-            resolver.async_resolve(parsed_uri.Host(), std::to_string(parsed_uri.Port()), yield);
+        resolver.async_resolve(parsed_uri.Host(), std::to_string(parsed_uri.Port()), yield);
     beast::get_lowest_layer(stream).async_connect(results, yield);
     stream.async_handshake(ssl::stream_base::client, yield);
     // Set up an HTTP POST request message
     beast::http::request<beast::http::string_body> req{
-            beast::http::verb::post, parsed_uri.PathQueryFragment(), version};
+        beast::http::verb::post, parsed_uri.PathQueryFragment(), version};
     req.set(beast::http::field::host, parsed_uri.Host());
     for (auto header : headers) {
       req.set(boost::beast::string_view(header.first.data()),
@@ -387,9 +394,9 @@ response_t HttpImpl::Post(absl::string_view uri,
           return response_t();
         }
 
-        // when trusted CA is configured
-        // stream_truncated also happen sometime and we choose to ignore the stream_truncated error,
-        // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
+          // when trusted CA is configured
+          // stream_truncated also happen sometime and we choose to ignore the stream_truncated error,
+          // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
         else if (ec != boost::asio::ssl::error::stream_truncated) {
           spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
           return response_t();

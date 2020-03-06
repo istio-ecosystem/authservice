@@ -34,6 +34,10 @@ private:
 public:
   explicit Uri(absl::string_view uri);
 
+  Uri(const Uri &uri);
+
+  void operator=(Uri &&uri);
+
   std::string Scheme() { return "https"; }
 
   std::string Host() { return host_; }

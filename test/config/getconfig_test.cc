@@ -1,13 +1,122 @@
+#include <boost/filesystem.hpp>
+#include <fstream>
 #include "src/config/get_config.h"
 #include "gtest/gtest.h"
+#include "test/shared/assertions.h"
 
 namespace authservice {
 namespace config {
 
-TEST(GetConfigTest, ReturnsTheConfig) {
+using test_helpers::ASSERT_THROWS_STD_RUNTIME_ERROR;
+
+class GetConfigTest : public ::testing::Test {
+protected:
+  // Note that the json '{' and '}' are doubled to escape them in usages of fmt::format below
+  const char *minimal_valid_config = R"JSON(
+  {{
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "chains": [
+      {{
+        "name": "test-chain",
+        "filters": [
+          {{
+            "oidc":
+            {{
+              "authorization_uri": "{}",
+              "token_uri": "{}",
+              "callback_uri": "{}",
+              "jwks": "fake-jwks",
+                "client_id": "fake-client-id",
+                "client_secret": "fake-client-secret",
+                "id_token": {{
+                  "preamble": "Bearer",
+                  "header": "authorization"
+                }}
+            }}
+          }}
+        ]
+      }}
+    ]
+  }}
+  )JSON";
+
+  const char *multiple_chains_valid_config = R"JSON(
+  {{
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "chains": [
+      {{
+        "name": "test-chain1",
+        "filters": [
+          {{
+            "oidc":
+            {{
+              "authorization_uri": "{}",
+              "token_uri": "{}",
+              "callback_uri": "{}",
+              "jwks": "fake-jwks",
+                "client_id": "fake-client-id",
+                "client_secret": "fake-client-secret",
+                "id_token": {{
+                  "preamble": "Bearer",
+                  "header": "authorization"
+                }}
+            }}
+          }}
+        ]
+      }},
+      {{
+        "name": "test-chain2",
+        "filters": [
+          {{
+            "oidc":
+            {{
+              "authorization_uri": "{}",
+              "token_uri": "{}",
+              "callback_uri": "{}",
+              "jwks": "fake-jwks",
+                "client_id": "fake-client-id",
+                "client_secret": "fake-client-secret",
+                "id_token": {{
+                  "preamble": "Bearer",
+                  "header": "authorization"
+                }}
+            }}
+          }}
+        ]
+      }}
+    ]
+  }}
+  )JSON";
+
+  std::string tmp_filename;
+
+  virtual void SetUp() {
+    auto pid = ::getpid();
+    auto time = ::time(nullptr);
+    tmp_filename = "/tmp/test." + std::to_string(pid) + "_" + std::to_string(time) + ".json";
+  }
+
+  virtual void TearDown() {
+    std::remove(tmp_filename.c_str());
+  }
+
+  void write_test_file(const std::string &json_string) {
+    std::ofstream stream;
+    stream.open(tmp_filename);
+    stream << json_string;
+    stream.close();
+  }
+};
+
+TEST_F(GetConfigTest, ReturnsTheConfig) {
   auto config = GetConfig("test/fixtures/valid-config.json");
-  const oidc::OIDCConfig &oidc =
-      config->chains().at(0).filters().at(0).oidc();
+  const oidc::OIDCConfig &oidc = config->chains().at(0).filters().at(0).oidc();
 
   ASSERT_EQ(config->listen_port(), 10003);
   ASSERT_EQ(config->log_level(), "trace");
@@ -46,16 +155,112 @@ TEST(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.trusted_certificate_authority(), "ca_placeholder");
 }
 
-TEST(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
-  ASSERT_THROW(GetConfig("test/fixtures/invalid-config.json"),
-               std::runtime_error);
+TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
+  write_test_file(R"JSON(
+    {
+      "filters": [
+        {
+          "oidc":
+          {
+          }
+        }
+      ]
+    }
+  )JSON");
+
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); }, "filters: Cannot find field.");
 }
 
-TEST(GetConfigTest,
-     ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
-  ASSERT_THROW(
-      GetConfig("test/fixtures/invalid-config-with-intermediate-nodes.json"),
-      std::runtime_error);
+TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfigForUriNestedProperties) {
+  write_test_file(R"JSON(
+    {
+      "filters": [
+        {
+          "oidc":
+          {
+            "authorization_uri": "",
+            "token_uri": "",
+            "callback_uri": "",
+            "jwks": ""
+          }
+        }
+      ]
+    }
+  )JSON");
+
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); }, "filters: Cannot find field.");
+}
+
+TEST_F(GetConfigTest, ValidatesTheUris) {
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz"));
+  ASSERT_NO_THROW(GetConfig(tmp_filename));
+
+  write_test_file(fmt::format(minimal_valid_config, "invalid", "https://bar", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid authorization_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "invalid", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid token_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "invalid"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid callback_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo?q=2", "https://bar", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid authorization_uri: query params and fragments not allowed: https://foo?q=2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo#2", "https://bar", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid authorization_uri: query params and fragments not allowed: https://foo#2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar?q=2", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid token_uri: query params and fragments not allowed: https://bar?q=2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar#2", "https://baz"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid token_uri: query params and fragments not allowed: https://bar#2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz?q=2"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid callback_uri: query params and fragments not allowed: https://baz?q=2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz#2"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid callback_uri: query params and fragments not allowed: https://baz#2");
+}
+
+TEST_F(GetConfigTest, ValidatesTheUris_WhenThereAreMultipleChains) {
+  write_test_file(fmt::format(multiple_chains_valid_config,
+      "https://foo1", "https://bar1", "https://baz1",
+      "https://foo2", "https://bar2", "https://baz2"));
+  ASSERT_NO_THROW(GetConfig(tmp_filename));
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "invalid", "https://bar1", "https://baz1",
+                              "https://foo2", "https://bar2", "https://baz2"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid authorization_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "https://foo1", "https://bar1", "https://baz1",
+                              "invalid", "https://bar2", "https://baz2"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid authorization_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "https://foo1", "https://bar1", "https://baz1",
+                              "https://foo2", "invalid", "https://baz2"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid token_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "https://foo1", "https://bar1", "https://baz1",
+                              "https://foo2", "https://bar2", "invalid"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid callback_uri: uri must be https scheme: invalid");
 }
 
 }  // namespace config

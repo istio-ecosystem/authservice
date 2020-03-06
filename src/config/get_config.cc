@@ -1,11 +1,13 @@
 #include "get_config.h"
-#include <boost/algorithm/string/join.hpp>
 #include <google/protobuf/util/json_util.h>
 #include "spdlog/spdlog.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include "config/config.pb.validate.h"
+#include "src/common/http/http.h"
+#include "absl/strings/string_view.h"
+#include <fmt/ostream.h>
 
 using namespace std;
 using namespace google::protobuf::util;
@@ -13,8 +15,21 @@ using namespace google::protobuf::util;
 namespace authservice {
 namespace config {
 
-unique_ptr<Config> GetConfig(
-    const string &configFileName) {
+void validateUri(absl::string_view uri, absl::string_view uri_name) {
+  array<string, 3> path_query_fragment_array;
+  try {
+    auto parsed_uri = common::http::Http::ParseUri(uri);
+    path_query_fragment_array = common::http::Http::DecodePath(parsed_uri.PathQueryFragment());
+  } catch (runtime_error &e) {
+    throw runtime_error(fmt::format("invalid {}: ", uri_name) + e.what());
+  }
+  if (!path_query_fragment_array[1].empty() || !path_query_fragment_array[2].empty()) {
+    throw runtime_error(fmt::format("invalid {}: query params and fragments not allowed: {}", uri_name, uri));
+  }
+
+}
+
+unique_ptr<Config> GetConfig(const string &configFileName) {
   ifstream configFile(configFileName);
   if (!configFile) {
     throw runtime_error("failed to open filter config");
@@ -29,15 +44,21 @@ unique_ptr<Config> GetConfig(
     throw runtime_error(status.error_message());
   }
 
-  std::string error;
+  string error;
   if (!Validate(*(config.get()), &error)) {
     throw runtime_error(error);
+  }
+
+  for (const auto &chain : config->chains()) {
+    validateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri");
+    validateUri(chain.filters(0).oidc().callback_uri(), "callback_uri");
+    validateUri(chain.filters(0).oidc().token_uri(), "token_uri");
   }
 
   return config;
 }
 
-spdlog::level::level_enum GetConfiguredLogLevel(const Config& config) {
+spdlog::level::level_enum GetConfiguredLogLevel(const Config &config) {
   auto log_level_string = config.log_level();
   spdlog::level::level_enum level;
 
@@ -60,11 +81,9 @@ spdlog::level::level_enum GetConfiguredLogLevel(const Config& config) {
   return level;
 }
 
-std::string GetConfiguredAddress(const Config& config) {
-  std::stringstream address_string_builder;
-
-  address_string_builder << config.listen_address() << ":" << std::dec
-                         << config.listen_port();
+string GetConfiguredAddress(const Config &config) {
+  stringstream address_string_builder;
+  address_string_builder << config.listen_address() << ":" << dec << config.listen_port();
   auto address = address_string_builder.str();
   return address;
 }

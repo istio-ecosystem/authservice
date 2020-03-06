@@ -1,7 +1,7 @@
 filegroup(
     name = "fixtures",
-    srcs = glob([
-        "*.json",
-    ]),
+    srcs = [
+        "valid-config.json",
+    ],
     visibility = ["//test:__subpackages__"],
 )
