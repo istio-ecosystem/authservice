@@ -26,7 +26,7 @@ typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
 
 class Uri {
 private:
-  const std::string https_prefix_ = "https://";
+  static const std::string https_prefix_;
   std::string host_;
   int32_t port_ = 443;
   std::string pathQueryFragment_; // includes the path, query, and fragment (if any)
@@ -36,15 +36,15 @@ public:
 
   Uri(const Uri &uri);
 
-  void operator=(Uri &&uri);
+  Uri& operator=(Uri &&uri) noexcept;
 
-  std::string Scheme() { return "https"; }
+  inline std::string Scheme() { return "https"; }
 
-  std::string Host() { return host_; }
+  inline std::string Host() { return host_; }
 
-  int32_t Port() { return port_; }
+  inline int32_t Port() { return port_; }
 
-  std::string PathQueryFragment() { return pathQueryFragment_; }
+  inline std::string PathQueryFragment() { return pathQueryFragment_; }
 };
 
 class Http {
