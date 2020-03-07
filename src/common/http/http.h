@@ -24,19 +24,50 @@ typedef std::shared_ptr<Http> ptr_t;
 typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
 
+class PathQueryFragment {
+private:
+  std::string path_;
+  std::string query_;
+  std::string fragment_;
+
+public:
+  explicit PathQueryFragment(absl::string_view path_query_fragment);
+
+  inline const std::string &Path() const {
+    return path_;
+  }
+
+  inline const std::string &Query() const {
+    return query_;
+  }
+
+  inline bool HasQuery() const {
+    return !query_.empty();
+  }
+
+  inline const std::string &Fragment() const {
+    return fragment_;
+  }
+
+  inline bool HasFragment() const {
+    return !fragment_.empty();
+  }
+};
+
 class Uri {
 private:
   static const std::string https_prefix_;
   std::string host_;
   int32_t port_ = 443;
-  std::string pathQueryFragment_; // includes the path, query, and fragment (if any)
+  std::string pathQueryFragmentString_; // includes the path, query, and fragment (if any)
+  PathQueryFragment pathQueryFragment_;
 
 public:
   explicit Uri(absl::string_view uri);
 
   Uri(const Uri &uri);
 
-  Uri& operator=(Uri &&uri) noexcept;
+  Uri &operator=(Uri &&uri) noexcept;
 
   inline std::string Scheme() { return "https"; }
 
@@ -44,7 +75,17 @@ public:
 
   inline int32_t Port() { return port_; }
 
-  inline std::string PathQueryFragment() { return pathQueryFragment_; }
+  inline std::string PathQueryFragment() { return pathQueryFragmentString_; }
+
+  std::string Path();
+
+  std::string Query();
+
+  inline bool HasQuery() const { return pathQueryFragment_.HasQuery(); };
+
+  std::string Fragment();
+
+  inline bool HasFragment() const { return pathQueryFragment_.HasFragment(); };
 };
 
 class Http {
@@ -130,20 +171,6 @@ public:
    */
   static absl::optional<std::map<std::string, std::string>> DecodeCookies(
       absl::string_view cookies);
-
-  /**
- * Decode a uri into a scheme, host, port, and path.
- * @param uri string
- * @return the decoded Uri
- */
-  static Uri ParseUri(absl::string_view uri);
-
-  /**
-   * Decode a path into a path, query and fragment triple.
-   * @param path the path to decode
-   * @return the decoded triple
-   */
-  static std::array<std::string, 3> DecodePath(absl::string_view path);
 
   /**
    * Virtual destructor

@@ -8,6 +8,7 @@
 #include "src/common/http/http.h"
 #include "absl/strings/string_view.h"
 #include <fmt/ostream.h>
+#include <memory>
 
 using namespace std;
 using namespace google::protobuf::util;
@@ -15,18 +16,16 @@ using namespace google::protobuf::util;
 namespace authservice {
 namespace config {
 
-void validateUri(absl::string_view uri, absl::string_view uri_name) {
-  array<string, 3> path_query_fragment_array;
+void ValidateUri(absl::string_view uri, absl::string_view uri_name) {
+  unique_ptr<common::http::Uri> parsed_uri;
   try {
-    auto parsed_uri = common::http::Http::ParseUri(uri);
-    path_query_fragment_array = common::http::Http::DecodePath(parsed_uri.PathQueryFragment());
+    parsed_uri = unique_ptr<common::http::Uri>(new common::http::Uri(uri));
   } catch (runtime_error &e) {
     throw runtime_error(fmt::format("invalid {}: ", uri_name) + e.what());
   }
-  if (!path_query_fragment_array[1].empty() || !path_query_fragment_array[2].empty()) {
+  if (parsed_uri->HasQuery() || parsed_uri->HasFragment()) {
     throw runtime_error(fmt::format("invalid {}: query params and fragments not allowed: {}", uri_name, uri));
   }
-
 }
 
 unique_ptr<Config> GetConfig(const string &configFileName) {
@@ -50,9 +49,9 @@ unique_ptr<Config> GetConfig(const string &configFileName) {
   }
 
   for (const auto &chain : config->chains()) {
-    validateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri");
-    validateUri(chain.filters(0).oidc().callback_uri(), "callback_uri");
-    validateUri(chain.filters(0).oidc().token_uri(), "token_uri");
+    ValidateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri");
+    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri");
+    ValidateUri(chain.filters(0).oidc().token_uri(), "token_uri");
   }
 
   return config;

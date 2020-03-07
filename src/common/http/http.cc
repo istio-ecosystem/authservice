@@ -236,7 +236,7 @@ absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
   return result;
 }
 
-Uri::Uri(absl::string_view uri) {
+Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
   if (uri.find(https_prefix_) != 0) { // must start with https://
     throw std::runtime_error(absl::StrCat("uri must be https scheme: ", uri));
   }
@@ -256,10 +256,12 @@ Uri::Uri(absl::string_view uri) {
   }
   host_and_port = std::string(uri_without_scheme.substr(0, end_of_host_and_port_index).data(),
                               end_of_host_and_port_index);
-  pathQueryFragment_ = std::string(uri_without_scheme.substr(end_of_host_and_port_index).data());
-  if (!absl::StartsWith(pathQueryFragment_, "/")) {
-    pathQueryFragment_ = "/" + pathQueryFragment_;
+  pathQueryFragmentString_ = std::string(uri_without_scheme.substr(end_of_host_and_port_index).data());
+  if (!absl::StartsWith(pathQueryFragmentString_, "/")) {
+    pathQueryFragmentString_ = "/" + pathQueryFragmentString_;
   }
+
+  pathQueryFragment_ = http::PathQueryFragment(pathQueryFragmentString_);
 
   auto colon_position = host_and_port.find(':');
   if (colon_position == 0) {
@@ -283,48 +285,56 @@ Uri::Uri(absl::string_view uri) {
 
 const std::string Uri::https_prefix_ = "https://";
 
-Uri& Uri::operator=(Uri &&uri) noexcept {
+Uri &Uri::operator=(Uri &&uri) noexcept {
   host_ = uri.host_;
   port_ = uri.port_;
+  pathQueryFragmentString_ = uri.pathQueryFragmentString_;
   pathQueryFragment_ = uri.pathQueryFragment_;
   return *this;
 }
 
-Uri::Uri(const Uri &uri) {
-  host_ = uri.host_;
-  port_ = uri.port_;
-  pathQueryFragment_ = uri.pathQueryFragment_;
+Uri::Uri(const Uri &uri)
+    : host_(uri.host_),
+      port_(uri.port_),
+      pathQueryFragmentString_(uri.pathQueryFragmentString_),
+      pathQueryFragment_(uri.pathQueryFragment_) {
 }
 
-Uri Http::ParseUri(absl::string_view uri) {
-  return Uri(uri);
+std::string Uri::Path() {
+  return pathQueryFragment_.Path();
 }
 
-std::array<std::string, 3> Http::DecodePath(absl::string_view path) {
+std::string Uri::Fragment() {
+  return pathQueryFragment_.Fragment();
+}
+
+std::string Uri::Query() {
+  return pathQueryFragment_.Query();
+}
+
+PathQueryFragment::PathQueryFragment(absl::string_view path_query_fragment) {
   // See https://tools.ietf.org/html/rfc3986#section-3.4 and https://tools.ietf.org/html/rfc3986#section-3.5
-  std::array<std::string, 3> result;
-  auto question_mark_position = path.find('?');
-  auto hashtag_position = path.find("#");
+  auto question_mark_position = path_query_fragment.find('?');
+  auto hashtag_position = path_query_fragment.find("#");
   if (question_mark_position == absl::string_view::npos && hashtag_position == absl::string_view::npos) {
-    result[0] = std::string(path.data());
+    path_ = std::string(path_query_fragment.data());
   } else if (question_mark_position == absl::string_view::npos) {
-    result[0] = std::string(path.substr(0, hashtag_position).data(), hashtag_position);
-    result[2] = std::string(path.substr(hashtag_position + 1).data());
+    path_ = std::string(path_query_fragment.substr(0, hashtag_position).data(), hashtag_position);
+    fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
   } else if (hashtag_position == absl::string_view::npos) {
-    result[0] = std::string(path.substr(0, question_mark_position).data(), question_mark_position);
-    result[1] = std::string(path.substr(question_mark_position + 1).data());
+    path_ = std::string(path_query_fragment.substr(0, question_mark_position).data(), question_mark_position);
+    query_ = std::string(path_query_fragment.substr(question_mark_position + 1).data());
   } else {
     if (question_mark_position < hashtag_position) {
       auto query_length = hashtag_position - question_mark_position - 1;
-      result[0] = std::string(path.substr(0, question_mark_position).data(), question_mark_position);
-      result[1] = std::string(path.substr(question_mark_position + 1, query_length).data(), query_length);
-      result[2] = std::string(path.substr(hashtag_position + 1).data());
+      path_ = std::string(path_query_fragment.substr(0, question_mark_position).data(), question_mark_position);
+      query_ = std::string(path_query_fragment.substr(question_mark_position + 1, query_length).data(), query_length);
+      fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
     } else {
-      result[0] = std::string(path.substr(0, hashtag_position).data(), hashtag_position);
-      result[2] = std::string(path.substr(hashtag_position + 1).data());
+      path_ = std::string(path_query_fragment.substr(0, hashtag_position).data(), hashtag_position);
+      fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
     }
   }
-  return result;
 }
 
 response_t HttpImpl::Post(absl::string_view uri,
@@ -349,7 +359,7 @@ response_t HttpImpl::Post(absl::string_view uri,
       }
     }
 
-    auto parsed_uri = http::Http::ParseUri(uri);
+    auto parsed_uri = http::Uri(uri);
 
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
