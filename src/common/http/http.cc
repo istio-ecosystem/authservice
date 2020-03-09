@@ -300,15 +300,15 @@ Uri::Uri(const Uri &uri)
       pathQueryFragment_(uri.pathQueryFragment_) {
 }
 
-std::string Uri::Path() {
+std::string Uri::GetPath() {
   return pathQueryFragment_.Path();
 }
 
-std::string Uri::Fragment() {
+std::string Uri::GetFragment() {
   return pathQueryFragment_.Fragment();
 }
 
-std::string Uri::Query() {
+std::string Uri::GetQuery() {
   return pathQueryFragment_.Query();
 }
 
@@ -364,18 +364,18 @@ response_t HttpImpl::Post(absl::string_view uri,
     tcp::resolver resolver(ioc);
     beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
     if (!SSL_set_tlsext_host_name(stream.native_handle(),
-                                  parsed_uri.Host().c_str())) {
+                                  parsed_uri.GetHost().c_str())) {
       throw boost::system::error_code{static_cast<int>(::ERR_get_error()),
                                       boost::asio::error::get_ssl_category()};
     }
     const auto results =
-        resolver.async_resolve(parsed_uri.Host(), std::to_string(parsed_uri.Port()), yield);
+        resolver.async_resolve(parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
     beast::get_lowest_layer(stream).async_connect(results, yield);
     stream.async_handshake(ssl::stream_base::client, yield);
     // Set up an HTTP POST request message
     beast::http::request<beast::http::string_body> req{
-        beast::http::verb::post, parsed_uri.PathQueryFragment(), version};
-    req.set(beast::http::field::host, parsed_uri.Host());
+        beast::http::verb::post, parsed_uri.GetPathQueryFragment(), version};
+    req.set(beast::http::field::host, parsed_uri.GetHost());
     for (auto header : headers) {
       req.set(boost::beast::string_view(header.first.data()),
               boost::beast::string_view(header.second.data()));
