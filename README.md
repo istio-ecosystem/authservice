@@ -31,6 +31,9 @@ Please refer to the [bookinfo-example](./bookinfo-example) directory for an exam
 
 Refer to the [configuration options guide](docs/README.md) for all of the available configuration options.
 
+## How does authservice work?
+We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to explain how authservice makes decisions at different points in the login lifecycle. 
+
 ## Developer Notes
 See the [Makefile](Makefile) for common tasks.
 
