@@ -8,6 +8,18 @@ to the Istio mesh. `authservice` is compatible with any standard OIDC Provider a
 including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
 Together, they allow developers to protect their APIs and web apps without any application code required.
 
+Some of the features it provides:
+- Transparent login and logout
+  - Retrieves OAuth2 Access tokens, ID tokens, and refresh tokens
+- Fine-grained control over which url paths are protected 
+- Session management
+  - Configuration of session lifetime and idle timeouts
+  - Refreshes expired tokens automatically
+- Compatible with any standard OIDC Provider
+- Supports multiple OIDC Providers for same application
+- Trusts custom CA certs when talking to OIDC Providers
+- Works either at the sidecar or gateway level
+
 ## Using the `authservice` docker image
 The `authservice` images are hosted on [authservice's GitHub Package Registry](https://github.com/istio-ecosystem/authservice/packages).
 NOTE: Github Package Registry currently does **NOT** work with Kubernetes. [This issue](https://github.com/kubernetes-sigs/kind/issues/870) 
