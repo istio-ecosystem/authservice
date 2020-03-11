@@ -71,6 +71,10 @@ other services of the Bookinfo app aside from `productpage`.
 
     `kubectl apply -f config/bookinfo-gateway.yaml`
 
+    Note that session affinity (via Istio `DestinationRule`) is required when you deploy multiple instances of `productpage`, 
+    which ensures that the requests from the same user-agent reach the same instance of `productpage`. 
+    This is required because Authservice currently only supports in-memory session storage.
+    
 1. Next confirm that the Bookinfo app is running.
    After determining the [ingress IP and port](https://istio.io/docs/tasks/traffic-management/ingress/ingress-control/#determining-the-ingress-ip-and-ports),
    use a browser to navigate to the `productpage` UI, substituting the ingress host: `https://<INGRESS_HOST>/productpage`.
@@ -113,15 +117,15 @@ other services of the Bookinfo app aside from `productpage`.
       the query parameter
    1. The Authservice exchanged the authorization code for tokens by making a call from the Authservice directly to the
       OIDC provider (as a "backend-to-backend request", rather than another browser redirect)
-   1. The Authservice redirected the browser back to the landing page of the `productpage` service
-   1. The Authservice received the request to the landing page and injected the OIDC ID token into the `Authentication`
+   1. The Authservice redirected the browser back to the originally requested path of the `productpage` service
+   1. The Authservice received the request to the `productpage` and injected the OIDC ID token into the `Authentication`
       http request header of that request before allowing the request to continue on to the `productpage`
    1. Before the request continues to the `productpage`, the Istio authentication policy validated the token
       from the `Authentication` request header and, since it was valid, allowed the request to go to the `productpage`
    1. The `productpage` renders its UI in the http response and the browser shows the UI
 
-   The Authservice saves its state into the user's browser cookies, so future `productpage` page loads in the browser
-   will not require authentication until the OIDC tokens expire. To log out and remove the cookies immediately,
+   The Authservice sets a session ID cookie on user's browser, so future `productpage` page loads in the browser
+   will not require authentication until the OIDC tokens expire. To log out and remove the current user's session immediately,
    point the browser to `https://<INGRESS_HOST>/authservice_logout` (this path is configurable in the Authservice's
    `ConfigMap`).
 
@@ -130,16 +134,7 @@ other services of the Bookinfo app aside from `productpage`.
 The authentication tokens acquired using the Authservice can also be used for authorization, provided that they contain 
 scopes. This section demonstrates how to leverage the Authservice to relay the authorization token to protected apps and services. 
   
-
-1. Install Istio with a Patched Envoy Proxy
-
-    | ⚠️🚨 WARNING 🚨⚠️: A custom Istio with fixes will be installed, so a cluster without Istio currently installed is required. |
-    | --- |
-    
-    The current sidecar proxy image bundled with Istio contains [a bug which prevents setting multiple headers](https://github.com/envoyproxy/envoy/issues/8649). Unfortunately, because of this the Authservice cannot set multiple headers in a single request until a fix is released, namely id token header and access token header. A fork of the Envoy Proxy with a fix permitting multiple headers to be set per a single request is required to demonstrate the authorization features of the Authservice. Instructions on how to build and deploy a patched ingress sidecar can be found in the [wiki](https://github.com/istio-ecosystem/authservice/wiki/Installing-Istio-with-a-Custom-Envoy-Proxy).
-
-1. Configure the Authservice for authorization
-    Additionally the Authservice must be configured to provide authorization. It must both request scopes for protected resources and also attach the authorization token as a header.
+1. Configure the Authservice to provide authorization. It must both request scopes for protected resources and also attach the authorization token as a header.
 
     1. Setup a `ConfigMap` for Authservice. Fill in [`authservice-configmap-template-for-authn-and-authz.yaml`](authservice-configmap-template-for-authn-and-authz.yaml) to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md) for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
 
@@ -171,6 +166,10 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
        ```bash
        kubectl apply -f config/bookinfo-gateway.yaml
        ```
+       
+       Note that session affinity (via Istio `DestinationRule`) is required when you deploy multiple instances of `productpage`, 
+       which ensures that the requests from the same user-agent reach the same instance of `productpage`. 
+       This is required because Authservice currently only supports in-memory session storage.
        
     1. Next confirm that the Bookinfo app is running.
        
@@ -242,12 +241,5 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
    | Page is viewable but reviews are not            | x                |              |
    | Istio unauthorized message: RBAC: access denied |                  |              |
 
-Through this demo, the user will have set up a cluster with a custom Istio installed, installed the Bookinfo app, and set
-up authentication and authorization. 
 
-This doc shows how to integrate Authservice into an Istio system deployed on Kubernetes.
-
-This demo uses the [Istio Bookinfo sample application](https://istio.io/docs/examples/bookinfo/).
-
-This demo takes advantage of an Istio feature set that gives the ability to inject http filters on Sidecars. This feature set was released in Istio 1.3.0.
-
+For a full list of Authservice configuration options, see the [configuration docs](../docs/README.md).

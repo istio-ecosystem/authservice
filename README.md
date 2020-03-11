@@ -8,6 +8,18 @@ to the Istio mesh. `authservice` is compatible with any standard OIDC Provider a
 including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
 Together, they allow developers to protect their APIs and web apps without any application code required.
 
+Some of the features it provides:
+- Transparent login and logout
+  - Retrieves OAuth2 Access tokens, ID tokens, and refresh tokens
+- Fine-grained control over which url paths are protected 
+- Session management
+  - Configuration of session lifetime and idle timeouts
+  - Refreshes expired tokens automatically
+- Compatible with any standard OIDC Provider
+- Supports multiple OIDC Providers for same application
+- Trusts custom CA certs when talking to OIDC Providers
+- Works either at the sidecar or gateway level
+
 ## Using the `authservice` docker image
 The `authservice` images are hosted on [authservice's GitHub Package Registry](https://github.com/istio-ecosystem/authservice/packages).
 NOTE: Github Package Registry currently does **NOT** work with Kubernetes. [This issue](https://github.com/kubernetes-sigs/kind/issues/870) 
@@ -18,6 +30,9 @@ and `docker push` it to your own image registry (e.g. Docker Hub) in order to us
 Please refer to the [bookinfo-example](./bookinfo-example) directory for an example of how to use the Authservice.
 
 Refer to the [configuration options guide](docs/README.md) for all of the available configuration options.
+
+## How does authservice work?
+We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to explain how authservice makes decisions at different points in the login lifecycle. 
 
 ## Developer Notes
 See the [Makefile](Makefile) for common tasks.
