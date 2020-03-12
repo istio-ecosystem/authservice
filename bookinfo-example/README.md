@@ -1,4 +1,4 @@
-# Bookinfo with Authservice Example (Sidecar integration)
+# Bookinfo with Authservice Example
 
 This doc shows how to integrate Authservice into an Istio system deployed on Kubernetes.
 
@@ -12,7 +12,6 @@ Things needed before starting:
 - A Kubernetes cluster that is compatible with Istio 1.3 or newer
 - An OIDC provider configured to support Authorization Code grant type. The urls and credentials for this 
 provider will be needed to configure Authservice.
-
  
 ### Pre-requisites:
 1. Download Istio 1.3 or greater. For example:
@@ -29,7 +28,7 @@ provider will be needed to configure Authservice.
    [`scripts/generate-self-signed-certs-for-ingress-gateway.sh`](scripts/generate-self-signed-certs-for-ingress-gateway.sh)
 
 
-## Deploy Bookinfo Using the Authservice for Token Acquisition
+## Deploy Bookinfo Using the Authservice for Token Acquisition (Sidecar integration)
 
 The goal of these steps is the protect the `productpage` service with OIDC authentication provided by the mesh.
 
@@ -129,7 +128,7 @@ other services of the Bookinfo app aside from `productpage`.
    point the browser to `https://<INGRESS_HOST>/authservice_logout` (this path is configurable in the Authservice's
    `ConfigMap`).
 
-## Deploy Bookinfo Using the Authservice for Authorization 
+## Deploy Bookinfo Using the Authservice for Token Acquisition + Authorization (Sidecar integration)
 
 The authentication tokens acquired using the Authservice can also be used for authorization, provided that they contain 
 scopes. This section demonstrates how to leverage the Authservice to relay the authorization token to protected apps and services. 
@@ -243,3 +242,35 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
 
 
 For a full list of Authservice configuration options, see the [configuration docs](../docs/README.md).
+
+## Istio Ingress-gateway integration
+One might want to use the Authservice at the gateway level to provide a single login flow for all applications inside an Istio mesh, a.k.a. using it as an Auth API Gateway.
+
+### Additional Pre-requisites:
+
+1. External Load Balancer: Currently Authservice can be used at either the sidecar or gateway. However, there may be issues when it is used at the gateway in an installation with multiple gateway instances. These issues are due to session state being stored in-memory, and only happen when users go from talking to one Authservice instance to another mid-session. Such problems can be avoided it the gateway instances are placed behind a load balancer that supports session affinity.
+
+1. Installing Authservice in Istio Ingress-gateway: Currently, there is not yet a native way to install Authservice into the Istio Ingress-gateway. A more integrated way to install Authservice as part of the Gateway will be considered in the future. However, you can manually modify the `Deployment` of `istio-ingressgateway` to add the Authservice container:
+
+```
+containers:
+        # Adding the authservice container
+        - name: authservice
+          image: AUTHSERVICE_IMAGE
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 10003
+          volumeMounts:
+            - name: authcode-sample-app-authservice-configmap-volume
+              mountPath: /etc/authservice
+        - name: istio-proxy
+          ...
+```          
+
+### Notes:
+The steps of using Authservice at the Ingress-gateway are roughly the same as the Sidecar integration steps detailed above except for these major differences:
+1. The Istio Authentication Policy will have to target the Ingress-gateway, which will result in a JWT AuthN filter being added to the gateway.
+1. The `ext_authz` envoy filter will have to be inserted into the gateway's filter chain (the Istio `EnvoyFilter` config will have to target the gateway).
+1. The Authservice will no longer be required to be deployed at the Sidecar level alongside the application. 
+
+Better user experience and more sample configs will be added in the future.
