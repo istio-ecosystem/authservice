@@ -22,7 +22,7 @@ AuthServiceImpl::AuthServiceImpl(const config::Config &config)
     ::envoy::service::auth::v2::CheckResponse *response) {
   spdlog::trace("{}", __func__);
   try {
-    auto request_path = common::http::Http::DecodePath(request->attributes().request().http().path())[0];
+    auto request_path = common::http::PathQueryFragment(request->attributes().request().http().path()).Path();
     if (!common::utilities::trigger_rules::TriggerRuleMatchesPath(request_path, trigger_rules_config_)) {
       spdlog::debug(
           "{}: no matching trigger rule, so allowing request to proceed without any authservice functionality {}://{}{} ",

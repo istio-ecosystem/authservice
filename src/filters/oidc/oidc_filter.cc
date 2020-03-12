@@ -355,11 +355,11 @@ bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckReq
 }
 
 std::string OidcFilter::RequestPath(const CheckRequest *request) {
-  return common::http::Http::DecodePath(request->attributes().request().http().path())[0];
+  return common::http::PathQueryFragment(request->attributes().request().http().path()).Path();
 }
 
 std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
-  return common::http::Http::DecodePath(request->attributes().request().http().path())[1];
+  return common::http::PathQueryFragment(request->attributes().request().http().path()).Query();
 }
 
 bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
@@ -368,9 +368,9 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   auto scheme = request->attributes().request().http().scheme();
   spdlog::trace("{}: checking handler for {}://{}{}", __func__, scheme, request_host, path);
 
-  auto request_path_parts = common::http::Http::DecodePath(path);
+  auto request_path_parts = common::http::PathQueryFragment(path);
   auto configured_uri = idp_config_.callback_uri();
-  auto parsed_uri = common::http::Http::ParseUri(configured_uri);
+  auto parsed_uri = common::http::Uri(configured_uri);
   auto configured_port = parsed_uri.Port();
   auto configured_hostname = parsed_uri.Host();
   auto configured_scheme = parsed_uri.Scheme();
@@ -381,7 +381,7 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
 
   std::string configured_callback_host_with_port = buf.str();
 
-  bool path_matches = request_path_parts[0] == configured_path;
+  bool path_matches = request_path_parts.Path() == configured_path;
 
   bool host_matches = request_host == configured_callback_host_with_port ||
                       (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
