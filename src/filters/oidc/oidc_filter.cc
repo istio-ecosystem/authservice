@@ -371,10 +371,10 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   auto request_path_parts = common::http::PathQueryFragment(path);
   auto configured_uri = idp_config_.callback_uri();
   auto parsed_uri = common::http::Uri(configured_uri);
-  auto configured_port = parsed_uri.Port();
-  auto configured_hostname = parsed_uri.Host();
-  auto configured_scheme = parsed_uri.Scheme();
-  auto configured_path = parsed_uri.PathQueryFragment();
+  auto configured_port = parsed_uri.GetPort();
+  auto configured_hostname = parsed_uri.GetHost();
+  auto configured_scheme = parsed_uri.GetScheme();
+  auto configured_path = parsed_uri.GetPathQueryFragment();
 
   std::stringstream buf;
   buf << configured_hostname << ':' << std::dec << configured_port;

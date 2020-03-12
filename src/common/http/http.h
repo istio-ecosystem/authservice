@@ -69,21 +69,21 @@ public:
 
   Uri &operator=(Uri &&uri) noexcept;
 
-  inline std::string Scheme() { return "https"; }
+  inline std::string GetScheme() { return "https"; }
 
-  inline std::string Host() { return host_; }
+  inline std::string GetHost() { return host_; }
 
-  inline int32_t Port() { return port_; }
+  inline int32_t GetPort() { return port_; }
 
-  inline std::string PathQueryFragment() { return pathQueryFragmentString_; }
+  inline std::string GetPathQueryFragment() { return pathQueryFragmentString_; }
 
-  std::string Path();
+  std::string GetPath();
 
-  std::string Query();
+  std::string GetQuery();
 
   inline bool HasQuery() const { return pathQueryFragment_.HasQuery(); };
 
-  std::string Fragment();
+  std::string GetFragment();
 
   inline bool HasFragment() const { return pathQueryFragment_.HasFragment(); };
 };
