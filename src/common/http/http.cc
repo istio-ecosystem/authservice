@@ -281,10 +281,13 @@ Uri::Uri(absl::string_view uri) {
   }
 }
 
-void Uri::operator=(Uri &&uri) {
+const std::string Uri::https_prefix_ = "https://";
+
+Uri& Uri::operator=(Uri &&uri) noexcept {
   host_ = uri.host_;
   port_ = uri.port_;
   pathQueryFragment_ = uri.pathQueryFragment_;
+  return *this;
 }
 
 Uri::Uri(const Uri &uri) {
