@@ -128,41 +128,77 @@ TEST(Http, EncodeCookies) {
 }
 
 TEST(Http, ParseUri) {
-  auto result1 = Http::ParseUri("https://example.com/path");
-  ASSERT_EQ(result1.Scheme(), "https");
-  ASSERT_EQ(result1.Host(), "example.com");
-  ASSERT_EQ(result1.Port(), 443);
-  ASSERT_EQ(result1.PathQueryFragment(), "/path");
+  auto result = Http::ParseUri("https://example.com/path");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example.com");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/path");
 
-  auto result2 = Http::ParseUri("https://example/path?query#fragment");
-  ASSERT_EQ(result2.Scheme(), "https");
-  ASSERT_EQ(result2.Host(), "example");
-  ASSERT_EQ(result2.Port(), 443);
-  ASSERT_EQ(result2.PathQueryFragment(), "/path?query#fragment");
+  result = Http::ParseUri("https://example/path?query#fragment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/path?query#fragment");
 
-  auto result3 = Http::ParseUri("https://www.example.com:1234");
-  ASSERT_EQ(result3.Scheme(), "https");
-  ASSERT_EQ(result3.Host(), "www.example.com");
-  ASSERT_EQ(result3.Port(), 1234);
-  ASSERT_EQ(result3.PathQueryFragment(), "/");
+  result = Http::ParseUri("https://example/path#fragment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/path#fragment");
 
-  auto result4 = Http::ParseUri("https://www.example.com:1234/path");
-  ASSERT_EQ(result4.Scheme(), "https");
-  ASSERT_EQ(result4.Host(), "www.example.com");
-  ASSERT_EQ(result4.Port(), 1234);
-  ASSERT_EQ(result4.PathQueryFragment(), "/path");
+  result = Http::ParseUri("https://example/?query#fragment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/?query#fragment");
 
-  auto result5 = Http::ParseUri("https://example.com");
-  ASSERT_EQ(result5.Scheme(), "https");
-  ASSERT_EQ(result5.Host(), "example.com");
-  ASSERT_EQ(result5.Port(), 443);
-  ASSERT_EQ(result5.PathQueryFragment(), "/");
+  result = Http::ParseUri("https://example/#fragment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/#fragment");
 
-  auto result6 = Http::ParseUri("https://www.example.com:65535/path");
-  ASSERT_EQ(result6.Scheme(), "https");
-  ASSERT_EQ(result6.Host(), "www.example.com");
-  ASSERT_EQ(result6.Port(), 65535);
-  ASSERT_EQ(result6.PathQueryFragment(), "/path");
+  result = Http::ParseUri("https://www.example.com:1234");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 1234);
+  ASSERT_EQ(result.PathQueryFragment(), "/");
+
+  result = Http::ParseUri("https://www.example.com:1234/path");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 1234);
+  ASSERT_EQ(result.PathQueryFragment(), "/path");
+
+  result = Http::ParseUri("https://example.com");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "example.com");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/");
+
+  result = Http::ParseUri("https://www.example.com:65535/path");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 65535);
+  ASSERT_EQ(result.PathQueryFragment(), "/path");
+
+  result = Http::ParseUri("https://www.example.com?que/ry");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/?que/ry");
+
+  result = Http::ParseUri("https://www.example.com#frag/?ment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/#frag/?ment");
+
+  result = Http::ParseUri("https://www.example.com?query#frag/?ment");
+  ASSERT_EQ(result.Scheme(), "https");
+  ASSERT_EQ(result.Host(), "www.example.com");
+  ASSERT_EQ(result.Port(), 443);
+  ASSERT_EQ(result.PathQueryFragment(), "/?query#frag/?ment");
 
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("noscheme"); }, "uri must be https scheme: noscheme");
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Http::ParseUri("not_https://host"); }, "uri must be https scheme: not_https://host");
@@ -200,6 +236,26 @@ TEST(Http, DecodePath) {
   ASSERT_STREQ("/", result5[0].data());
   ASSERT_STREQ("", result5[1].data());
   ASSERT_STREQ("", result5[2].data());
+
+  auto result6 = Http::DecodePath("/path#fragment?still_fragment/still_fragment");
+  ASSERT_STREQ("/path", result6[0].data());
+  ASSERT_STREQ("", result6[1].data());
+  ASSERT_STREQ("fragment?still_fragment/still_fragment", result6[2].data());
+
+  auto result7 = Http::DecodePath("/path?query/still_query#fragment/still_fragment?still_fragment");
+  ASSERT_STREQ("/path", result7[0].data());
+  ASSERT_STREQ("query/still_query", result7[1].data());
+  ASSERT_STREQ("fragment/still_fragment?still_fragment", result7[2].data());
+
+  auto result8 = Http::DecodePath("/path#fragment/still_fragment?still_fragment");
+  ASSERT_STREQ("/path", result8[0].data());
+  ASSERT_STREQ("", result8[1].data());
+  ASSERT_STREQ("fragment/still_fragment?still_fragment", result8[2].data());
+
+  auto result9 = Http::DecodePath("/#fragment/still_fragment?still_fragment");
+  ASSERT_STREQ("/", result9[0].data());
+  ASSERT_STREQ("", result9[1].data());
+  ASSERT_STREQ("fragment/still_fragment?still_fragment", result9[2].data());
 }
 
 }  // namespace http
