@@ -11,7 +11,6 @@
 #include <vector>
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "config/common/config.pb.h"
 
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
@@ -24,6 +23,25 @@ class Http;
 typedef std::shared_ptr<Http> ptr_t;
 typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
+
+class Uri {
+private:
+  const std::string https_prefix_ = "https://";
+  std::string host_;
+  int32_t port_ = 443;
+  std::string pathQueryFragment_; // includes the path, query, and fragment (if any)
+
+public:
+  explicit Uri(absl::string_view uri);
+
+  std::string Scheme() { return "https"; }
+
+  std::string Host() { return host_; }
+
+  int32_t Port() { return port_; }
+
+  std::string PathQueryFragment() { return pathQueryFragment_; }
+};
 
 class Http {
 public:
@@ -110,19 +128,18 @@ public:
       absl::string_view cookies);
 
   /**
+ * Decode a uri into a scheme, host, port, and path.
+ * @param uri string
+ * @return the decoded Uri
+ */
+  static Uri ParseUri(absl::string_view uri);
+
+  /**
    * Decode a path into a path, query and fragment triple.
    * @param path the path to decode
    * @return the decoded triple
    */
   static std::array<std::string, 3> DecodePath(absl::string_view path);
-
-  /**
-   * Return a URL encoding of the given endpoint.
-   * @param endpoint the endpoint to encode.
-   * @return A url.
-   */
-  static std::string ToUrl(
-      const config::common::Endpoint &endpoint);
 
   /**
    * Virtual destructor
@@ -138,7 +155,7 @@ public:
    * @return http response.
    */
   virtual response_t Post(
-      const config::common::Endpoint &endpoint,
+      absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,
@@ -152,7 +169,7 @@ public:
 class HttpImpl : public Http {
 public:
   response_t Post(
-      const config::common::Endpoint &endpoint,
+      absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,

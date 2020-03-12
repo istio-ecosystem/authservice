@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package authservice.config.oidc;
 
-import "config/common/config.proto";
 import "validate/validate.proto";
 
 // Defines how a token obtained through an OIDC flow is forwarded to services.
@@ -31,7 +30,7 @@ message LogoutConfig {
 
     // A http request path that the authservice matches against to initiate logout.
     // Whenever a request is made to that path, the authservice will remove the authservice-specific
-    // cookies and respond with a redirect to the configured `redirect_to_uri`. Removing the cookies
+    // cookies and respond with a redirect to the configured `redirect_uri`. Removing the cookies
     // causes the user to be unauthenticated in future requests.
     // If the service application has its own logout controller, then it may be desirable to have its
     // logout controller redirect to this path. If the service application does not need its own logout
@@ -45,7 +44,7 @@ message LogoutConfig {
     // [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout).
     // As with all redirects, the user's browser will perform a GET to this URI.
     // Required.
-    string redirect_to_uri = 2 [(validate.rules).string.min_len = 1];
+    string redirect_uri = 2 [(validate.rules).string.min_len = 1];
 }
 
 // The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
@@ -55,32 +54,11 @@ message OIDCConfig {
 
     // The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint).
     // Required.
-    common.Endpoint authorization = 1 [(validate.rules).message.required = true];
+    string authorization_uri = 1 [(validate.rules).string.min_len = 1];
 
     // The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint).
     // Required.
-    common.Endpoint token = 2 [(validate.rules).message.required = true];
-
-    // The OIDC Provider's JWKS configuration used during `id_token` verification.
-    // Use either `jwks_uri` or `jwks` (see below).
-    // Required.
-    oneof jwks_config {
-        option (validate.required) = true;
-
-        // *This is currently ignored.* In a future version it will be the URL of the OIDC provider’s
-        // public key set to validate signature of the JWT.
-        // See [OpenID Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata).
-        // This should match the `jwksUri` value of
-        // [Istio Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/).
-        common.Endpoint jwks_uri = 3;
-
-        // The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in
-        // the OIDC provider's
-        // [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
-        // Note that this JSON value must be escaped when embedded in a json configmap
-        // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)).
-        string jwks = 4;
-    }
+    string token_uri = 2 [(validate.rules).string.min_len = 1];
 
     // This value will be used as the `redirect_uri` param of the authorization code grant
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
@@ -89,43 +67,52 @@ message OIDCConfig {
     // the service so that the authservice can intercept the request and handle it
     // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)).
     // Required.
-    common.Endpoint callback = 5 [(validate.rules).message.required = true];
+    string callback_uri = 3 [(validate.rules).string.min_len = 1];
+
+    // The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in
+    // the OIDC provider's
+    // [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
+    // Note that this JSON value must be escaped when embedded in a json configmap
+    // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)).
+    // Used during token verification.
+    // Required.
+    string jwks = 4 [(validate.rules).string.min_len = 1];
 
     // The OIDC client ID assigned to the filter to be used in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // Required.
-    string client_id = 6 [(validate.rules).string.min_len = 1];
+    string client_id = 5 [(validate.rules).string.min_len = 1];
 
     // The OIDC client secret assigned to the filter to be used in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // Required.
-    string client_secret = 7 [(validate.rules).string.min_len = 1];
+    string client_secret = 6 [(validate.rules).string.min_len = 1];
 
     // Additional scopes passed to the OIDC Provider in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here.
     // Required, but an empty array is allowed.
-    repeated string scopes = 8;
+    repeated string scopes = 7;
 
     // A unique identifier of the authservice's browser cookies. Can be any string.
     // Only needed when multiple services in the same domain are each protected by
     // their own authservice, in which case each service's authservice should have
     // a unique value to avoid cookie name conflicts.
     // Optional.
-    string cookie_name_prefix = 9;
+    string cookie_name_prefix = 8;
 
     // The configuration for adding ID Tokens as headers to requests forwarded to a service.
     // Required.
-    TokenConfig id_token = 10 [(validate.rules).message.required = true];
+    TokenConfig id_token = 9 [(validate.rules).message.required = true];
 
     // The configuration for adding Access Tokens as headers to requests forwarded to a service.
     // Optional.
-    TokenConfig access_token = 11;
+    TokenConfig access_token = 10;
 
     // When specified, the authservice will destroy the authservice session when a request is
     // made to the configured path.
     // Optional.
-    LogoutConfig logout = 12;
+    LogoutConfig logout = 11;
 
     // The Authservice associates obtained OIDC tokens with a session ID in a session store.
     // It also stores some temporary information during the login process into the session store,
@@ -137,7 +124,7 @@ message OIDCConfig {
     // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
     // Optional.
-    uint32 absolute_session_timeout = 13;
+    uint32 absolute_session_timeout = 12;
 
     // The Authservice associates obtained OIDC tokens with a session ID in a session store.
     // It also stores some temporary information during the login process into the session store,
@@ -149,10 +136,10 @@ message OIDCConfig {
     // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
     // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
     // Optional.
-    uint32 idle_session_timeout = 14;
+    uint32 idle_session_timeout = 13;
 
     // When specified, the Authservice will trust the specified Certificate Authority when performing HTTPS calls to
     // the Token Endpoint of the OIDC Identity Provider.
     // Optional.
-    string trusted_certificate_authority = 15;
+    string trusted_certificate_authority = 14;
 }

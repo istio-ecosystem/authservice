@@ -3,14 +3,10 @@
     {
       "oidc":
       {
-        "authorization": {
-        },
-        "token": {
-        },
-        "jwks_uri": {
-        },
-        "callback": {
-        }
+        "authorization_uri": "",
+        "token_uri": "",
+        "callback_uri": "",
+        "jwks": ""
       }
     }
   ]
