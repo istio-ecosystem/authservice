@@ -1,7 +1,7 @@
 #include "src/common/http/http.h"
-#include "config/common/config.pb.h"
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"
+#include "test/shared/assertions.h"
 
 namespace authservice {
 namespace common {
@@ -35,53 +35,7 @@ struct {
                     }};
 }  // namespace
 
-TEST(Http, ToUrl) {
-  struct {
-    struct {
-      const char *scheme;
-      const char *hostname;
-      int port;
-      const char *path;
-    } endpoint;
-    const char *url;
-  } test_cases[] = {
-      {
-          .endpoint = {.scheme = "https",
-                       .hostname = "foo",
-                       .port = 443,
-                       .path = "/bar"},
-          .url = "https://foo/bar",
-      },
-      {
-          .endpoint =
-              {.scheme = "http", .hostname = "foo", .port = 80, .path = "/bar"},
-          .url = "http://foo/bar",
-      },
-      {
-          .endpoint = {.scheme = "https",
-                       .hostname = "foo",
-                       .port = 8443,
-                       .path = "/bar"},
-          .url = "https://foo:8443/bar",
-      },
-      {
-          .endpoint = {.scheme = "http",
-                       .hostname = "foo",
-                       .port = 8080,
-                       .path = "/bar"},
-          .url = "http://foo:8080/bar",
-      },
-  };
-  for (auto test : test_cases) {
-    config::common::Endpoint e;
-    e.set_scheme(test.endpoint.scheme);
-    e.set_hostname(test.endpoint.hostname);
-    e.set_port(test.endpoint.port);
-    e.set_path(test.endpoint.path);
-    auto url = Http::ToUrl(e);
-    ASSERT_STREQ(url.c_str(), test.url);
-  }
-}
+using test_helpers::ASSERT_THROWS_STD_RUNTIME_ERROR;
 
 TEST(Http, UrlSafeEncode) {
   std::string encoded = Http::UrlSafeEncode(hex_test_case.raw);
@@ -173,32 +127,171 @@ TEST(Http, EncodeCookies) {
   ASSERT_FALSE(result.has_value());
 }
 
-TEST(Http, DecodePath) {
-  auto result1 = Http::DecodePath("/path?query#fragment");
-  ASSERT_EQ("/path", std::string(result1[0].data(), result1[0].size()));
-  ASSERT_EQ("query", std::string(result1[1].data(), result1[1].size()));
-  ASSERT_STREQ("query", result1[1].data());
-  ASSERT_STREQ("fragment", result1[2].data());
+TEST(Http, ParseUri) {
+  auto result = Uri("https://example.com/path");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example.com");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/path");
+  ASSERT_EQ(result.GetPath(), "/path");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
 
-  auto result2 = Http::DecodePath("/path?query");
-  ASSERT_STREQ("/path", result2[0].data());
-  ASSERT_STREQ("query", result2[1].data());
-  ASSERT_STREQ("", result2[2].data());
+  result = Uri("https://example/path?query#fragment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/path?query#fragment");
+  ASSERT_EQ(result.GetPath(), "/path");
+  ASSERT_EQ(result.GetQuery(), "query");
+  ASSERT_EQ(result.GetFragment(), "fragment");
 
-  auto result3 = Http::DecodePath("/path#fragment");
-  ASSERT_STREQ("/path", result3[0].data());
-  ASSERT_STREQ("", result3[1].data());
-  ASSERT_STREQ("fragment", result3[2].data());
+  result = Uri("https://example/path#fragment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/path#fragment");
+  ASSERT_EQ(result.GetPath(), "/path");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "fragment");
 
-  auto result4 = Http::DecodePath("/path");
-  ASSERT_STREQ("/path", result4[0].data());
-  ASSERT_STREQ("", result4[1].data());
-  ASSERT_STREQ("", result4[2].data());
+  result = Uri("https://example/?query#fragment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/?query#fragment");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "query");
+  ASSERT_EQ(result.GetFragment(), "fragment");
 
-  auto result5 = Http::DecodePath("/?#");
-  ASSERT_STREQ("/", result5[0].data());
-  ASSERT_STREQ("", result5[1].data());
-  ASSERT_STREQ("", result5[2].data());
+  result = Uri("https://example/#fragment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/#fragment");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "fragment");
+
+  result = Uri("https://www.example.com:1234");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 1234);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
+
+  result = Uri("https://www.example.com:1234/path");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 1234);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/path");
+  ASSERT_EQ(result.GetPath(), "/path");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
+
+  result = Uri("https://example.com");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "example.com");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
+
+  result = Uri("https://www.example.com:65535/path");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 65535);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/path");
+  ASSERT_EQ(result.GetPath(), "/path");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
+
+  result = Uri("https://www.example.com?que/ry");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/?que/ry");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "que/ry");
+  ASSERT_EQ(result.GetFragment(), "");
+
+  result = Uri("https://www.example.com#frag/?ment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/#frag/?ment");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "frag/?ment");
+
+  result = Uri("https://www.example.com?query#frag/?ment");
+  ASSERT_EQ(result.GetScheme(), "https");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 443);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/?query#frag/?ment");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "query");
+  ASSERT_EQ(result.GetFragment(), "frag/?ment");
+
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("noscheme"); }, "uri must be https scheme: noscheme");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("not_https://host"); }, "uri must be https scheme: not_https://host");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://"); }, "no host in uri: https://"); // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://:80/path"); }, "no host in uri: https://:80/path"); // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:/path"); }, "port not valid in uri: https://host:/path"); // colon, but no port
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:a8/path"); }, "port not valid in uri: https://host:a8/path"); // port not an int
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:65536/path"); }, "port value must be between 0 and 65535: https://host:65536/path"); // port int too large
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:-1/path"); }, "port value must be between 0 and 65535: https://host:-1/path"); // port int too small
+}
+
+TEST(Http, ParsePathQueryFragment) {
+  auto result1 = PathQueryFragment("/path?query#fragment");
+  ASSERT_EQ("/path", result1.Path());
+  ASSERT_EQ("query", result1.Query());
+  ASSERT_EQ("query", result1.Query());
+  ASSERT_EQ("fragment", result1.Fragment());
+
+  auto result2 = PathQueryFragment("/path?query");
+  ASSERT_EQ("/path", result2.Path());
+  ASSERT_EQ("query", result2.Query());
+  ASSERT_EQ("", result2.Fragment());
+
+  auto result3 = PathQueryFragment("/path#fragment");
+  ASSERT_EQ("/path", result3.Path());
+  ASSERT_EQ("", result3.Query());
+  ASSERT_EQ("fragment", result3.Fragment());
+
+  auto result4 = PathQueryFragment("/path");
+  ASSERT_EQ("/path", result4.Path());
+  ASSERT_EQ("", result4.Query());
+  ASSERT_EQ("", result4.Fragment());
+
+  auto result5 = PathQueryFragment("/?#");
+  ASSERT_EQ("/", result5.Path());
+  ASSERT_EQ("", result5.Query());
+  ASSERT_EQ("", result5.Fragment());
+
+  auto result6 = PathQueryFragment("/path#fragment?still_fragment/still_fragment");
+  ASSERT_EQ("/path", result6.Path());
+  ASSERT_EQ("", result6.Query());
+  ASSERT_EQ("fragment?still_fragment/still_fragment", result6.Fragment());
+
+  auto result7 = PathQueryFragment("/path?query/still_query#fragment/still_fragment?still_fragment");
+  ASSERT_EQ("/path", result7.Path());
+  ASSERT_EQ("query/still_query", result7.Query());
+  ASSERT_EQ("fragment/still_fragment?still_fragment", result7.Fragment());
+
+  auto result8 = PathQueryFragment("/path#fragment/still_fragment?still_fragment");
+  ASSERT_EQ("/path", result8.Path());
+  ASSERT_EQ("", result8.Query());
+  ASSERT_EQ("fragment/still_fragment?still_fragment", result8.Fragment());
+
+  auto result9 = PathQueryFragment("/#fragment/still_fragment?still_fragment");
+  ASSERT_EQ("/", result9.Path());
+  ASSERT_EQ("", result9.Query());
+  ASSERT_EQ("fragment/still_fragment?still_fragment", result9.Fragment());
 }
 
 }  // namespace http

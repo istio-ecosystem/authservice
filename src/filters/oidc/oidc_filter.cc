@@ -178,7 +178,6 @@ google::rpc::Code OidcFilter::RedirectToIdp(
     scopes.insert(scope);
   }
 
-  auto callback = common::http::Http::ToUrl(idp_config_.callback());
   auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
@@ -186,12 +185,12 @@ google::rpc::Code OidcFilter::RedirectToIdp(
       {"client_id",     idp_config_.client_id()},
       {"nonce",         nonce},
       {"state",         state},
-      {"redirect_uri",  callback}};
+      {"redirect_uri",  idp_config_.callback_uri()}};
   auto query = common::http::Http::EncodeQueryData(params);
 
   SetStandardResponseHeaders(response);
 
-  auto redirect_location = absl::StrJoin({common::http::Http::ToUrl(idp_config_.authorization()), query}, "?");
+  auto redirect_location = absl::StrJoin({idp_config_.authorization_uri(), query}, "?");
   SetRedirectHeaders(redirect_location, response);
 
   session_store_->SetAuthorizationState(session_id.data(),
@@ -202,18 +201,15 @@ google::rpc::Code OidcFilter::RedirectToIdp(
   return google::rpc::UNAUTHENTICATED;
 }
 
-std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &httpRequest) {
-  auto requested_url_endpoint = config::common::Endpoint();
-  requested_url_endpoint.set_scheme(https_scheme_);
-  requested_url_endpoint.set_hostname(httpRequest.host());
-  requested_url_endpoint.set_path(httpRequest.path());
-  requested_url_endpoint.set_port(443);
+std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &http_request) {
+  auto request_without_query =
+      std::string(https_scheme_) + "://" + http_request.host() + http_request.path();
 
-  if (httpRequest.query().empty()) {
-    return common::http::Http::ToUrl(requested_url_endpoint);
+  if (http_request.query().empty()) {
+    return request_without_query;
   }
 
-  return absl::StrJoin({common::http::Http::ToUrl(requested_url_endpoint), httpRequest.query()}, "?");
+  return absl::StrJoin({request_without_query, http_request.query()}, "?");
 }
 
 void OidcFilter::SetHeader(
@@ -321,7 +317,7 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
 }
 
 void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
-  SetRedirectHeaders(idp_config_.logout().redirect_to_uri(), response);
+  SetRedirectHeaders(idp_config_.logout().redirect_uri(), response);
   SetStandardResponseHeaders(response);
   auto responseHeaders = response->mutable_denied_response()->mutable_headers();
   DeleteCookie(responseHeaders, GetSessionIdCookieName());
@@ -359,11 +355,11 @@ bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckReq
 }
 
 std::string OidcFilter::RequestPath(const CheckRequest *request) {
-  return common::http::Http::DecodePath(request->attributes().request().http().path())[0];
+  return common::http::PathQueryFragment(request->attributes().request().http().path()).Path();
 }
 
 std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
-  return common::http::Http::DecodePath(request->attributes().request().http().path())[1];
+  return common::http::PathQueryFragment(request->attributes().request().http().path()).Query();
 }
 
 bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
@@ -372,22 +368,23 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   auto scheme = request->attributes().request().http().scheme();
   spdlog::trace("{}: checking handler for {}://{}{}", __func__, scheme, request_host, path);
 
-  auto request_path_parts = common::http::Http::DecodePath(path);
-  auto configured_port = idp_config_.callback().port();
-  auto configured_hostname = idp_config_.callback().hostname();
-  auto configured_scheme = idp_config_.callback().scheme();
+  auto request_path_parts = common::http::PathQueryFragment(path);
+  auto configured_uri = idp_config_.callback_uri();
+  auto parsed_uri = common::http::Uri(configured_uri);
+  auto configured_port = parsed_uri.GetPort();
+  auto configured_hostname = parsed_uri.GetHost();
+  auto configured_scheme = parsed_uri.GetScheme();
+  auto configured_path = parsed_uri.GetPathQueryFragment();
 
   std::stringstream buf;
   buf << configured_hostname << ':' << std::dec << configured_port;
 
   std::string configured_callback_host_with_port = buf.str();
 
-  bool path_matches = request_path_parts[0] == idp_config_.callback().path();
+  bool path_matches = request_path_parts.Path() == configured_path;
 
-  // TODO this should only assume 443 when the request's scheme is also https and only assume 80 when the request's scheme is also 80
   bool host_matches = request_host == configured_callback_host_with_port ||
-                      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname) ||
-                      (configured_scheme == "http" && configured_port == 80 && request_host == configured_hostname);
+                      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
 
   return host_matches && path_matches;
 }
@@ -431,7 +428,6 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
       {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
   };
 
-  auto redirect_uri = common::http::Http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"client_id",     idp_config_.client_id()},
       {"client_secret", idp_config_.client_secret()},
@@ -444,7 +440,7 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
 
   spdlog::info("{}: POSTing to refresh access token", __func__);
   auto retrieved_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::Http::EncodeFormData(params),
+      idp_config_.token_uri(), headers, common::http::Http::EncodeFormData(params),
       idp_config_.trusted_certificate_authority(), ioc, yield);
 
   if (retrieved_token_response == nullptr) {
@@ -508,15 +504,14 @@ google::rpc::Code OidcFilter::RetrieveToken(
   };
 
   // Build body
-  auto redirect_uri = common::http::Http::ToUrl(idp_config_.callback());
   std::multimap<absl::string_view, absl::string_view> params = {
       {"code",         code_from_request->second},
-      {"redirect_uri", redirect_uri},
+      {"redirect_uri", idp_config_.callback_uri()},
       {"grant_type",   "authorization_code"},
   };
 
   auto retrieve_token_response = http_ptr_->Post(
-      idp_config_.token(), headers, common::http::Http::EncodeFormData(params),
+      idp_config_.token_uri(), headers, common::http::Http::EncodeFormData(params),
       idp_config_.trusted_certificate_authority(), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,

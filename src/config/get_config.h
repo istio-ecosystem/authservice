@@ -8,11 +8,11 @@
 namespace authservice {
 namespace config {
 
-std::unique_ptr<Config> GetConfig(
-    const std::string& configFile);
+std::unique_ptr<Config> GetConfig(const std::string &configFile);
 
-spdlog::level::level_enum GetConfiguredLogLevel(const Config& config);
-std::string GetConfiguredAddress(const Config& config);
+spdlog::level::level_enum GetConfiguredLogLevel(const Config &config);
+
+std::string GetConfiguredAddress(const Config &config);
 
 }  // namespace config
 }  // namespace authservice

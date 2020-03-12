@@ -11,7 +11,6 @@
 #include <vector>
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "config/common/config.pb.h"
 
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
@@ -24,6 +23,70 @@ class Http;
 typedef std::shared_ptr<Http> ptr_t;
 typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
+
+class PathQueryFragment {
+private:
+  std::string path_;
+  std::string query_;
+  std::string fragment_;
+
+public:
+  explicit PathQueryFragment(absl::string_view path_query_fragment);
+
+  inline const std::string &Path() const {
+    return path_;
+  }
+
+  inline const std::string &Query() const {
+    return query_;
+  }
+
+  inline bool HasQuery() const {
+    return !query_.empty();
+  }
+
+  inline const std::string &Fragment() const {
+    return fragment_;
+  }
+
+  inline bool HasFragment() const {
+    return !fragment_.empty();
+  }
+};
+
+class Uri {
+private:
+  static const std::string https_prefix_;
+  std::string host_;
+  int32_t port_ = 443;
+  std::string pathQueryFragmentString_; // includes the path, query, and fragment (if any)
+  PathQueryFragment pathQueryFragment_;
+
+public:
+  explicit Uri(absl::string_view uri);
+
+  Uri(const Uri &uri);
+
+  Uri &operator=(Uri &&uri) noexcept;
+
+  inline std::string GetScheme() { return "https"; }
+
+  inline std::string GetHost() { return host_; }
+
+  inline int32_t GetPort() { return port_; }
+
+  inline std::string GetPathQueryFragment() { return pathQueryFragmentString_; }
+
+  std::string GetPath();
+
+  std::string GetQuery();
+
+  inline bool HasQuery() const { return pathQueryFragment_.HasQuery(); };
+
+  std::string GetFragment();
+
+  inline bool HasFragment() const { return pathQueryFragment_.HasFragment(); };
+};
 
 class Http {
 public:
@@ -110,21 +173,6 @@ public:
       absl::string_view cookies);
 
   /**
-   * Decode a path into a path, query and fragment triple.
-   * @param path the path to decode
-   * @return the decoded triple
-   */
-  static std::array<std::string, 3> DecodePath(absl::string_view path);
-
-  /**
-   * Return a URL encoding of the given endpoint.
-   * @param endpoint the endpoint to encode.
-   * @return A url.
-   */
-  static std::string ToUrl(
-      const config::common::Endpoint &endpoint);
-
-  /**
    * Virtual destructor
    */
   virtual ~Http() = default;
@@ -138,7 +186,7 @@ public:
    * @return http response.
    */
   virtual response_t Post(
-      const config::common::Endpoint &endpoint,
+      absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,
@@ -152,7 +200,7 @@ public:
 class HttpImpl : public Http {
 public:
   response_t Post(
-      const config::common::Endpoint &endpoint,
+      absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,

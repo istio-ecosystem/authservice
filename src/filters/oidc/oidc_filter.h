@@ -151,7 +151,7 @@ private:
  * @param The http request
  * @return The requested Url from the http request as a string
  */
-  static std::string GetRequestUrl(const AttributeContext_HttpRequest &httpRequest);
+  static std::string GetRequestUrl(const AttributeContext_HttpRequest &http_request);
 
   /**
    * @brief Get the directives that should be used when setting a cookie
