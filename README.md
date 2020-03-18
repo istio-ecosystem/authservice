@@ -37,6 +37,8 @@ We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to expla
 ## Developer Notes
 See the [Makefile](Makefile) for common tasks.
 
+If you are developing on a Mac, [this setup guide](https://github.com/istio-ecosystem/authservice/wiki/Setting-up-CLion-on-MacOS-for-Authservice-development) may be helpful.
+
 ## Roadmap
 See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)
 
