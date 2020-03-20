@@ -399,21 +399,12 @@ response_t HttpImpl::Post(absl::string_view uri,
     stream.async_shutdown(yield[ec]);
 
     if (ec) {
-      // when trusted CA is not configured
       // not_connected happens sometimes so don't bother reporting it.
-      if (ec != beast::errc::not_connected) {
-        if (ca_cert.empty()) {
-          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-          return response_t();
-        }
-
-          // when trusted CA is configured
-          // stream_truncated also happen sometime and we choose to ignore the stream_truncated error,
-          // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
-        else if (ec != boost::asio::ssl::error::stream_truncated) {
-          spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-          return response_t();
-        }
+      // stream_truncated also happens sometime and we choose to ignore the stream_truncated error,
+      // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
+      if (ec != beast::errc::not_connected && ec != boost::asio::ssl::error::stream_truncated) {
+        spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+        return response_t();
       }
     }
 
