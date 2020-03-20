@@ -182,6 +182,15 @@ TEST(Http, ParseUri) {
   ASSERT_EQ(result.GetQuery(), "");
   ASSERT_EQ(result.GetFragment(), "");
 
+  result = Uri("http://www.example.com:1234");
+  ASSERT_EQ(result.GetScheme(), "http");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 1234);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "");
+  ASSERT_EQ(result.GetFragment(), "");
+
   result = Uri("https://www.example.com:1234/path");
   ASSERT_EQ(result.GetScheme(), "https");
   ASSERT_EQ(result.GetHost(), "www.example.com");
@@ -236,9 +245,19 @@ TEST(Http, ParseUri) {
   ASSERT_EQ(result.GetQuery(), "query");
   ASSERT_EQ(result.GetFragment(), "frag/?ment");
 
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("noscheme"); }, "uri must be https scheme: noscheme");
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("not_https://host"); }, "uri must be https scheme: not_https://host");
+  result = Uri("http://www.example.com?query#frag/?ment");
+  ASSERT_EQ(result.GetScheme(), "http");
+  ASSERT_EQ(result.GetHost(), "www.example.com");
+  ASSERT_EQ(result.GetPort(), 80);
+  ASSERT_EQ(result.GetPathQueryFragment(), "/?query#frag/?ment");
+  ASSERT_EQ(result.GetPath(), "/");
+  ASSERT_EQ(result.GetQuery(), "query");
+  ASSERT_EQ(result.GetFragment(), "frag/?ment");
+
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("noscheme"); }, "uri must be http or https scheme: noscheme");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("ftp://host"); }, "uri must be http or https scheme: ftp://host");
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://"); }, "no host in uri: https://"); // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("http://"); }, "no host in uri: http://"); // no host
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://:80/path"); }, "no host in uri: https://:80/path"); // no host
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:/path"); }, "port not valid in uri: https://host:/path"); // colon, but no port
   ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:a8/path"); }, "port not valid in uri: https://host:a8/path"); // port not an int

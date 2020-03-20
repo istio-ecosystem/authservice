@@ -3,7 +3,6 @@
 #include "spdlog/spdlog.h"
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include "config/config.pb.validate.h"
 #include "src/common/http/http.h"
 #include "absl/strings/string_view.h"
@@ -16,15 +15,21 @@ using namespace google::protobuf::util;
 namespace authservice {
 namespace config {
 
-void ValidateUri(absl::string_view uri, absl::string_view uri_name) {
+void ValidateUri(absl::string_view uri, absl::string_view uri_name, absl::string_view required_scheme) {
   unique_ptr<common::http::Uri> parsed_uri;
   try {
     parsed_uri = unique_ptr<common::http::Uri>(new common::http::Uri(uri));
   } catch (runtime_error &e) {
+    if (std::string(e.what()).find("uri must be http or https scheme") != std::string::npos) {
+      throw runtime_error(fmt::format("invalid {}: uri must be {} scheme: {}", uri_name, required_scheme, uri));
+    }
     throw runtime_error(fmt::format("invalid {}: ", uri_name) + e.what());
   }
   if (parsed_uri->HasQuery() || parsed_uri->HasFragment()) {
     throw runtime_error(fmt::format("invalid {}: query params and fragments not allowed: {}", uri_name, uri));
+  }
+  if (parsed_uri->GetScheme() != required_scheme) {
+    throw runtime_error(fmt::format("invalid {}: uri must be {} scheme: {}", uri_name, required_scheme, uri));
   }
 }
 
@@ -49,9 +54,13 @@ unique_ptr<Config> GetConfig(const string &configFileName) {
   }
 
   for (const auto &chain : config->chains()) {
-    ValidateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri");
-    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri");
-    ValidateUri(chain.filters(0).oidc().token_uri(), "token_uri");
+    ValidateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri", "https");
+    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri", "https");
+    ValidateUri(chain.filters(0).oidc().token_uri(), "token_uri", "https");
+    const auto proxy_uri = chain.filters(0).oidc().proxy_uri();
+    if (!proxy_uri.empty()) {
+      ValidateUri(proxy_uri, "proxy_uri", "http");
+    }
   }
 
   return config;

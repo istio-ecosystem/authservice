@@ -28,6 +28,7 @@ protected:
               "authorization_uri": "{}",
               "token_uri": "{}",
               "callback_uri": "{}",
+              "proxy_uri": "{}",
               "jwks": "fake-jwks",
                 "client_id": "fake-client-id",
                 "client_secret": "fake-client-secret",
@@ -59,6 +60,7 @@ protected:
               "authorization_uri": "{}",
               "token_uri": "{}",
               "callback_uri": "{}",
+              "proxy_uri": "{}",
               "jwks": "fake-jwks",
                 "client_id": "fake-client-id",
                 "client_secret": "fake-client-secret",
@@ -79,6 +81,7 @@ protected:
               "authorization_uri": "{}",
               "token_uri": "{}",
               "callback_uri": "{}",
+              "proxy_uri": "{}",
               "jwks": "fake-jwks",
                 "client_id": "fake-client-id",
                 "client_secret": "fake-client-secret",
@@ -153,6 +156,8 @@ TEST_F(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.idle_session_timeout(), 600);
 
   ASSERT_EQ(oidc.trusted_certificate_authority(), "ca_placeholder");
+
+  ASSERT_EQ(oidc.proxy_uri(), "http://proxy.example.com");
 }
 
 TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfig) {
@@ -192,75 +197,103 @@ TEST_F(GetConfigTest, ValidateOidcConfigThrowsForInvalidConfigForUriNestedProper
 }
 
 TEST_F(GetConfigTest, ValidatesTheUris) {
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz", "http://proxy"));
   ASSERT_NO_THROW(GetConfig(tmp_filename));
 
-  write_test_file(fmt::format(minimal_valid_config, "invalid", "https://bar", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz", ""));
+  ASSERT_NO_THROW(GetConfig(tmp_filename));
+
+  write_test_file(fmt::format(minimal_valid_config, "invalid", "https://bar", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid authorization_uri: uri must be https scheme: invalid");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "invalid", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "invalid", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid token_uri: uri must be https scheme: invalid");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "invalid"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "invalid", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid callback_uri: uri must be https scheme: invalid");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo?q=2", "https://bar", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo?q=2", "https://bar", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid authorization_uri: query params and fragments not allowed: https://foo?q=2");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo#2", "https://bar", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo#2", "https://bar", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid authorization_uri: query params and fragments not allowed: https://foo#2");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar?q=2", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar?q=2", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid token_uri: query params and fragments not allowed: https://bar?q=2");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar#2", "https://baz"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar#2", "https://baz", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid token_uri: query params and fragments not allowed: https://bar#2");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz?q=2"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz?q=2", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid callback_uri: query params and fragments not allowed: https://baz?q=2");
 
-  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz#2"));
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz#2", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid callback_uri: query params and fragments not allowed: https://baz#2");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz", "https://proxy"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid proxy_uri: uri must be http scheme: https://proxy");
+
+  write_test_file(fmt::format(minimal_valid_config, "https://foo", "https://bar", "https://baz", "https://proxy?q"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid proxy_uri: query params and fragments not allowed: https://proxy?q");
 }
 
 TEST_F(GetConfigTest, ValidatesTheUris_WhenThereAreMultipleChains) {
   write_test_file(fmt::format(multiple_chains_valid_config,
-      "https://foo1", "https://bar1", "https://baz1",
-      "https://foo2", "https://bar2", "https://baz2"));
+      "https://foo1", "https://bar1", "https://baz1", "",
+      "https://foo2", "https://bar2", "https://baz2", ""));
   ASSERT_NO_THROW(GetConfig(tmp_filename));
 
   write_test_file(fmt::format(multiple_chains_valid_config,
-                              "invalid", "https://bar1", "https://baz1",
-                              "https://foo2", "https://bar2", "https://baz2"));
+      "https://foo1", "https://bar1", "https://baz1", "http://proxy",
+      "https://foo2", "https://bar2", "https://baz2", "http://proxy"));
+  ASSERT_NO_THROW(GetConfig(tmp_filename));
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "invalid", "https://bar1", "https://baz1", "",
+                              "https://foo2", "https://bar2", "https://baz2", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid authorization_uri: uri must be https scheme: invalid");
 
   write_test_file(fmt::format(multiple_chains_valid_config,
-                              "https://foo1", "https://bar1", "https://baz1",
-                              "invalid", "https://bar2", "https://baz2"));
+                              "https://foo1", "https://bar1", "https://baz1", "",
+                              "invalid", "https://bar2", "https://baz2", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid authorization_uri: uri must be https scheme: invalid");
 
   write_test_file(fmt::format(multiple_chains_valid_config,
-                              "https://foo1", "https://bar1", "https://baz1",
-                              "https://foo2", "invalid", "https://baz2"));
+                              "https://foo1", "https://bar1", "https://baz1", "",
+                              "https://foo2", "invalid", "https://baz2", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid token_uri: uri must be https scheme: invalid");
 
   write_test_file(fmt::format(multiple_chains_valid_config,
-                              "https://foo1", "https://bar1", "https://baz1",
-                              "https://foo2", "https://bar2", "invalid"));
+                              "https://foo1", "https://bar1", "https://baz1", "",
+                              "https://foo2", "https://bar2", "invalid", ""));
   ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
                                   "invalid callback_uri: uri must be https scheme: invalid");
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "https://foo1", "https://bar1", "https://baz1", "https://proxy",
+                              "https://foo2", "https://bar2", "https://baz2", ""));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid proxy_uri: uri must be http scheme: https://proxy");
+
+  write_test_file(fmt::format(multiple_chains_valid_config,
+                              "https://foo1", "https://bar1", "https://baz1", "",
+                              "https://foo2", "https://bar2", "https://baz2", "https://proxy"));
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { GetConfig(tmp_filename); },
+                                  "invalid proxy_uri: uri must be http scheme: https://proxy");
 }
 
 }  // namespace config

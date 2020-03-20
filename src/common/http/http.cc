@@ -237,13 +237,20 @@ absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
 }
 
 Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
-  if (uri.find(https_prefix_) != 0) { // must start with https://
-    throw std::runtime_error(absl::StrCat("uri must be https scheme: ", uri));
+  std::string scheme_prefix;
+  if (uri.find(https_prefix_) == 0) {
+    scheme_ = "https";
+    scheme_prefix = https_prefix_;
+  } else if (uri.find(http_prefix_) == 0) {
+    scheme_ = "http";
+    scheme_prefix = http_prefix_;
+  } else {
+    throw std::runtime_error(absl::StrCat("uri must be http or https scheme: ", uri));
   }
-  if (uri.length() == https_prefix_.length()) {
+  if (uri.length() == scheme_prefix.length()) {
     throw std::runtime_error(absl::StrCat("no host in uri: ", uri));
   }
-  auto uri_without_scheme = uri.substr(https_prefix_.length());
+  auto uri_without_scheme = uri.substr(scheme_prefix.length());
 
   std::string host_and_port;
   auto positions = {uri_without_scheme.find('/'), uri_without_scheme.find('?'), uri_without_scheme.find('#')};
@@ -280,14 +287,21 @@ Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
     host_ = std::string(host_and_port.substr(0, colon_position).data(), colon_position);
   } else {
     host_ = host_and_port;
+    if (scheme_ == "http") {
+      port_ = 80;
+    } else if (scheme_ == "https") {
+      port_ = 443;
+    }
   }
 }
 
 const std::string Uri::https_prefix_ = "https://";
+const std::string Uri::http_prefix_ = "http://";
 
 Uri &Uri::operator=(Uri &&uri) noexcept {
   host_ = uri.host_;
   port_ = uri.port_;
+  scheme_ = uri.scheme_;
   pathQueryFragmentString_ = uri.pathQueryFragmentString_;
   pathQueryFragment_ = uri.pathQueryFragment_;
   return *this;
@@ -295,6 +309,7 @@ Uri &Uri::operator=(Uri &&uri) noexcept {
 
 Uri::Uri(const Uri &uri)
     : host_(uri.host_),
+      scheme_(uri.scheme_),
       port_(uri.port_),
       pathQueryFragmentString_(uri.pathQueryFragmentString_),
       pathQueryFragment_(uri.pathQueryFragment_) {
@@ -338,8 +353,11 @@ PathQueryFragment::PathQueryFragment(absl::string_view path_query_fragment) {
 }
 
 response_t HttpImpl::Post(absl::string_view uri,
-                          const std::map<absl::string_view, absl::string_view> &headers, absl::string_view body,
-                          absl::string_view ca_cert, boost::asio::io_context &ioc,
+                          const std::map<absl::string_view, absl::string_view> &headers,
+                          absl::string_view body,
+                          absl::string_view ca_cert,
+                          absl::string_view proxy_uri,
+                          boost::asio::io_context &ioc,
                           boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
   try {
@@ -368,9 +386,37 @@ response_t HttpImpl::Post(absl::string_view uri,
       throw boost::system::error_code{static_cast<int>(::ERR_get_error()),
                                       boost::asio::error::get_ssl_category()};
     }
-    const auto results =
-        resolver.async_resolve(parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
-    beast::get_lowest_layer(stream).async_connect(results, yield);
+
+    if (!proxy_uri.empty()) {
+      auto parsed_proxy_uri = http::Uri(proxy_uri);
+      const auto results = resolver.async_resolve(parsed_proxy_uri.GetHost(), std::to_string(parsed_proxy_uri.GetPort()), yield);
+      beast::get_lowest_layer(stream).async_connect(results, yield);
+
+      std::string target = absl::StrCat(parsed_uri.GetHost(), ":", std::to_string(parsed_uri.GetPort()));
+      beast::http::request<beast::http::string_body> http_connect_req{beast::http::verb::connect, target, version};
+      http_connect_req.set(beast::http::field::host, target);
+
+      // Send the HTTP connect request to the remote host
+      beast::http::async_write(stream.next_layer(), http_connect_req, yield);
+
+      // Read the response from the server
+      boost::beast::flat_buffer http_connect_buffer;
+      beast::http::response<beast::http::empty_body> http_connect_res;
+      beast::http::parser<false, beast::http::empty_body> p(http_connect_res);
+      p.skip(true); // skip reading the body of the response because there won't be a body
+
+      beast::http::async_read(stream.next_layer(), http_connect_buffer, p, yield);
+      if (http_connect_res.result() != beast::http::status::ok) {
+        throw std::runtime_error(
+            absl::StrCat("http connect failed with status: ", http_connect_res.result_int())
+        );
+      }
+
+    } else {
+      const auto results = resolver.async_resolve(parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
+      beast::get_lowest_layer(stream).async_connect(results, yield);
+    }
+
     stream.async_handshake(ssl::stream_base::client, yield);
     // Set up an HTTP POST request message
     beast::http::request<beast::http::string_body> req{

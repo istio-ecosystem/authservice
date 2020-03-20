@@ -57,8 +57,10 @@ public:
 class Uri {
 private:
   static const std::string https_prefix_;
+  static const std::string http_prefix_;
   std::string host_;
-  int32_t port_ = 443;
+  std::string scheme_;
+  int32_t port_;
   std::string pathQueryFragmentString_; // includes the path, query, and fragment (if any)
   PathQueryFragment pathQueryFragment_;
 
@@ -69,7 +71,7 @@ public:
 
   Uri &operator=(Uri &&uri) noexcept;
 
-  inline std::string GetScheme() { return "https"; }
+  inline std::string GetScheme() { return scheme_; }
 
   inline std::string GetHost() { return host_; }
 
@@ -185,13 +187,13 @@ public:
    * @param ca_cert the ca cert to be trusted in the http call
    * @return http response.
    */
-  virtual response_t Post(
-      absl::string_view uri,
-      const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body,
-      absl::string_view ca_cert,
-      boost::asio::io_context &ioc,
-      boost::asio::yield_context yield) const = 0;
+  virtual response_t Post(absl::string_view uri,
+                          const std::map<absl::string_view, absl::string_view> &headers,
+                          absl::string_view body,
+                          absl::string_view ca_cert,
+                          absl::string_view proxy_uri,
+                          boost::asio::io_context &ioc,
+                          boost::asio::yield_context yield) const = 0;
 };
 
 /**
@@ -199,13 +201,13 @@ public:
  */
 class HttpImpl : public Http {
 public:
-  response_t Post(
-      absl::string_view uri,
-      const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body,
-      absl::string_view ca_cert,
-      boost::asio::io_context &ioc,
-      boost::asio::yield_context yield) const override;
+  response_t Post(absl::string_view uri,
+                  const std::map<absl::string_view, absl::string_view> &headers,
+                  absl::string_view body,
+                  absl::string_view ca_cert,
+                  absl::string_view proxy_uri,
+                  boost::asio::io_context &ioc,
+                  boost::asio::yield_context yield) const override;
 };
 
 }  // namespace http
