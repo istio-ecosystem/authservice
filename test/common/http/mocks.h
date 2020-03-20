@@ -9,11 +9,12 @@ namespace common {
 namespace http {
 class HttpMock : public Http {
 public:
-  MOCK_CONST_METHOD6(Post, response_t(
+  MOCK_CONST_METHOD7(Post, response_t(
       absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body,
       absl::string_view ca_cert,
+      absl::string_view proxy_uri,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield));
 };

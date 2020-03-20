@@ -33,6 +33,7 @@
             "jwks": "jwks_placeholder",
             "client_id": "foo",
             "client_secret": "bar",
+            "proxy_uri": "http://proxy.example.com",
             "scopes": [
               "scope"
             ],
