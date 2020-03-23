@@ -2,16 +2,13 @@
 .DEFAULT_GOAL:=all
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
-PROTOS=$(shell find config -name '*.proto')
 TARGET:=//src/main:auth_server
 BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
 
 all: build test docs
 
-docs: docs/README.md
-
-docs/README.md: $(PROTOS)
-	# go get -v -u go.etcd.io/protodoc
+docs:
+	# If the protodoc command is not found, you can install it with: go get -v -u go.etcd.io/protodoc
 	protodoc --directories=config=message --title="Configuration Options" --output="docs/README.md"
 	grep -v '(validate.required)' docs/README.md > /tmp/README.md && mv /tmp/README.md docs/README.md
 
