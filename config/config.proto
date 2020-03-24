@@ -65,7 +65,7 @@ message FilterChain {
 }
 
 // The top-level configuration object.
-// For a simple example, see the [sample JSON in the bookinfo configmap template](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml).
+// For a simple example, see the [sample JSON in the bookinfo configmap template](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template-for-authn-and-authz.yaml).
 message Config {
 
     // Each incoming http request is matched against the list of filters in the chain, in order,
