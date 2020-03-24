@@ -3,7 +3,7 @@
 
 ##### message `Config` (config/config.proto)
 
-The top-level configuration object. For a simple example, see the [sample JSON in the bookinfo configmap template](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml).
+The top-level configuration object. For a simple example, see the [sample JSON in the bookinfo configmap template](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template-for-authn-and-authz.yaml).
 
 | Field | Description | Type |
 | ----- | ----------- | ---- |
