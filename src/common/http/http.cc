@@ -389,7 +389,13 @@ response_t HttpImpl::Post(absl::string_view uri,
 
     if (!proxy_uri.empty()) {
       auto parsed_proxy_uri = http::Uri(proxy_uri);
+
       const auto results = resolver.async_resolve(parsed_proxy_uri.GetHost(), std::to_string(parsed_proxy_uri.GetPort()), yield);
+      spdlog::info("{}: opening connection to proxy {} for request to destination {}:{}",
+                   __func__,
+                   proxy_uri.data(),
+                   parsed_uri.GetHost(),
+                   parsed_uri.GetPort());
       beast::get_lowest_layer(stream).async_connect(results, yield);
 
       std::string target = absl::StrCat(parsed_uri.GetHost(), ":", std::to_string(parsed_uri.GetPort()));
@@ -413,6 +419,7 @@ response_t HttpImpl::Post(absl::string_view uri,
       }
 
     } else {
+      spdlog::info("{}: opening connection to {}:{}", __func__, parsed_uri.GetHost(), parsed_uri.GetPort());
       const auto results = resolver.async_resolve(parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
       beast::get_lowest_layer(stream).async_connect(results, yield);
     }

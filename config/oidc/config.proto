@@ -48,8 +48,7 @@ message LogoutConfig {
 }
 
 // The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
-// via the standard authorization code grant flow from an OIDC Provider. Retrieved tokens are encrypted and placed
-// in cookies for use in subsequent requests.
+// via the standard authorization code grant flow from an OIDC Provider.
 message OIDCConfig {
 
     // The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint).

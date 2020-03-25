@@ -65,7 +65,7 @@ Specifies how a request can be matched to a filter chain.
 
 ##### message `OIDCConfig` (config/oidc/config.proto)
 
-The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens via the standard authorization code grant flow from an OIDC Provider. Retrieved tokens are encrypted and placed in cookies for use in subsequent requests.
+The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens via the standard authorization code grant flow from an OIDC Provider.
 
 | Field | Description | Type |
 | ----- | ----------- | ---- |

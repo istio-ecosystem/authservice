@@ -451,8 +451,7 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
   http::status status = retrieved_token_response->result();
   if (status != boost::beast::http::status::ok) {
     spdlog::warn("{}: Received (non-OK) status {} from identity provider when refreshing the access token.", __func__,
-                 std::to_string(
-                     static_cast<double>(status)));
+                 std::to_string(static_cast<unsigned>(status)));
     return nullptr;
   }
 
