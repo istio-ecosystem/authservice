@@ -138,7 +138,7 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
     1. Setup a `ConfigMap` for Authservice. Fill in [`authservice-configmap-template-for-authn-and-authz.yaml`](authservice-configmap-template-for-authn-and-authz.yaml) to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md) for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
 
     ```bash
-    kubectl -f config/authservice-configmap-template-for-authn-and-authz.yaml
+    kubectl apply -f config/authservice-configmap-template-for-authn-and-authz.yaml
     ```
      This `ConfigMap` has two notable additions compared to the `ConfigMap` for authentication only ([`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml)).
 
@@ -161,7 +161,7 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
           
     1. Wait for the new pods to be in `Running` state. Note that the Authservice will be deployed in the same Pod as `productpage`.
 
-    1. If the `callback` or `logout` paths in [`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml) were edited in a previous step, then edit those same paths in [`config/bookinfo-gateway.yaml`](config/bookinfo-gateway.yaml). Otherwise, no edit is needed. When ready, apply the file to create the ingress gateway and routing rules for Bookinfo:
+    1. If the `callback` or `logout` paths in [`config/authservice-configmap-template-for-authn-and-authz.yaml`](config/authservice-configmap-template-for-authn-and-authz.yaml) were edited in a previous step, then edit those same paths in [`config/bookinfo-gateway.yaml`](config/bookinfo-gateway.yaml). Otherwise, no edit is needed. When ready, apply the file to create the ingress gateway and routing rules for Bookinfo:
        ```bash
        kubectl apply -f config/bookinfo-gateway.yaml
        ```
