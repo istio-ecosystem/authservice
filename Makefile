@@ -30,7 +30,7 @@ bazel-bin/src/main/auth_server:
 	bazel build $(BAZEL_FLAGS) //src/main:auth_server
 
 build:
-	bazel build $(BAZEL_FLAGS) //src/... --host_jvm_args=-Xmx2g
+	bazel build $(BAZEL_FLAGS) //src/...
 
 run:
 	bazel run $(BAZEL_FLAGS) $(TARGET)
