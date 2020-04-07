@@ -103,7 +103,7 @@ TEST(Http, EncodeSetCookie) {
   ASSERT_STREQ("name=value; HttpOnly; SameSite=Strict; Secure", result.c_str());
 }
 
-TEST(Http, EncodeCookies) {
+TEST(Http, DecodeCookies) {
   auto cookies1 = "name=value";
   auto result = Http::DecodeCookies(cookies1);
   ASSERT_TRUE(result.has_value());
@@ -122,9 +122,13 @@ TEST(Http, EncodeCookies) {
   result = Http::DecodeCookies(cookies3);
   ASSERT_FALSE(result.has_value());
 
-  auto cookies4 = "first=1;second=2";
+  auto cookies4 = "first=1; second=value=with=equals; third=\"another=one=with-quotes\"";
   result = Http::DecodeCookies(cookies4);
-  ASSERT_FALSE(result.has_value());
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ(result->size(), 3);
+  ASSERT_STREQ((*result)["first"].c_str(), "1");
+  ASSERT_STREQ((*result)["second"].c_str(), "value=with=equals");
+  ASSERT_STREQ((*result)["third"].c_str(), "\"another=one=with-quotes\"");
 }
 
 TEST(Http, ParseUri) {

@@ -225,7 +225,7 @@ absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
   std::map<std::string, std::string> result;
   std::vector<absl::string_view> cookie_list = absl::StrSplit(cookies, "; ");
   for (auto cookie : cookie_list) {
-    std::vector<absl::string_view> cookie_parts = absl::StrSplit(cookie, '=');
+    std::vector<absl::string_view> cookie_parts = absl::StrSplit(cookie, absl::MaxSplits('=', 1));
     if (cookie_parts.size() != 2) {
       // Invalid cookie encoding. Must Name=Value
       return absl::nullopt;
