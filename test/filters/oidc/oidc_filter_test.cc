@@ -744,7 +744,16 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCann
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
   auto code = filter.Process(&request_, &response_);
-  ASSERT_EQ(code, google::rpc::Code::UNAVAILABLE);
+  ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::StatusCode::BadRequest);
+  ASSERT_EQ(response_.denied_response().body(), "Oops, your session has expired. Please try again.");
+  ASSERT_THAT(
+      response_.denied_response().headers(),
+      ContainsHeaders({
+                          {CacheControl, StrEq(CacheControlDirectives::NoCache)},
+                          {Pragma,       StrEq(PragmaDirectives::NoCache)},
+                      })
+  );
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAccessToken) {
