@@ -140,17 +140,19 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
     ```bash
     kubectl apply -f config/authservice-configmap-template-for-authn-and-authz.yaml
     ```
-     This `ConfigMap` has two notable additions compared to the `ConfigMap` for authentication only ([`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml)).
+     This `ConfigMap` has several notable changes compared to the previous `ConfigMap` for authentication only ([`config/authservice-configmap-template-for-authn.yaml`](config/authservice-configmap-template-for-authn.yaml)).
 
-     1. It contains a key `chains[*].filters[*].oidc.scopes` which contains a list of strings of scopes that the Authservice is enabled to request on behalf of the service it is protecting. In this example, the Authservice will request `productpage.read`. 
+     1. It updates the value at the key `chains[*].filters[*].oidc.scopes` which contains a list of strings of scopes that the Authservice is enabled to request on behalf of the service it is protecting. In this example, the Authservice will request `productpage.read` and `reviews.read`. 
 
-     1. It contains a key `chains[*].filters[*].oidc.access_token` which is an object defining a preamble and a header name to provide the access token as a header after receipt.
+     1. It adds a key `chains[*].filters[*].oidc.access_token` which is an object defining a preamble and a header name to provide the access token as a header after receipt. Note that this example assumes that the access token will be returned by the OIDC Provider in JWT format. Please check the documentation for your OIDC Provider's Authorization endpoint. In this example, the access token is configured to be sent on the header named `Authorization`. This aligns with the default header name used by Istio's Authentication `Policy` to validate JWT tokens.
+
+     1. It has changed the value at the key `chains[*].filters[*].oidc.id_token`. This moves the ID token to a different request header compared to the `ConfigMap` for authentication only used previously. Now the ID token will be sent on a header called `x-id-token`. The header name `x-id-token` itself does not have any special meaning.
 
 1. Configure the Bookinfo app
 
     1. Edit [`config/bookinfo-with-authservice-template.yaml`](config/bookinfo-with-authservice-template.yaml)
 
-       1. Supply a Authservice image. This has previously been described in the steps ["Deploy Bookinfo Using the Authservice for Token Acquisition"](#authservice-image) from above. 
+       Supply a Authservice image. This has previously been described in the steps ["Deploy Bookinfo Using the Authservice for Token Acquisition"](#authservice-image) from above. 
 
     1. Deploy Bookinfo and Authservice by applying the Authservice deployment file.
        
