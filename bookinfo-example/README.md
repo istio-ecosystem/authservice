@@ -135,7 +135,7 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
   
 1. Configure the Authservice to provide authorization. It must both request scopes for protected resources and also attach the authorization token as a header.
 
-    1. Setup a `ConfigMap` for Authservice. Fill in [`authservice-configmap-template-for-authn-and-authz.yaml`](authservice-configmap-template-for-authn-and-authz.yaml) to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md) for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
+    1. Setup a `ConfigMap` for Authservice. Fill in [`config/authservice-configmap-template-for-authn-and-authz.yaml`](config/authservice-configmap-template-for-authn-and-authz.yaml) to include the OIDC provider's configurations. Currently, only the `oidc` filter can be configured in the `ConfigMap`. See [here](../docs/README.md) for the description of each field. Once the values have been substituted, apply the `ConfigMap`.
 
     ```bash
     kubectl apply -f config/authservice-configmap-template-for-authn-and-authz.yaml
