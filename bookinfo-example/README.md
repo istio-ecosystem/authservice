@@ -272,7 +272,25 @@ containers:
 ### Notes:
 The steps of using Authservice at the Ingress-gateway are roughly the same as the Sidecar integration steps detailed above except for these major differences:
 1. The Istio Authentication Policy will have to target the Ingress-gateway, which will result in a JWT AuthN filter being added to the gateway.
-1. The `ext_authz` envoy filter will have to be inserted into the gateway's filter chain (the Istio `EnvoyFilter` config will have to target the gateway).
+1. The `ConfigMap` should be created in the `istio-system` namespace to make it accessible to the authservice container in the `istio-ingressgateway` pod.
+1. The `ext_authz` envoy filter will have to be inserted into the gateway's filter chain. E.g.:
+   ```
+   apiVersion: networking.istio.io/v1alpha3
+   kind: EnvoyFilter
+   metadata:
+     name: ingress-token-service-filter
+     namespace: istio-system # note: the namespace has changed
+   spec:
+     workloadSelector:
+       labels:
+         istio: ingressgateway # note: target gateway pod's label
+     configPatches:
+     - applyTo: HTTP_FILTER
+       match:
+         context: GATEWAY
+   # ... the rest is the same as before
+   ```
 1. The Authservice will no longer be required to be deployed at the Sidecar level alongside the application. 
+1. The path part of the configured `callback_uri`, and if configured, the `logout.path`, must be paths that are routable to the app by the ingress gateway's `VirtualService`, or else the Authservice at the gateway will not receieve those requests and will not be able to process them. This is a perhaps counter-intuitive since the Authservice container is no longer running in the app's pod, so it may not feel like this is needed, but it is required.
 
 Better user experience and more sample configs will be added in the future.
