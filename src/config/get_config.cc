@@ -55,7 +55,7 @@ unique_ptr<Config> GetConfig(const string &configFileName) {
 
   for (const auto &chain : config->chains()) {
     ValidateUri(chain.filters(0).oidc().authorization_uri(), "authorization_uri", "https");
-    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri", "https");
+//    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri", "https");
     ValidateUri(chain.filters(0).oidc().token_uri(), "token_uri", "https");
     const auto proxy_uri = chain.filters(0).oidc().proxy_uri();
     if (!proxy_uri.empty()) {

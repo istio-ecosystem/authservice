@@ -203,7 +203,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
 
 std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &http_request) {
   auto request_without_query =
-      std::string(https_scheme_) + "://" + http_request.host() + http_request.path();
+      std::string("http") + "://" + http_request.host() + http_request.path();
 
   if (http_request.query().empty()) {
     return request_without_query;
@@ -245,9 +245,11 @@ std::string OidcFilter::EncodeCookieTimeoutDirective(int64_t timeout) {
 
 std::string OidcFilter::GetCookieName(const std::string &cookie) const {
   if (idp_config_.cookie_name_prefix() == "") {
-    return "__Host-authservice-" + cookie + "-cookie";
+   // return "__Host-authservice-" + cookie + "-cookie";
+    return "authservice-" + cookie + "-cookie";
   }
-  return "__Host-" + idp_config_.cookie_name_prefix() + "-authservice-" +
+  // return "__Host-" + idp_config_.cookie_name_prefix() + "-authservice-" +
+  return  idp_config_.cookie_name_prefix() + "-authservice-" +
          cookie + "-cookie";
 }
 
@@ -287,7 +289,7 @@ std::set<std::string> OidcFilter::GetCookieDirectives(int64_t timeout) {
       {
           common::http::headers::SetCookieDirectives::HttpOnly,
           common::http::headers::SetCookieDirectives::SameSiteLax,
-          common::http::headers::SetCookieDirectives::Secure,
+//          common::http::headers::SetCookieDirectives::Secure,
           "Path=/"
       };
 
@@ -384,7 +386,10 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   bool path_matches = request_path_parts.Path() == configured_path;
 
   bool host_matches = request_host == configured_callback_host_with_port ||
-                      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
+                      (
+                          //configured_scheme == "https" && configured_port == 443 &&
+                          request_host == configured_hostname
+                      );
 
   return host_matches && path_matches;
 }
