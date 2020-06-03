@@ -1,6 +1,7 @@
 #include "src/filters/filter_chain.h"
 #include "gtest/gtest.h"
 #include "src/filters/pipe.h"
+#include "redis.h"
 
 namespace authservice {
 namespace filters {
@@ -67,6 +68,22 @@ TEST(FilterChainTest, New) {
   FilterChainImpl chain(*configuration);
   auto instance = chain.New();
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+}
+
+TEST(FilterChainTest, RedisPlusPlus) {
+  using namespace sw::redis;
+  auto redis = Redis("tcp://127.0.0.1:6379");
+
+
+  // ***** STRING commands *****
+
+  redis.hset("session_id", "nonce","some-nonce");
+  auto val = redis.hget("session_id", "nonce");    // val is of type OptionalString. See 'API Reference' section for details.
+  if (val) {
+  // Dereference val to get the returned value of std::string type.
+  std::cout << *val << std::endl;
+  }   // else key doesn't exist.
+  FAIL();
 }
 
 }  // namespace filters

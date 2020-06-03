@@ -1,0 +1,724 @@
+diff --git a/WORKSPACE b/WORKSPACE
+index 502ba3b..800dda0 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -130,3 +130,59 @@ http_archive(
+         "https://github.com/google/googletest/archive/release-1.8.1.tar.gz",
+     ],
+ )
++
++_HIREDIS_WORKSPACE= """"""
++
++_HIREDIS_BUILD = """
++cc_library(
++    name = "hiredis",
++    srcs=glob(["*.c"]),
++    hdrs=glob(["*.h"]),
++    textual_hdrs=["dict.c"],
++    visibility = ["//visibility:public"],
++    defines = ["HIREDIS_COMPILED_LIB"],
++)
++
++cc_library(
++    name = "hiredis_headers",
++    hdrs=glob(["*.h"]),
++    visibility = ["//visibility:public"],
++    include_prefix = "hiredis",
++)
++"""
++
++http_archive(
++    name = "com_github_redis_hiredis",
++    build_file_content = _HIREDIS_BUILD,
++    strip_prefix = "hiredis-0.14.1",
++    urls = [
++        "https://github.com/redis/hiredis/archive/v0.14.1.tar.gz",
++    ],
++    workspace_file_content = _HIREDIS_WORKSPACE,
++)
++
++# redis-plus-plus
++_REDIS_PLUS_PLUS_WORKSPACE = """"""
++
++_REDIS_PLUS_PLUS_BUILD = """
++cc_library(
++    name = "redis_plus_plus",
++    deps = ["@com_github_redis_hiredis//:hiredis_headers"],
++    srcs = glob(["src/**/*.cpp"]),
++    hdrs = glob(["src/**/*.h", "src/**/*.hpp"]),
++    visibility = ["//visibility:public"],
++    defines = ["REDIS_PLUS_PLUS_COMPILED_LIB"],
++    strip_include_prefix = "src/sw/redis++",
++)
++"""
++
++http_archive(
++    name = "com_github_sewenew_redis_plus_plus",
++    build_file_content = _REDIS_PLUS_PLUS_BUILD,
++    strip_prefix = "redis-plus-plus-1.1.1",
++    urls = [
++        "https://github.com/sewenew/redis-plus-plus/archive/1.1.1.tar.gz",
++    ],
++    workspace_file_content = _REDIS_PLUS_PLUS_WORKSPACE,
++)
++
+diff --git a/bazel/boost.bzl b/bazel/boost.bzl
+index 6e19fd7..1dded14 100644
+--- a/bazel/boost.bzl
++++ b/bazel/boost.bzl
+@@ -61,8 +61,8 @@ def boost_build_rule(name):
+              # on MacOS, when you are running on MacOS you can comment out the "libboost_{}.so.{}" line and uncomment
+              # the "libboost_{}.dylib" line to compile the project and run the tests.
+              # Unfortunately, select statements are not allowed for genrule `outs` :(
+-            "libboost_{}.so.{}".format(name, BOOST_VERSION),
+-            #"libboost_{}.dylib".format(name), # Use this on MacOS instead of the .so line above.
++#            "libboost_{}.so.{}".format(name, BOOST_VERSION),
++            "libboost_{}.dylib".format(name), # Use this on MacOS instead of the .so line above.
+         ],
+         cmd =
+             select({
+diff --git a/src/filters/BUILD b/src/filters/BUILD
+index b47660b..8abbbd4 100644
+--- a/src/filters/BUILD
++++ b/src/filters/BUILD
+@@ -40,5 +40,6 @@ xx_library(
+         "@com_github_abseil-cpp//absl/strings:strings",
+         "@com_github_gabime_spdlog//:spdlog",
+         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
++        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+     ],
+ )
+diff --git a/src/filters/oidc/BUILD b/src/filters/oidc/BUILD
+index fd8797f..cf52d84 100644
+--- a/src/filters/oidc/BUILD
++++ b/src/filters/oidc/BUILD
+@@ -30,6 +30,33 @@ xx_library(
+     ],
+ )
+ 
++xx_library(
++    name = "redis_session_store",
++    srcs = ["redis_session_store.cc"],
++    hdrs = ["redis_session_store.h", "session_store.h"],
++    deps = [
++        "//src/filters/oidc:token_response",
++        "//src/common/utilities:time_service",
++        "//src/common/utilities:synchronized",
++        "//src/filters/oidc:redis_wrapper",
++        "@com_github_abseil-cpp//absl/strings:strings",
++        "@com_github_abseil-cpp//absl/types:optional",
++        "@com_github_gabime_spdlog//:spdlog",
++        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
++        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
++        "@com_github_redis_hiredis//:hiredis",
++    ],
++)
++
++xx_library(
++    name = "redis_wrapper",
++    srcs = ["redis_wrapper.cc"],
++    hdrs = ["redis_wrapper.h"],
++    deps = [
++        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
++    ],
++)
++
+ xx_library(
+     name = "oidc_filter",
+     srcs = ["oidc_filter.cc"],
+@@ -41,6 +68,7 @@ xx_library(
+         "//src/common/utilities:random",
+         "//src/filters:filter",
+         "//src/filters/oidc:in_memory_session_store",
++        "//src/filters/oidc:redis_session_store",
+         "//src/common/utilities:time_service",
+         "//src/filters/oidc:token_response",
+         "@boost//:all",
+@@ -49,3 +77,4 @@ xx_library(
+         "@com_google_googleapis//google/rpc:code_cc_proto",
+     ],
+ )
++
+diff --git a/src/filters/oidc/oidc_filter.cc b/src/filters/oidc/oidc_filter.cc
+index 15669e6..7cb90ae 100644
+--- a/src/filters/oidc/oidc_filter.cc
++++ b/src/filters/oidc/oidc_filter.cc
+@@ -485,10 +485,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
+ 
+   auto authorization_state = session_store_->GetAuthorizationState(session_id);
+   if (!authorization_state) {
+-    spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect.", __func__);
+-    response->mutable_denied_response()->mutable_status()->set_code(envoy::type::StatusCode::BadRequest);
+-    response->mutable_denied_response()->set_body("Oops, your session has expired. Please try again.");
+-    return google::rpc::Code::UNAUTHENTICATED;
++    spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect. INVALID_ARGUMENT", __func__);
++    return google::rpc::Code::INVALID_ARGUMENT;
+   }
+ 
+   // Compare state from request and session
+diff --git a/src/filters/oidc/redis_session_store.cc b/src/filters/oidc/redis_session_store.cc
+new file mode 100644
+index 0000000..57cf22d
+--- /dev/null
++++ b/src/filters/oidc/redis_session_store.cc
+@@ -0,0 +1,132 @@
++#include <spdlog/spdlog.h>
++#include "redis_session_store.h"
++#include <string>
++
++namespace authservice {
++namespace filters {
++namespace oidc {
++
++RedisSessionStore::RedisSessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
++                                     uint32_t absolute_session_timeout_in_seconds,
++                                     uint32_t idle_session_timeout_in_seconds,
++                                     std::shared_ptr<RedisWrapper> redis_wrapper) :
++    time_service_(time_service),
++    absolute_session_timeout_in_seconds_(absolute_session_timeout_in_seconds),
++    idle_session_timeout_in_seconds_(idle_session_timeout_in_seconds),
++    redis_wrapper_(redis_wrapper) {}
++
++void RedisSessionStore::SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) {
++  auto redis_session_id = sw::redis::StringView(session_id.data());
++  redis_wrapper_->hset(redis_session_id, "id_token", std::string(token_response->IDToken().jwt_));
++  redis_wrapper_->hset(redis_session_id, "access_token", sw::redis::StringView(*token_response->AccessToken()));
++  redis_wrapper_->hset(redis_session_id, "refresh_token", sw::redis::StringView(*token_response->RefreshToken()));
++  redis_wrapper_->hset(redis_session_id,
++               "access_token_expiry",
++               sw::redis::StringView(std::to_string(*token_response->GetAccessTokenExpiry())));
++
++  redis_wrapper_->hsetnx(redis_session_id,
++                 "time_added",
++                 sw::redis::StringView(std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch())));
++
++  RefreshExpiration(redis_session_id);
++}
++
++std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_view session_id) {
++  google::jwt_verify::Jwt jwt_id_token;
++  auto redis_session_id = sw::redis::StringView(session_id.data());
++
++  if (!redis_wrapper_->hexists(redis_session_id, "id_token")) {
++    return nullptr;
++  }
++
++  auto status = jwt_id_token.parseFromString(redis_wrapper_->hget(redis_session_id, "id_token").value());
++  if (status != google::jwt_verify::Status::Ok) {
++    spdlog::info("{}: failed to parse `id_token` into a JWT: {}", __func__,
++                 google::jwt_verify::getStatusString(status));
++    return nullptr;
++  }
++  auto access_token = redis_wrapper_->hget(redis_session_id, "access_token");
++  auto refresh_token = redis_wrapper_->hget(redis_session_id, "refresh_token");
++  auto access_token_expiry = redis_wrapper_->hget(redis_session_id, "access_token_expiry");
++
++  auto token_response = std::make_shared<TokenResponse>(jwt_id_token);
++
++  // TODO: check for existence of these fields
++  //set access
++  token_response->SetAccessToken(absl::string_view(access_token.value()));
++  //set refresh
++  token_response->SetRefreshToken(absl::string_view(refresh_token.value()));
++  //set access expiry
++  token_response->SetAccessTokenExpiry(std::stoi(access_token_expiry.value()));
++
++  RefreshExpiration(redis_session_id);
++
++  return token_response;
++}
++
++void RedisSessionStore::RemoveSession(absl::string_view session_id) {
++  redis_wrapper_->del(sw::redis::StringView(session_id.data()));
++}
++
++void RedisSessionStore::SetAuthorizationState(absl::string_view session_id,
++                                              std::shared_ptr<AuthorizationState> authorization_state) {
++  auto redis_session_id = sw::redis::StringView(session_id.data());
++  redis_wrapper_->hset(redis_session_id, "state", std::string(authorization_state->GetState()));
++  redis_wrapper_->hset(redis_session_id, "nonce", sw::redis::StringView(authorization_state->GetNonce()));
++  redis_wrapper_->hset(redis_session_id, "requested_url", sw::redis::StringView(authorization_state->GetRequestedUrl()));
++
++  redis_wrapper_->hsetnx(redis_session_id,
++                 "time_added",
++                 sw::redis::StringView(std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch())));
++
++  RefreshExpiration(redis_session_id);
++}
++
++std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(absl::string_view session_id) {
++  auto redis_session_id = sw::redis::StringView(session_id.data());
++
++  if (!redis_wrapper_->hexists(redis_session_id, "state")) {
++    return nullptr;
++  }
++
++  auto state = redis_wrapper_->hget(redis_session_id, "state");
++  auto nonce = redis_wrapper_->hget(redis_session_id, "nonce");
++  auto requested_url = redis_wrapper_->hget(redis_session_id, "requested_url");
++
++  RefreshExpiration(redis_session_id);
++
++  return std::make_shared<AuthorizationState>(absl::string_view(state.value()),
++                                              absl::string_view(nonce.value()),
++                                              absl::string_view(requested_url.value()))
++}
++
++void RedisSessionStore::ClearAuthorizationState(absl::string_view session_id) {
++  auto redis_session_id = sw::redis::StringView(session_id.data());
++
++  redis_wrapper_->hdel(redis_session_id, "state");
++  redis_wrapper_->hdel(redis_session_id, "nonce");
++  redis_wrapper_->hdel(redis_session_id, "requested_url");
++
++  RefreshExpiration(redis_session_id);
++}
++
++// abs: 200 idle:60
++// 0 expireat(0+60)
++//30 expireat(30 +60)
++//170 expireat(0 + 200)
++
++void RedisSessionStore::RefreshExpiration(sw::redis::StringView session_id) {
++  int current_time = time_service_->GetCurrentTimeInSecondsSinceEpoch();
++  int time_added = std::stoi(redis_wrapper_->hget(session_id, "time_added").value());
++  if ((absolute_session_timeout_in_seconds_ + time_added) < idle_session_timeout_in_seconds_ + current_time) {
++    redis_wrapper_->expireat(session_id, absolute_session_timeout_in_seconds_ + time_added);
++  } else {
++    redis_wrapper_->expireat(session_id, idle_session_timeout_in_seconds_ + current_time);
++  }
++}
++
++void RedisSessionStore::RemoveAllExpired() {}
++
++}  // namespace oidc
++}  // namespace filters
++}  // namespace authservice
+diff --git a/src/filters/oidc/redis_session_store.h b/src/filters/oidc/redis_session_store.h
+new file mode 100644
+index 0000000..ff0f7ba
+--- /dev/null
++++ b/src/filters/oidc/redis_session_store.h
+@@ -0,0 +1,52 @@
++#ifndef AUTHSERVICE_REDIS_SESSION_STORE_H
++#define AUTHSERVICE_REDIS_SESSION_STORE_H
++
++#include "src/filters/oidc/session_store.h"
++#include "src/common/utilities/time_service.h"
++#include "src/common/utilities/synchronized.h"
++#include "src/filters/oidc/redis_wrapper.h"
++
++namespace authservice {
++namespace filters {
++namespace oidc {
++
++class Session;
++
++class RedisSessionStore : public SessionStore {
++private:
++  std::unordered_map<std::string, std::shared_ptr<Session>> session_map_;
++  std::shared_ptr<common::utilities::TimeService> time_service_;
++  uint32_t absolute_session_timeout_in_seconds_;
++  uint32_t idle_session_timeout_in_seconds_;
++  std::recursive_mutex mutex_;
++  std::shared_ptr<RedisWrapper> redis_wrapper_;
++
++public:
++  RedisSessionStore(
++      std::shared_ptr<common::utilities::TimeService> time_service,
++      uint32_t absolute_session_timeout_in_seconds,
++      uint32_t idle_session_timeout_in_seconds,
++      std::shared_ptr<RedisWrapper> redis_wrapper);
++
++  virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
++
++  virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
++
++  virtual void SetAuthorizationState(absl::string_view session_id, std::shared_ptr<AuthorizationState> authorization_state) override;
++
++  virtual std::shared_ptr<AuthorizationState> GetAuthorizationState(absl::string_view session_id) override;
++
++  virtual void ClearAuthorizationState(absl::string_view session_id) override;
++
++  virtual void RemoveSession(absl::string_view session_id) override;
++
++  virtual void RemoveAllExpired() override;
++
++  virtual void RefreshExpiration(sw::redis::StringView session_id);
++};
++
++}  // namespace oidc
++}  // namespace filters
++}  // namespace authservice
++
++#endif //AUTHSERVICE_REDIS_SESSION_STORE_H
+diff --git a/src/filters/oidc/redis_wrapper.cc b/src/filters/oidc/redis_wrapper.cc
+new file mode 100644
+index 0000000..70391f4
+--- /dev/null
++++ b/src/filters/oidc/redis_wrapper.cc
+@@ -0,0 +1,37 @@
++
++#include "src/filters/oidc/redis_wrapper.h"
++
++#include <utility>
++
++namespace authservice {
++namespace filters {
++namespace oidc {
++
++RedisWrapper::RedisWrapper(std::shared_ptr<sw::redis::Redis> redis) : redis_(std::move(redis)) {}
++
++sw::redis::OptionalString oidc::RedisWrapper::hget(const sw::redis::StringView &key, const sw::redis::StringView &value) {
++  return redis_->hget(key, value);
++}
++
++bool RedisWrapper::hset(const sw::redis::StringView &key, const sw::redis::StringView &field, const sw::redis::StringView &val) {
++  return redis_->hset(key, field, val);
++}
++bool RedisWrapper::hsetnx(const sw::redis::StringView &key, const sw::redis::StringView &field, const sw::redis::StringView &val) {
++  return redis_->hsetnx(key, field, val);
++}
++bool RedisWrapper::hexists(const sw::redis::StringView &key, const sw::redis::StringView &field) {
++  return redis_->hexists(key, field);
++}
++long long RedisWrapper::del(const sw::redis::StringView &key) {
++  return redis_->del(key);
++}
++bool RedisWrapper::expireat(const sw::redis::StringView &key, long long timestamp) {
++  return redis_->expireat(key, timestamp);
++}
++long long RedisWrapper::hdel(const sw::redis::StringView &key, const sw::redis::StringView &field) {
++  return redis_->hdel(key, field);
++}
++
++} //oidc
++} //filters
++} //authservice
+\ No newline at end of file
+diff --git a/src/filters/oidc/redis_wrapper.h b/src/filters/oidc/redis_wrapper.h
+new file mode 100644
+index 0000000..67db2c8
+--- /dev/null
++++ b/src/filters/oidc/redis_wrapper.h
+@@ -0,0 +1,33 @@
++#ifndef AUTHSERVICE_TEST_FILTERS_OIDC_REDIS_WRAPPER_H_
++#define AUTHSERVICE_TEST_FILTERS_OIDC_REDIS_WRAPPER_H_
++
++#include "redis.h"
++
++namespace authservice {
++namespace filters {
++namespace oidc {
++
++class RedisWrapper {
++ private:
++  std::shared_ptr<sw::redis::Redis> redis_;
++ public:
++  virtual ~RedisWrapper(){};
++  explicit RedisWrapper(std::shared_ptr<sw::redis::Redis> redis);
++  virtual sw::redis::OptionalString hget(const sw::redis::StringView &key, const sw::redis::StringView &value);
++  virtual bool hset(const sw::redis::StringView &key,
++                    const sw::redis::StringView &field,
++                    const sw::redis::StringView &val);
++  virtual bool hsetnx(const sw::redis::StringView &key,
++                      const sw::redis::StringView &field,
++                      const sw::redis::StringView &val);
++  virtual bool hexists(const sw::redis::StringView &key, const sw::redis::StringView &field);
++  virtual long long del(const sw::redis::StringView &key);
++  virtual bool expireat(const sw::redis::StringView &key, long long timestamp);
++  virtual long long hdel(const sw::redis::StringView &key, const sw::redis::StringView &field);
++};
++
++}  // namespace oidc
++}  // namespace filters
++}  // namespace authservice
++
++#endif //AUTHSERVICE_TEST_FILTERS_OIDC_REDIS_WRAPPER_H_
+diff --git a/test/filters/BUILD b/test/filters/BUILD
+index 7a2243c..576b383 100644
+--- a/test/filters/BUILD
++++ b/test/filters/BUILD
+@@ -18,6 +18,8 @@ cc_test(
+         "@com_github_grpc_grpc//:grpc++",
+         "@com_google_googletest//:gtest_main",
+         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
++        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
++        "@com_github_redis_hiredis//:hiredis",
+     ],
+     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+ )
+diff --git a/test/filters/filter_chain_test.cc b/test/filters/filter_chain_test.cc
+index 46c642c..21ef155 100644
+--- a/test/filters/filter_chain_test.cc
++++ b/test/filters/filter_chain_test.cc
+@@ -1,6 +1,7 @@
+ #include "src/filters/filter_chain.h"
+ #include "gtest/gtest.h"
+ #include "src/filters/pipe.h"
++#include "redis.h"
+ 
+ namespace authservice {
+ namespace filters {
+@@ -69,5 +70,21 @@ TEST(FilterChainTest, New) {
+   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+ }
+ 
++TEST(FilterChainTest, RedisPlusPlus) {
++  using namespace sw::redis;
++  auto redis = Redis("tcp://127.0.0.1:6379");
++
++
++  // ***** STRING commands *****
++
++  redis.hset("session_id", "nonce","some-nonce");
++  auto val = redis.hget("session_id", "nonce");    // val is of type OptionalString. See 'API Reference' section for details.
++  if (val) {
++  // Dereference val to get the returned value of std::string type.
++  std::cout << *val << std::endl;
++  }   // else key doesn't exist.
++  FAIL();
++}
++
+ }  // namespace filters
+ }  // namespace authservice
+\ No newline at end of file
+diff --git a/test/filters/oidc/BUILD b/test/filters/oidc/BUILD
+index c9cae0e..7527be9 100644
+--- a/test/filters/oidc/BUILD
++++ b/test/filters/oidc/BUILD
+@@ -3,6 +3,8 @@ cc_library(
+     hdrs = ["mocks.h"],
+     deps = [
+         "//src/filters/oidc:token_response",
++        "//src/filters/oidc:redis_wrapper",
++        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+     ],
+ )
+ 
+@@ -29,6 +31,18 @@ cc_test(
+     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+ )
+ 
++cc_test(
++    name = "redis_session_store_test",
++    srcs = ["redis_session_store_test.cc"],
++    deps = [
++        "//test/common/utilities:mocks",
++        "//src/common/utilities:time_service",
++        "//src/filters/oidc:redis_session_store",
++        "@com_google_googletest//:gtest_main",
++    ],
++    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
++)
++
+ cc_test(
+     name = "oidc_filter_test",
+     srcs = ["oidc_filter_test.cc"],
+diff --git a/test/filters/oidc/mocks.h b/test/filters/oidc/mocks.h
+index 25d495c..99d0966 100644
+--- a/test/filters/oidc/mocks.h
++++ b/test/filters/oidc/mocks.h
+@@ -3,12 +3,14 @@
+ 
+ #include "gmock/gmock.h"
+ #include "src/filters/oidc/token_response.h"
++#include "redis.h"
++#include "src/filters/oidc/redis_wrapper.h"
+ 
+ namespace authservice {
+ namespace filters {
+ namespace oidc {
+ class TokenResponseParserMock final : public TokenResponseParser {
+-public:
++ public:
+   MOCK_CONST_METHOD3(Parse,
+                      std::shared_ptr<TokenResponse>(
+                          const std::string &client_id,
+@@ -19,6 +21,18 @@ public:
+                          const TokenResponse &existing_token_response,
+                          const std::string &raw_response_string));
+ };
++
++class RedisWrapperMock final : public RedisWrapper {
++ public:
++  MOCK_METHOD(sw::redis::OptionalString, hget, (const sw::redis::StringView, const sw::redis::StringView));
++  MOCK_METHOD(bool, hset, (const sw::redis::StringView, const sw::redis::StringView, const sw::redis::StringView));
++  MOCK_METHOD(bool, hsetnx, (const sw::redis::StringView, const sw::redis::StringView, const sw::redis::StringView));
++  MOCK_METHOD(bool, hexists, (const sw::redis::StringView, const sw::redis::StringView));
++  MOCK_METHOD(long long, del, (const sw::redis::StringView));
++  MOCK_METHOD(long long, hdel, (const sw::redis::StringView, const sw::redis::StringView));
++  MOCK_METHOD(bool, expireat, (const sw::redis::StringView, const sw::redis::StringView, long long));
++};
++
+ }  // namespace oidc
+ }  // namespace filters
+ }  // namespace authservice
+diff --git a/test/filters/oidc/redis_session_store_test.cc b/test/filters/oidc/redis_session_store_test.cc
+new file mode 100644
+index 0000000..c2cdce3
+--- /dev/null
++++ b/test/filters/oidc/redis_session_store_test.cc
+@@ -0,0 +1,162 @@
++#include <thread>
++#include <include/gmock/gmock-actions.h>
++#include "gtest/gtest.h"
++#include "src/filters/oidc/redis_session_store.h"
++#include "test/common/utilities/mocks.h"
++#include "test/filters/oidc/mocks.h"
++
++namespace authservice {
++namespace filters {
++namespace oidc {
++
++using ::testing::Return;
++
++class RedisSessionStoreTest : public ::testing::Test {
++protected:
++  google::jwt_verify::Jwt id_token_jwt;
++  std::shared_ptr<common::utilities::TimeServiceMock> time_service_mock_;
++  std::shared_ptr<RedisWrapperMock> redis_wrapper_mock_;
++
++  void SetUp() override {
++    auto jwt_status = id_token_jwt.parseFromString(
++        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg");
++    ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
++
++    time_service_mock_ = std::make_shared<testing::NiceMock<common::utilities::TimeServiceMock>>();
++    redis_wrapper_mock_ = std::make_shared<RedisWrapperMock>();
++    RedisWrapperMock();
++  }
++
++  std::shared_ptr<TokenResponse> CreateTokenResponse();
++};
++
++std::shared_ptr<TokenResponse> RedisSessionStoreTest::CreateTokenResponse() {
++  auto token_response = std::make_shared<TokenResponse>(id_token_jwt);
++  token_response->SetRefreshToken("fake_refresh_token");
++  token_response->SetAccessToken("fake_access_token");
++  token_response->SetAccessTokenExpiry(42);
++  return token_response;
++}
++
++TEST_F(RedisSessionStoreTest, SetTokenResponseAndGetTokenResponse) {
++  InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
++  auto session_id = std::string("fake_session_id");
++  auto other_session_id = "other_session_id";
++  auto token_response = CreateTokenResponse();
++
++  auto result = in_memory_session_store.GetTokenResponse(session_id);
++  ASSERT_FALSE(result);
++
++  in_memory_session_store.SetTokenResponse(session_id, token_response);
++  // Caution: when you mutate the original, you mutate the same object that is held in the session store's map
++  token_response->SetAccessToken("fake_access_token2");
++
++  result = in_memory_session_store.GetTokenResponse(other_session_id);
++  ASSERT_FALSE(result);
++
++  result = in_memory_session_store.GetTokenResponse(session_id);
++  ASSERT_TRUE(result);
++  ASSERT_EQ(result->IDToken().jwt_, id_token_jwt.jwt_);
++  ASSERT_EQ(result->RefreshToken(), "fake_refresh_token");
++  ASSERT_EQ(result->AccessToken(), "fake_access_token2"); // will be the mutated value, so be careful!
++  ASSERT_EQ(result->GetAccessTokenExpiry(), 42);
++
++  token_response->SetAccessTokenExpiry(99);
++  in_memory_session_store.SetTokenResponse(session_id, token_response); // overwrite
++
++  result = in_memory_session_store.GetTokenResponse(session_id);
++  ASSERT_TRUE(result);
++  ASSERT_EQ(result->IDToken().jwt_, id_token_jwt.jwt_);
++  ASSERT_EQ(result->RefreshToken(), "fake_refresh_token");
++  ASSERT_EQ(result->AccessToken(), "fake_access_token2");
++  ASSERT_EQ(result->GetAccessTokenExpiry(), 99);
++}
++
++TEST_F(RedisSessionStoreTest, SetAuthorizationStateAndClearAuthorizationStateAndGetAuthorizationState) {
++  InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
++  std::string session_id = "fake_session_id";
++  std::string other_session_id = "other_session_id";
++  std::string state = "some-state";
++  std::string original_state(state);
++  std::string nonce = "some-nonce";
++  std::string original_nonce(nonce);
++  std::string requested_url = "https://example.com";
++  std::string original_requested_url(requested_url);
++  auto authorization_state = std::make_shared<AuthorizationState>(state, nonce, requested_url);
++
++  auto result = in_memory_session_store.GetAuthorizationState(session_id);
++  ASSERT_FALSE(result);
++
++  in_memory_session_store.ClearAuthorizationState(session_id); // does not crash
++  ASSERT_FALSE(result);
++
++  in_memory_session_store.SetAuthorizationState(session_id, authorization_state);
++
++  result = in_memory_session_store.GetAuthorizationState(other_session_id);
++  ASSERT_FALSE(result);
++
++  // mutate original strings that were passed to AuthorizationState constructor, make sure it doesn't change AuthorizationState
++  nonce += "-modified";
++  state += "-modified";
++  requested_url += "/modified";
++  result = in_memory_session_store.GetAuthorizationState(session_id);
++  ASSERT_TRUE(result);
++  ASSERT_EQ(result->GetRequestedUrl(), original_requested_url);
++  ASSERT_EQ(result->GetState(), original_state);
++  ASSERT_EQ(result->GetNonce(), original_nonce);
++
++  std::string another_state = "some-other-state";
++  std::string another_nonce = "some-other-nonce";
++  std::string another_requested_url = "https://other.example.com";
++  auto another_authorization_state = std::make_shared<AuthorizationState>(another_state, another_nonce,
++                                                                          another_requested_url);
++  in_memory_session_store.SetAuthorizationState(session_id, another_authorization_state); // overwrite
++
++  result = in_memory_session_store.GetAuthorizationState(session_id);
++  ASSERT_TRUE(result);
++  ASSERT_EQ(result->GetRequestedUrl(), another_requested_url);
++  ASSERT_EQ(result->GetState(), another_state);
++  ASSERT_EQ(result->GetNonce(), another_nonce);
++
++  in_memory_session_store.ClearAuthorizationState(session_id);
++  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id));
++}
++
++TEST_F(RedisSessionStoreTest, Remove) {
++  InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);
++  auto session_id = std::string("fake_session_id");
++  auto token_response = CreateTokenResponse();
++  auto authorization_state = std::make_shared<AuthorizationState>("state", "nonce", "requested_url");
++
++  in_memory_session_store.SetAuthorizationState(session_id, authorization_state);
++  in_memory_session_store.SetTokenResponse(session_id, token_response);
++  ASSERT_TRUE(in_memory_session_store.GetTokenResponse(session_id));
++  ASSERT_TRUE(in_memory_session_store.GetAuthorizationState(session_id));
++
++  in_memory_session_store.RemoveSession(session_id);
++
++  ASSERT_FALSE(in_memory_session_store.GetTokenResponse(session_id));
++  ASSERT_FALSE(in_memory_session_store.GetAuthorizationState(session_id));
++
++  in_memory_session_store.RemoveSession("other-session-id"); // ignore non-existent keys without error
++}
++
++TEST_F(RedisSessionStoreTest, RefreshExpration) {
++
++}
++
++void RedisSessionStoreTest::MockRedisGetAuthorizationState(absl::string_view session_id) {
++  EXPECT_CALL(*redis_wrapper_mock_, hexists(session_id, "state")).WillOnceReturn()
++}
++
++void RedisSessionStoreTest::MockRedisSetAuthorizationState()
++
++void RedisSessionStoreTest::MockRedisGetTokenResponse()
++
++void RedisSessionStoreTest::MockRedisSetTokenResponse()
++
++void RedisSessionStoreTest::MockRedisRefreshExpiration()
++
++}  // namespace oidc
++}  // namespace filters
++}  // namespace authservice

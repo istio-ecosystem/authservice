@@ -40,5 +40,6 @@ xx_library(
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
         "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
     ],
 )

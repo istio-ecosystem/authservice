@@ -31,6 +31,33 @@ xx_library(
 )
 
 xx_library(
+    name = "redis_session_store",
+    srcs = ["redis_session_store.cc"],
+    hdrs = ["redis_session_store.h", "session_store.h"],
+    deps = [
+        "//src/filters/oidc:token_response",
+        "//src/common/utilities:time_service",
+        "//src/common/utilities:synchronized",
+        "//src/filters/oidc:redis_wrapper",
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+        "@com_github_redis_hiredis//:hiredis",
+    ],
+)
+
+xx_library(
+    name = "redis_wrapper",
+    srcs = ["redis_wrapper.cc"],
+    hdrs = ["redis_wrapper.h"],
+    deps = [
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+    ],
+)
+
+xx_library(
     name = "oidc_filter",
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],
@@ -41,6 +68,7 @@ xx_library(
         "//src/common/utilities:random",
         "//src/filters:filter",
         "//src/filters/oidc:in_memory_session_store",
+        "//src/filters/oidc:redis_session_store",
         "//src/common/utilities:time_service",
         "//src/filters/oidc:token_response",
         "@boost//:all",
@@ -49,3 +77,4 @@ xx_library(
         "@com_google_googleapis//google/rpc:code_cc_proto",
     ],
 )
+

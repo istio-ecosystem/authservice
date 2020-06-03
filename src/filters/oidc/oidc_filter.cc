@@ -485,10 +485,8 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   auto authorization_state = session_store_->GetAuthorizationState(session_id);
   if (!authorization_state) {
-    spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect.", __func__);
-    response->mutable_denied_response()->mutable_status()->set_code(envoy::type::StatusCode::BadRequest);
-    response->mutable_denied_response()->set_body("Oops, your session has expired. Please try again.");
-    return google::rpc::Code::UNAUTHENTICATED;
+    spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect. INVALID_ARGUMENT", __func__);
+    return google::rpc::Code::INVALID_ARGUMENT;
   }
 
   // Compare state from request and session

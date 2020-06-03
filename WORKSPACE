@@ -130,3 +130,59 @@ http_archive(
         "https://github.com/google/googletest/archive/release-1.8.1.tar.gz",
     ],
 )
+
+_HIREDIS_WORKSPACE= """"""
+
+_HIREDIS_BUILD = """
+cc_library(
+    name = "hiredis",
+    srcs=glob(["*.c"]),
+    hdrs=glob(["*.h"]),
+    textual_hdrs=["dict.c"],
+    visibility = ["//visibility:public"],
+    defines = ["HIREDIS_COMPILED_LIB"],
+)
+
+cc_library(
+    name = "hiredis_headers",
+    hdrs=glob(["*.h"]),
+    visibility = ["//visibility:public"],
+    include_prefix = "hiredis",
+)
+"""
+
+http_archive(
+    name = "com_github_redis_hiredis",
+    build_file_content = _HIREDIS_BUILD,
+    strip_prefix = "hiredis-0.14.1",
+    urls = [
+        "https://github.com/redis/hiredis/archive/v0.14.1.tar.gz",
+    ],
+    workspace_file_content = _HIREDIS_WORKSPACE,
+)
+
+# redis-plus-plus
+_REDIS_PLUS_PLUS_WORKSPACE = """"""
+
+_REDIS_PLUS_PLUS_BUILD = """
+cc_library(
+    name = "redis_plus_plus",
+    deps = ["@com_github_redis_hiredis//:hiredis_headers"],
+    srcs = glob(["src/**/*.cpp"]),
+    hdrs = glob(["src/**/*.h", "src/**/*.hpp"]),
+    visibility = ["//visibility:public"],
+    defines = ["REDIS_PLUS_PLUS_COMPILED_LIB"],
+    strip_include_prefix = "src/sw/redis++",
+)
+"""
+
+http_archive(
+    name = "com_github_sewenew_redis_plus_plus",
+    build_file_content = _REDIS_PLUS_PLUS_BUILD,
+    strip_prefix = "redis-plus-plus-1.1.1",
+    urls = [
+        "https://github.com/sewenew/redis-plus-plus/archive/1.1.1.tar.gz",
+    ],
+    workspace_file_content = _REDIS_PLUS_PLUS_WORKSPACE,
+)
+

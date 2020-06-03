@@ -61,8 +61,8 @@ def boost_build_rule(name):
              # on MacOS, when you are running on MacOS you can comment out the "libboost_{}.so.{}" line and uncomment
              # the "libboost_{}.dylib" line to compile the project and run the tests.
              # Unfortunately, select statements are not allowed for genrule `outs` :(
-            "libboost_{}.so.{}".format(name, BOOST_VERSION),
-            #"libboost_{}.dylib".format(name), # Use this on MacOS instead of the .so line above.
+#            "libboost_{}.so.{}".format(name, BOOST_VERSION),
+            "libboost_{}.dylib".format(name), # Use this on MacOS instead of the .so line above.
         ],
         cmd =
             select({
