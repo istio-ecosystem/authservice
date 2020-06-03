@@ -246,7 +246,8 @@ scopes. This section demonstrates how to leverage the Authservice to relay the a
 For a full list of Authservice configuration options, see the [configuration docs](../docs/README.md).
 
 ## Istio Ingress-gateway integration
-One might want to use the Authservice at the gateway level to provide a single login flow for all applications inside an Istio mesh, a.k.a. using it as an Auth API Gateway.
+
+One might prefer to use the Authservice at the gateway level to provide a single login flow for all applications inside an Istio mesh, rather than using it at the sidecar level.
 
 ### Additional Pre-requisites:
 
