@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "src/filters/pipe.h"
 #include "redis.h"
+#include "src/filters/oidc/redis_wrapper.h"
 
 namespace authservice {
 namespace filters {
@@ -72,18 +73,25 @@ TEST(FilterChainTest, New) {
 
 TEST(FilterChainTest, RedisPlusPlus) {
   using namespace sw::redis;
-  auto redis = Redis("tcp://127.0.0.1:6379");
+  google::jwt_verify::Jwt id_token_jwt;
+  auto jwt_status = id_token_jwt.parseFromString(
+      "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiYXVkIjpbImNsaWVudDEiXSwibm9uY2UiOiJyYW5kb20ifQ.NQi_VTRjZ8jv5cAp4inpuQ9STfVgCoWfONjLnZEMk8la8s99J9b6QmcKtO2tabTgvcseikVNlPuB6fZztY_fxhdrNE0dBNAl1lhz_AWBz6Yr-D82LLKk5NQ-IKDloF19Pic0Ub9pGCqNLOlmRXRVcfwwq5nISzfP6OdrjepRZ2Jd3rc2HvHYm-6GstH4xkKViABVwCDmwlAOi47bdHPByHkZOOnHSQEElr4tqO_uAQRpj36Yvt-95nPKhWaufZhcpYKk1H7ZRmylJQuG_dhlw4gN1i5iWBMk-Sj_2xyk05Bap1qkKSeHTxyqzhtDAH0LHYZdo_2hU-7YnL4JRhVVwg");
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+//  auto redis = Redis("tcp://127.0.0.1:6379");
+  auto redis_wrapper = oidc::RedisWrapper(std::make_shared<Redis>("tcp://127.0.0.1:6379"));
+  auto token_response = std::make_shared<oidc::TokenResponse>(id_token_jwt);
 
+  redis_wrapper.del("session_id");
 
-  // ***** STRING commands *****
-
-  redis.hset("session_id", "nonce","some-nonce");
-  auto val = redis.hget("session_id", "nonce");    // val is of type OptionalString. See 'API Reference' section for details.
-  if (val) {
-  // Dereference val to get the returned value of std::string type.
-  std::cout << *val << std::endl;
-  }   // else key doesn't exist.
-  FAIL();
+  redis_wrapper.hset("session_id", "id_token", std::string(token_response->IDToken().jwt_));
+//  redis_wrapper.hset("session_id", "access_token", *token_response->AccessToken());
+//  redis_wrapper.hset("session_id", "refresh_token", *token_response->RefreshToken());
+//  redis_wrapper.hset("session_id", "access_token_expiry", std::to_string(*token_response->GetAccessTokenExpiry()));
+//
+//  auto storedAccessToken = redis_wrapper.hget("session_id", "access_token");
+//  ASSERT_FALSE(storedAccessToken);
+//  //ASSERT_EQ(redis_wrapper.hget("session_id", "refresh_token").value(), sw::redis::OptionalString().value());
+//  //ASSERT_EQ(redis_wrapper.hget("session_id", "access_token_expiry").value(), sw::redis::OptionalString().value());
 }
 
 }  // namespace filters

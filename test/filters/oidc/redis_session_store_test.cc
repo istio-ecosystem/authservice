@@ -5,6 +5,7 @@
 #include "src/filters/oidc/redis_session_store.h"
 #include "test/common/utilities/mocks.h"
 #include "test/filters/oidc/mocks.h"
+#include <string>
 
 namespace authservice {
 namespace filters {
@@ -39,18 +40,121 @@ std::shared_ptr<TokenResponse> RedisSessionStoreTest::CreateTokenResponse() {
   return token_response;
 }
 
-TEST_F(RedisSessionStoreTest, SetTokenResponseAndGetTokenResponse) {
+TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenNoTokenResponsePresent) {
   RedisSessionStore redis_session_store(time_service_mock_, 42, 128, redis_wrapper_mock_);
   auto session_id = std::string("fake_session_id");
-  auto other_session_id = "other_session_id";
   auto token_response = CreateTokenResponse();
 
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(sw::redis::StringView("fake_session_id"), sw::redis::StringView("state"))).WillOnce(Return(false));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hexists(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(false));
 
   auto result = redis_session_store.GetTokenResponse(session_id);
   ASSERT_FALSE(result);
+}
 
-//  in_memory_session_store.SetTokenResponse(session_id, token_response);
+TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenIdTokenCannotBeParsed) {
+  RedisSessionStore redis_session_store(time_service_mock_, 42, 128, redis_wrapper_mock_);
+  auto session_id = std::string("fake_session_id");
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hexists(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return("garbage"));
+
+  auto result = redis_session_store.GetTokenResponse(session_id);
+  ASSERT_FALSE(result);
+}
+
+
+TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenOnlyIdTokenIsPresent) {
+  int absolute_timeout_in_seconds = 128;
+  int idle_timeout_in_seconds = 42;
+  RedisSessionStore redis_session_store(time_service_mock_, absolute_timeout_in_seconds,
+                                        idle_timeout_in_seconds, redis_wrapper_mock_);
+  auto session_id = std::string("fake_session_id");
+  auto token_response = std::make_shared<oidc::TokenResponse>(id_token_jwt);
+
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hexists(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(token_response->IDToken().jwt_));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("access_token"))).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("refresh_token"))).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("access_token_expiry"))).WillOnce(Return(absl::nullopt));
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("time_added"))).WillOnce(Return("995"));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              expireat(absl::string_view("fake_session_id"), 1042)).Times(1);
+
+
+  auto result = redis_session_store.GetTokenResponse(session_id);
+  ASSERT_EQ(token_response->IDToken().jwt_, result->IDToken().jwt_);
+  ASSERT_FALSE(result->AccessToken());
+  ASSERT_FALSE(result->RefreshToken());
+  ASSERT_FALSE(result->GetAccessTokenExpiry());
+}
+
+TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenTokenResponsePresent) {
+  int absolute_timeout_in_seconds = 128;
+  int idle_timeout_in_seconds = 42;
+  RedisSessionStore redis_session_store(time_service_mock_, absolute_timeout_in_seconds,
+                                        idle_timeout_in_seconds, redis_wrapper_mock_);
+  auto session_id = std::string("fake_session_id");
+  auto token_response = CreateTokenResponse();
+
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hexists(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("id_token"))).WillOnce(Return(token_response->IDToken().jwt_));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("access_token"))).WillOnce(Return(*token_response->AccessToken()));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("refresh_token"))).WillOnce(Return(*token_response->RefreshToken()));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("access_token_expiry"))).WillOnce(Return(std::to_string(*token_response->GetAccessTokenExpiry())));
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("time_added"))).WillOnce(Return("995"));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              expireat(absl::string_view("fake_session_id"), 1042)).Times(1);
+
+
+  auto result = redis_session_store.GetTokenResponse(session_id);
+  ASSERT_EQ(token_response->IDToken().jwt_, result->IDToken().jwt_);
+  ASSERT_EQ(token_response->AccessToken(), result->AccessToken());
+  ASSERT_EQ(token_response->RefreshToken(), result->RefreshToken());
+  ASSERT_EQ(token_response->GetAccessTokenExpiry(), result->GetAccessTokenExpiry());
+}
+
+TEST_F(RedisSessionStoreTest, SetTokenResponse) {
+  int absolute_timeout_in_seconds = 128;
+  int idle_timeout_in_seconds = 42;
+  RedisSessionStore redis_session_store(time_service_mock_, absolute_timeout_in_seconds,
+                                        idle_timeout_in_seconds, redis_wrapper_mock_);
+  auto token_response = CreateTokenResponse();
+  auto session_id = std::string("fake_session_id");
+
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hset(absl::string_view("fake_session_id"), absl::string_view("id_token"), absl::string_view(token_response->IDToken().jwt_))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hset(absl::string_view("fake_session_id"), absl::string_view("access_token"), absl::string_view(*token_response->AccessToken()))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hset(absl::string_view("fake_session_id"), absl::string_view("refresh_token"), absl::string_view(*token_response->RefreshToken()))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hset(absl::string_view("fake_session_id"), absl::string_view("access_token_expiry"), absl::string_view(std::to_string(*token_response->GetAccessTokenExpiry())))).WillOnce(Return(true));
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hget(absl::string_view("fake_session_id"), absl::string_view("time_added"))).WillOnce(Return("995"));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              expireat(absl::string_view("fake_session_id"), 1042)).Times(1);
+
+
+  redis_session_store.SetTokenResponse(session_id, token_response);
+
+}
 //  // Caution: when you mutate the original, you mutate the same object that is held in the session store's map
 //  token_response->SetAccessToken("fake_access_token2");
 //
@@ -73,7 +177,7 @@ TEST_F(RedisSessionStoreTest, SetTokenResponseAndGetTokenResponse) {
 //  ASSERT_EQ(result->RefreshToken(), "fake_refresh_token");
 //  ASSERT_EQ(result->AccessToken(), "fake_access_token2");
 //  ASSERT_EQ(result->GetAccessTokenExpiry(), 99);
-}
+//}
 //
 //TEST_F(RedisSessionStoreTest, SetAuthorizationStateAndClearAuthorizationStateAndGetAuthorizationState) {
 //  InMemorySessionStore in_memory_session_store(time_service_mock_, 42, 128);

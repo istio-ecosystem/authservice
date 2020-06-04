@@ -18,7 +18,6 @@ private:
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t absolute_session_timeout_in_seconds_;
   uint32_t idle_session_timeout_in_seconds_;
-  std::recursive_mutex mutex_;
   std::shared_ptr<RedisWrapper> redis_wrapper_;
 
 public:
@@ -42,7 +41,7 @@ public:
 
   virtual void RemoveAllExpired() override;
 
-  virtual void RefreshExpiration(sw::redis::StringView session_id);
+  virtual void RefreshExpiration(absl::string_view session_id);
 };
 
 }  // namespace oidc
