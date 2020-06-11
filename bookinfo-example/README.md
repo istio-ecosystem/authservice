@@ -7,7 +7,7 @@ This demo uses the [Istio Bookinfo sample application](https://istio.io/docs/exa
 This demo takes advantage of an Istio feature set that gives the ability to inject http filters on 
 Sidecars. This feature set was released in Istio 1.3.0.
 
-Things needed before starting:
+Things needed before starting: 
 
 - A Kubernetes cluster that is compatible with Istio 1.3 or newer
 - An OIDC provider configured to support Authorization Code grant type. The urls and credentials for this 
