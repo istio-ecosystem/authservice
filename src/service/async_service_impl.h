@@ -65,13 +65,6 @@ class ProcessingState : public ServiceState {
 
   void Proceed() override;
 
-//  ::grpc::Status Check(
-//      ::grpc::ServerContext *,
-//      const ::envoy::service::auth::v2::CheckRequest *request,
-//      ::envoy::service::auth::v2::CheckResponse *response,
-//      boost::asio::io_context &ioc,
-//      boost::asio::yield_context yield);
-
  private:
   // GRPC service/queue/context
   Authorization::AsyncService &service_;
