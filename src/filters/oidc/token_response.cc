@@ -258,7 +258,7 @@ absl::optional<int64_t> TokenResponseParserImpl::ParseAccessTokenExpiry(
   if (expires_in_iter != fields.end()) {
     auto expires_in = int64_t(expires_in_iter->second.number_value());
     // Knock 5 seconds off the expiry time to take into account the time it may have taken to retrieve the token.
-    return absl::ToUnixSeconds(absl::Now()) + expires_in - 5;
+    return 12; // TODO REMOVE THIS TEMPORARY TESTING HACK. ALL ACCESS TOKENS ARE CONSIDERED TO EXPIRE IMMEDIATELY TO FORCE LOTS OF REFRESHES.
   }
   return absl::nullopt;
 }

@@ -8,13 +8,11 @@
 namespace authservice {
 namespace service {
 
-AuthServiceImpl::AuthServiceImpl(const config::Config &config)
-    : trigger_rules_config_(config.trigger_rules()) {
-  for (const auto &chain_config : config.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
-    chains_.push_back(std::move(chain));
-  }
-}
+AuthServiceImpl::AuthServiceImpl(std::vector<std::unique_ptr<filters::FilterChain>> &chains,
+                                 const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
+                                 boost::asio::io_context& ioc,
+                                 boost::asio::yield_context yield)
+    : chains_(chains), trigger_rules_config_(trigger_rules_config), ioc_(ioc), yield_(yield) {}
 
 ::grpc::Status AuthServiceImpl::Check(
     ::grpc::ServerContext *,
@@ -40,7 +38,7 @@ AuthServiceImpl::AuthServiceImpl(const config::Config &config)
                       request->attributes().request().http().path(), chain->Name());
         // Create a new instance of a processor.
         auto processor = chain->New();
-        auto status = processor->Process(request, response);
+        auto status = processor->Process(request, response, ioc_, yield_);
         // See src/filters/filter.h:filter::Process for a description of how status
         // codes should be handled
         switch (status) {
@@ -77,12 +75,6 @@ AuthServiceImpl::AuthServiceImpl(const config::Config &config)
     spdlog::error("%s unexpected error: unknown", __func__);
   }
   return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
-}
-
-void AuthServiceImpl::DoPeriodicCleanup() {
-  for (const auto &chain : chains_) {
-    chain->DoPeriodicCleanup();
-  }
 }
 
 }  // namespace service

@@ -10,6 +10,9 @@ cc_library(
         "async_service_impl.h",
         "service_impl.h",
     ],
+    textual_hdrs = [
+        "async_service_impl.cc",
+    ],
     deps = [
         "//config:config_cc",
         "//src/config",
