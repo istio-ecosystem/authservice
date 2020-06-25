@@ -1,7 +1,6 @@
 #ifndef AUTHSERVICE_ASYNC_SERVICE_IMPL_H
 #define AUTHSERVICE_ASYNC_SERVICE_IMPL_H
 
-#include "service_impl.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include <boost/asio.hpp>
 #include <grpcpp/grpcpp.h>

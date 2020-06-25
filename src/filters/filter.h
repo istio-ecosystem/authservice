@@ -1,5 +1,6 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_FILTER_H_
 #define AUTHSERVICE_SRC_FILTERS_FILTER_H_
+
 #include "absl/strings/string_view.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "google/rpc/code.pb.h"
@@ -10,7 +11,8 @@ using namespace envoy::service::auth::v2;
 
 namespace authservice {
 namespace filters {
-/** @brief Filter defines an abstract class for processing requests.
+/**
+ * @brief Filter defines an abstract class for processing requests.
  *
  * Filter defines an abstract class for processing requests. Filters are
  * composed into pipelines and processing passes
@@ -20,7 +22,8 @@ namespace filters {
 class Filter {
  public:
   virtual ~Filter() = default;
-  /** @brief Process a request mutating the response.
+  /**
+   * @brief Process a request mutating the response.
    *
    * Process the given request mutating the response to include new and amended
    * fields. Filters should return one of OK, UNAUTHENTICATED, or
@@ -44,27 +47,13 @@ class Filter {
    * PERMISSION_DENIED] for indicating successful processing.
    */
   virtual google::rpc::Code Process(
-          const ::envoy::service::auth::v2::CheckRequest* request,
-          ::envoy::service::auth::v2::CheckResponse* response,
-          boost::asio::io_context& ioc,
-          boost::asio::yield_context yield) = 0;
+      const ::envoy::service::auth::v2::CheckRequest *request,
+      ::envoy::service::auth::v2::CheckResponse *response,
+      boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) = 0;
 
-  /** @brief Process a request synchronously.
-   *
-   * Creates a new Boost io_context then calls the asynchronous version of this
-   * function inside a co-routine on this context.
-   * Mainly intended for use in tests.
-   *
-   * @param request the request process.
-   * @param response the response to augment.
-   * @return the status of the processing. One of [OK, UNAUTHENTICATED,
-   * PERMISSION_DENIED] for indicating successful processing.
-   */
-  virtual google::rpc::Code Process(
-          const ::envoy::service::auth::v2::CheckRequest* request,
-          ::envoy::service::auth::v2::CheckResponse* response);
-
-  /** @brief Name the well-known name of the filter.
+  /**
+   * @brief Name the well-known name of the filter.
    *
    * Name the well-known name of the filter which can be used for logging
    * purposes.

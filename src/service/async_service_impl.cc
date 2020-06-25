@@ -24,7 +24,6 @@ ProcessingState::ProcessingState(std::vector<std::unique_ptr<filters::FilterChai
 }
 
 ::grpc::Status Check(
-    ::grpc::ServerContext *,
     const ::envoy::service::auth::v2::CheckRequest *request,
     ::envoy::service::auth::v2::CheckResponse *response,
                           std::vector<std::unique_ptr<filters::FilterChain>> &chains,
@@ -104,7 +103,7 @@ void ProcessingState::Proceed() {
     spdlog::trace("Processing request");
 
     CheckResponse response;
-    authservice::service::Check(&ctx_, &request_, &response, chains_, trigger_rules_config_, this->io_context_, yield);
+    authservice::service::Check(&request_, &response, chains_, trigger_rules_config_, this->io_context_, yield);
 
     this->responder_.Finish(response, grpc::Status::OK, new CompleteState(this));
 
