@@ -49,4 +49,4 @@ Additional features being considered:
 ## Contributing & Contact
 We welcome feedback and contributions. Aside from submitting Github issues/PRs, you can reach out at `#oidc-proposal` 
 or `#security` channel on [Istio’s Slack](https://istio.slack.com/) workspace 
-([here's how to join](https://istio.io/about/community/join/)). 
+([here's how to join](https://istio.io/about/community/join/)).
