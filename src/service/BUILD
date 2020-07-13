@@ -8,7 +8,6 @@ cc_library(
     hdrs = [
         "async_service_impl.h",
     ],
-    textual_hdrs = ["async_service_impl.cc"],
     deps = [
         "//config:config_cc",
         "//src/config",

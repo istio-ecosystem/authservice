@@ -36,6 +36,14 @@ class AsyncAuthServiceImpl {
   void SchedulePeriodicCleanupTask();
 };
 
+::grpc::Status Check(
+        const ::envoy::service::auth::v2::CheckRequest *request,
+        ::envoy::service::auth::v2::CheckResponse *response,
+        std::vector<std::unique_ptr<filters::FilterChain>> &chains,
+        const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
+        boost::asio::io_context& ioc,
+        boost::asio::yield_context yield);
+
 class ServiceState {
  public:
   virtual ~ServiceState() = default;

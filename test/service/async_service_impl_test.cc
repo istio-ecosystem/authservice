@@ -1,5 +1,4 @@
 #include "src/service/async_service_impl.h"
-#include "src/service/async_service_impl.cc"
 #include "src/config/get_config.h"
 #include "src/filters/filter_chain.h"
 #include "gtest/gtest.h"
