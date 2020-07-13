@@ -2,6 +2,8 @@
 #define AUTHSERVICE_ASYNC_SERVICE_IMPL_H
 
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
+#include "config/config.pb.h"
+#include "src/filters/filter_chain.h"
 #include <boost/asio.hpp>
 #include <grpcpp/grpcpp.h>
 
