@@ -4,11 +4,9 @@ cc_library(
     name = "serviceimpl",
     srcs = [
         "async_service_impl.cc",
-        "service_impl.cc",
     ],
     hdrs = [
         "async_service_impl.h",
-        "service_impl.h",
     ],
     deps = [
         "//config:config_cc",

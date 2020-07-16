@@ -133,7 +133,32 @@ protected:
                                                         absl::string_view expected_nonce);
 
   void MockSessionGenerator(absl::string_view session_id, absl::string_view state, absl::string_view nonce);
+
+  static google::rpc::Code ProcessAndWaitForAsio(OidcFilter &filter,
+                                                 const ::envoy::service::auth::v2::CheckRequest *request,
+                                                 ::envoy::service::auth::v2::CheckResponse *response);
 };
+
+google::rpc::Code OidcFilterTest::ProcessAndWaitForAsio(OidcFilter &filter,
+                                                        const ::envoy::service::auth::v2::CheckRequest *request,
+                                                        ::envoy::service::auth::v2::CheckResponse *response) {
+  // Create a new io_context. All of the async IO handled inside the
+  // spawn below will be handled by this new io_context.
+  boost::asio::io_context ioc;
+  google::rpc::Code code;
+
+  // Spawn a co-routine to run the filter.
+  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
+    code = filter.Process(request, response, ioc, yield);
+  });
+
+  // Run the I/O context to completion, on the current thread.
+  // This consumes the current thread until all of the async
+  // I/O from the above spawn is finished.
+  ioc.run();
+
+  return code;
+}
 
 TEST_F(OidcFilterTest, Constructor) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
@@ -161,7 +186,7 @@ TEST_F(OidcFilterTest, NoHttpHeader) {
 
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto status = filter.Process(&request, &response);
+  auto status = ProcessAndWaitForAsio(filter, &request, &response);
   ASSERT_EQ(status, google::rpc::Code::INVALID_ARGUMENT);
 }
 
@@ -170,7 +195,7 @@ TEST_F(OidcFilterTest, NoHttpSchema) {
   OidcFilter filter(common::http::ptr_t(), config);
   ::envoy::service::auth::v2::CheckRequest request;
   ::envoy::service::auth::v2::CheckResponse response;
-  auto status = filter.Process(&request, &response);
+  auto status = ProcessAndWaitForAsio(filter, &request, &response);
   ASSERT_EQ(status.error_code(), ::grpc::StatusCode::INVALID_ARGUMENT);
 }
  */
@@ -183,7 +208,7 @@ TEST_F(OidcFilterTest, NoAuthorization) {
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(),
             ::envoy::type::StatusCode::Found);
@@ -221,7 +246,7 @@ TEST_F(OidcFilterTest, NoAuthorization_WithoutPathOrQueryParameters) {
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
 
-  filter.Process(&request_, &response_);
+  ProcessAndWaitForAsio(filter, &request_, &response_);
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(session_id, "https://example.com", state, nonce);
 }
 
@@ -232,7 +257,7 @@ TEST_F(OidcFilterTest, AlreadyHasUnexpiredIdTokenShouldSendRequestToAppWithAutho
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::OK);
 
   ASSERT_THAT(
@@ -262,7 +287,7 @@ TEST_F(OidcFilterTest,
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(new_session_id, requested_url_, state, nonce);
 
@@ -306,7 +331,7 @@ TEST_F(OidcFilterTest,
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + old_session_id});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   // We expect to be redirected to authenticate
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
 
@@ -356,7 +381,7 @@ TEST_F(OidcFilterTest,
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::OK);
   ASSERT_THAT(
       response_.ok_response().headers(),
@@ -391,7 +416,7 @@ TEST_F(OidcFilterTest,
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + old_session_id});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
 
@@ -436,7 +461,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToParseTh
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + old_session_id});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(new_session_id, requested_url_, state, nonce);
 
@@ -475,7 +500,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenFailingToEstabli
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + old_session_id});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(new_session_id, requested_url_, state, nonce);
 
@@ -523,7 +548,7 @@ TEST_F(OidcFilterTest, Process_RedirectsUsersToAuthenticate_WhenIDPReturnsUnsucc
 
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + old_session_id});
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(new_session_id, requested_url_, state, nonce);
@@ -553,7 +578,7 @@ TEST_F(OidcFilterTest,
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::OK);
   ASSERT_THAT(
@@ -577,7 +602,7 @@ TEST_F(OidcFilterTest,
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::OK);
   ASSERT_THAT(
@@ -616,7 +641,7 @@ TEST_F(OidcFilterTest, ExpiredIdTokenShouldRedirectToIdpToAuthenticateAgainWhenT
 
   session_store_->SetTokenResponse(old_session_id, std::make_shared<TokenResponse>(token_response));
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   // We expect to be redirected to authenticate because the id_token is expired
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(new_session_id, requested_url_, state, nonce);
@@ -640,7 +665,7 @@ TEST_F(OidcFilterTest,
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::OK);
 
   ASSERT_THAT(
@@ -662,7 +687,7 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
   httpRequest->set_path("/logout");
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_FALSE(session_store_->GetTokenResponse("session123"));
 
@@ -689,7 +714,7 @@ TEST_F(OidcFilterTest, LogoutWithNoCookies) {
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_path("/logout");
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(),
@@ -743,7 +768,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCann
   std::vector<std::string> parts = {callback_path_, "code=value&state=some-state-value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::StatusCode::BadRequest);
   ASSERT_EQ(response_.denied_response().body(), "Oops, your session has expired. Please try again.");
@@ -785,7 +810,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAcce
 
   std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
@@ -815,7 +840,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingCode) {
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
   ASSERT_THAT(
@@ -836,7 +861,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingState) {
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
   ASSERT_THAT(
@@ -864,7 +889,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenUnexpectedState) {
   httpRequest->set_path(absl::StrJoin(parts, "?"));
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
   ASSERT_THAT(
@@ -896,7 +921,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
   std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INTERNAL);
 
   ASSERT_THAT(
@@ -931,7 +956,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
   std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::INVALID_ARGUMENT);
 
   ASSERT_THAT(
@@ -998,7 +1023,7 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, s
   std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
 
   auto stored_token_response = session_store_->GetTokenResponse(session_id);

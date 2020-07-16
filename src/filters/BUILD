@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 xx_library(
     name = "filter",
-    srcs = ["filter.cc"],
+    srcs = [],
     hdrs = ["filter.h"],
     deps = [
         "@boost//:coroutine",

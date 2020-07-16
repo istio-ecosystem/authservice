@@ -17,7 +17,7 @@ public:
   virtual ~FilterChain() = default;
 
   /**
-   * Name returns a name given to the filter chain for use in debugging anf logging.
+   * Name returns a name given to the filter chain for use in debugging and logging.
    * @return the name of the filter chain.
    */
   virtual const std::string &Name() const = 0;

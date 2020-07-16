@@ -15,7 +15,7 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-/*** @brief An implementation of an OpenID Connect token acquisition filter.
+/** @brief An implementation of an OpenID Connect token acquisition filter.
  *
  * An implementation of an OpenID Connect token acquisition filter which
  * performs agent redirection and token acquisition
@@ -146,11 +146,11 @@ private:
       ::std::string> &headers);
 
   /**
- * @brief Assemble a URL string from a request
- *
- * @param The http request
- * @return The requested Url from the http request as a string
- */
+   * @brief Assemble a URL string from a request
+   *
+   * @param The http request
+   * @return The requested Url from the http request as a string
+   */
   static std::string GetRequestUrl(const AttributeContext_HttpRequest &http_request);
 
   /**
