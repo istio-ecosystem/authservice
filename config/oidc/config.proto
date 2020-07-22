@@ -24,6 +24,13 @@ message TokenConfig {
     string preamble = 2;
 }
 
+// When specified, the Authservice will use the configured redis server to store session data
+message RedisConfig {
+
+    // The redis server uri, e.g. "tcp://127.0.0.1:6379"
+    string server_uri = 1 [(validate.rules).string.min_len = 1];
+}
+
 // When specified, the authservice will destroy the authservice session when a request is
 // made to the configured path.
 message LogoutConfig {
@@ -157,4 +164,8 @@ message OIDCConfig {
     // the OIDC provider. See also the related `trusted_certificate_authority` configuration option.
     // Optional.
     string proxy_uri = 15;
+
+    // When specified, the Authservice will use the configured redis server to store session data.
+    // Optional.
+    RedisConfig redis_session_store_config = 16;
 }

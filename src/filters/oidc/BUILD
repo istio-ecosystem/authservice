@@ -54,6 +54,7 @@ xx_library(
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_redis_hiredis//:hiredis", # needed for linking
     ],
 )
 

@@ -136,7 +136,7 @@ _HIREDIS_WORKSPACE= """"""
 _HIREDIS_BUILD = """
 cc_library(
     name = "hiredis",
-    srcs=glob(["*.c"]),
+    srcs=glob(["*.c"], exclude=["test.c"]),
     hdrs=glob(["*.h"]),
     textual_hdrs=["dict.c"],
     visibility = ["//visibility:public"],

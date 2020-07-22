@@ -7,14 +7,14 @@ namespace filters {
 namespace oidc {
 
 namespace {
-  const char *id_token_key_ = "id_token";
-  const char *access_token_key_ = "access_token";
-  const char *access_token_expiry_key_ = "access_token_expiry";
-  const char *refresh_token_key_ = "refresh_token";
-  const char *state_key_ = "state";
-  const char *nonce_key_ = "nonce";
-  const char *requested_url_key_ = "requested_url";
-  const char *time_added_key_ = "time_added";
+std::string id_token_key_ = "id_token";
+std::string access_token_key_ = "access_token";
+std::string access_token_expiry_key_ = "access_token_expiry";
+std::string refresh_token_key_ = "refresh_token";
+std::string state_key_ = "state";
+std::string nonce_key_ = "nonce";
+std::string requested_url_key_ = "requested_url";
+std::string time_added_key_ = "time_added";
 } // namespace
 
 RedisSessionStore::RedisSessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
@@ -47,17 +47,21 @@ void RedisSessionStore::SetTokenResponse(absl::string_view session_id, std::shar
     redis_wrapper_->hdel(session_id, access_token_expiry_key_);
   }
 
-  redis_wrapper_->hsetnx(session_id, time_added_key_, std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+  redis_wrapper_->hsetnx(session_id,
+                         time_added_key_,
+                         std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
 
   RefreshExpiration(session_id);
 }
 
 std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_view session_id) {
+  //TODO: this call to hexists is unneeded, just call get (hmget) and check for nullptr
   google::jwt_verify::Jwt jwt_id_token;
   if (!redis_wrapper_->hexists(session_id, id_token_key_)) {
     return nullptr;
   }
 
+  //TODO: use hmget instead, reduce chattiness
   auto status = jwt_id_token.parseFromString(redis_wrapper_->hget(session_id, id_token_key_).value());
   if (status != google::jwt_verify::Status::Ok) {
     spdlog::info("{}: failed to parse `id_token` into a JWT: {}", __func__,
@@ -93,16 +97,20 @@ void RedisSessionStore::RemoveSession(absl::string_view session_id) {
 
 void RedisSessionStore::SetAuthorizationState(absl::string_view session_id,
                                               std::shared_ptr<AuthorizationState> authorization_state) {
+  //TODO: use hmset for the next 3 lines
   redis_wrapper_->hset(session_id, state_key_, std::string(authorization_state->GetState()));
   redis_wrapper_->hset(session_id, nonce_key_, authorization_state->GetNonce());
   redis_wrapper_->hset(session_id, requested_url_key_, authorization_state->GetRequestedUrl());
 
-  redis_wrapper_->hsetnx(session_id, time_added_key_, std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+  redis_wrapper_->hsetnx(session_id,
+                         time_added_key_,
+                         std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
 
   RefreshExpiration(session_id);
 }
 
 std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(absl::string_view session_id) {
+  // TODO use hmget and check for all nil values, instead of hexists followed by multiple hgets
   if (!redis_wrapper_->hexists(session_id, state_key_)) {
     return nullptr;
   }
@@ -119,6 +127,7 @@ std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(abs
 }
 
 void RedisSessionStore::ClearAuthorizationState(absl::string_view session_id) {
+  //TODO: hdel (use variadic variant of method)
   redis_wrapper_->hdel(session_id, state_key_);
   redis_wrapper_->hdel(session_id, nonce_key_);
   redis_wrapper_->hdel(session_id, requested_url_key_);
@@ -127,18 +136,19 @@ void RedisSessionStore::ClearAuthorizationState(absl::string_view session_id) {
 }
 
 void RedisSessionStore::RefreshExpiration(absl::string_view session_id) {
+  //TODO: callers should use hmget and send the time added to this function
   auto time_added_opt = redis_wrapper_->hget(session_id, time_added_key_);
   if (!time_added_opt.has_value()) {
-    redis_wrapper_->del(session_id);
+    redis_wrapper_->del(session_id); //TODO: instead of deleting the session, perhaps use 0? signal back to caller things aren't ok?
     return;
   }
-  int timestamp_added = std::stoi(time_added_opt.value());
-  int current_timestamp = time_service_->GetCurrentTimeInSecondsSinceEpoch();
-  if ((absolute_session_timeout_in_seconds_ + timestamp_added) < idle_session_timeout_in_seconds_ + current_timestamp) {
-    redis_wrapper_->expireat(session_id, absolute_session_timeout_in_seconds_ + timestamp_added);
-  } else {
-    redis_wrapper_->expireat(session_id, idle_session_timeout_in_seconds_ + current_timestamp);
-  }
+
+  auto time_added = std::stoi(time_added_opt.value());
+  auto current_time = time_service_->GetCurrentTimeInSecondsSinceEpoch();
+  auto absolute_end_time = absolute_session_timeout_in_seconds_ + time_added;
+  auto idle_end_time = idle_session_timeout_in_seconds_ + current_time;
+  auto expire_at_time = absolute_end_time < idle_end_time ? absolute_end_time : idle_end_time;
+  redis_wrapper_->expireat(session_id, expire_at_time);
 }
 
 void RedisSessionStore::RemoveAllExpired() {}

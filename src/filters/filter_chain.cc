@@ -4,6 +4,8 @@
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/pipe.h"
 #include "src/filters/oidc/in_memory_session_store.h"
+#include "redis.h"
+#include "src/filters/oidc/redis_session_store.h"
 
 namespace authservice {
 namespace filters {
@@ -62,12 +64,26 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
       // so here we ensure that each instance returned by New() shares the same session store.
       auto absolute_session_timeout = filter.oidc().absolute_session_timeout();
       auto idle_session_timeout = filter.oidc().idle_session_timeout();
-      oidc_session_store_ = std::static_pointer_cast<oidc::SessionStore>(
-          std::make_shared<oidc::InMemorySessionStore>(
-              std::make_shared<common::utilities::TimeService>(),
-              absolute_session_timeout,
-              idle_session_timeout)
-      );
+
+      if (filter.oidc().has_redis_session_store_config()) {
+        auto redis_sever_uri = filter.oidc().redis_session_store_config().server_uri();
+        auto redis_wrapper =  std::make_shared<oidc::RedisWrapper>(std::make_shared<sw::redis::Redis>(redis_sever_uri));
+
+        oidc_session_store_ = std::static_pointer_cast<oidc::RedisSessionStore>(
+            std::make_shared<oidc::RedisSessionStore>(
+                std::make_shared<common::utilities::TimeService>(),
+                absolute_session_timeout,
+                idle_session_timeout,
+                redis_wrapper)
+        );
+      } else {
+        oidc_session_store_ = std::static_pointer_cast<oidc::SessionStore>(
+            std::make_shared<oidc::InMemorySessionStore>(
+                std::make_shared<common::utilities::TimeService>(),
+                absolute_session_timeout,
+                idle_session_timeout)
+        );
+      }
     }
 
     result->AddFilter(FilterPtr(new oidc::OidcFilter(
