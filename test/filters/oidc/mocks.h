@@ -3,12 +3,16 @@
 
 #include "gmock/gmock.h"
 #include "src/filters/oidc/token_response.h"
+#include "redis.h"
+#include "src/filters/oidc/redis_wrapper.h"
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace authservice {
 namespace filters {
 namespace oidc {
 class TokenResponseParserMock final : public TokenResponseParser {
-public:
+ public:
   MOCK_CONST_METHOD3(Parse,
                      std::shared_ptr<TokenResponse>(
                          const std::string &client_id,
@@ -19,6 +23,19 @@ public:
                          const TokenResponse &existing_token_response,
                          const std::string &raw_response_string));
 };
+
+class RedisWrapperMock : public RedisWrapper {
+ public:
+  RedisWrapperMock() : RedisWrapper(nullptr) {};
+  MOCK_METHOD2(hget, absl::optional<std::string>(const absl::string_view, const absl::string_view));
+  MOCK_METHOD3(hset, bool(const absl::string_view, const absl::string_view, const absl::string_view));
+  MOCK_METHOD3(hsetnx, bool(const absl::string_view, const absl::string_view, const absl::string_view));
+  MOCK_METHOD2(hexists, bool(const absl::string_view, const absl::string_view));
+  MOCK_METHOD1(del, long long(const absl::string_view));
+  MOCK_METHOD2(hdel, long long(const absl::string_view, const absl::string_view));
+  MOCK_METHOD2(expireat, bool(const absl::string_view, long long));
+};
+
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice
