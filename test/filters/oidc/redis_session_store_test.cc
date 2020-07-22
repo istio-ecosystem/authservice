@@ -5,6 +5,7 @@
 #include "test/common/utilities/mocks.h"
 #include "test/filters/oidc/mocks.h"
 #include <string>
+#include <iostream>
 
 namespace authservice {
 namespace filters {
@@ -37,6 +38,8 @@ class RedisSessionStoreTest : public ::testing::Test {
   std::string state_key = "state";
   std::string state = "fake-state";
   std::string time_added_key = "time_added";
+  std::vector<std::string> list_of_token_response_keys =
+      {id_token_key, access_token_key, refresh_token_key, access_token_expiry_key};
 
   void SetUp() override {
     auto jwt_status = id_token_jwt.parseFromString(id_token);
@@ -52,23 +55,39 @@ class RedisSessionStoreTest : public ::testing::Test {
 };
 
 TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenNoTokenResponsePresent) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(id_token_key))).WillOnce(Return(false));
+  std::unordered_map<std::string, absl::optional<std::string>> empty_map = {
+      {id_token_key, absl::nullopt},
+      {access_token_key, absl::nullopt},
+      {refresh_token_key, absl::nullopt},
+      {access_token_expiry_key, absl::nullopt}
+  };
+
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(list_of_token_response_keys))).WillOnce(Return(empty_map));
   ASSERT_EQ(nullptr, redis_session_store->GetTokenResponse(session_id));
 }
 
 TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenIdTokenCannotBeParsed) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(id_token_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(id_token_key))).WillOnce(Return("garbage"));
+  std::unordered_map<std::string, absl::optional<std::string>> token_response_map = {
+      {id_token_key, "garbagio"},
+      {access_token_key, absl::nullopt},
+      {refresh_token_key, absl::nullopt},
+      {access_token_expiry_key, absl::nullopt}
+  };
+
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(list_of_token_response_keys))).WillOnce(Return(token_response_map));
 
   ASSERT_EQ(nullptr, redis_session_store->GetTokenResponse(session_id));
 }
 
 TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenOnlyIdTokenIsPresent) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(id_token_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(id_token_key))).WillOnce(Return(id_token));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(access_token_key))).WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(refresh_token_key))).WillOnce(Return(absl::nullopt));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(access_token_expiry_key))).WillOnce(Return(absl::nullopt));
+  std::unordered_map<std::string, absl::optional<std::string>> token_response_map = {
+      {id_token_key, id_token},
+      {access_token_key, absl::nullopt},
+      {refresh_token_key, absl::nullopt},
+      {access_token_expiry_key, absl::nullopt}
+  };
+
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(list_of_token_response_keys))).WillOnce(Return(token_response_map));
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("995"));
@@ -82,12 +101,15 @@ TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenOnlyIdTokenIsPresent) {
 }
 
 TEST_F(RedisSessionStoreTest, GetTokenResponse_WhenTokenResponsePresentWithAllValues) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(id_token_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(id_token_key))).WillOnce(Return(id_token));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(access_token_key))).WillOnce(Return(access_token));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(refresh_token_key))).WillOnce(Return(refresh_token));
-  EXPECT_CALL(*redis_wrapper_mock_,
-              hget(Eq(session_id), Eq(access_token_expiry_key))).WillOnce(Return(std::to_string(access_token_expiry)));
+  std::unordered_map<std::string, absl::optional<std::string>> token_response_map = {
+      {id_token_key, id_token},
+      {access_token_key, access_token},
+      {refresh_token_key, refresh_token},
+      {access_token_expiry_key, std::to_string(access_token_expiry)}
+  };
+
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(list_of_token_response_keys))).WillOnce(Return(token_response_map));
+
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("995"));
   EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1042))).Times(1);
@@ -125,15 +147,12 @@ TEST_F(RedisSessionStoreTest, SetTokenResponse_WithFullyPopulatedTokenResponse) 
 
 TEST_F(RedisSessionStoreTest, SetTokenResponse_WithOnlyIdToken) {
   EXPECT_CALL(*redis_wrapper_mock_, hset(Eq(session_id), Eq(id_token_key), Eq(id_token))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(access_token_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(refresh_token_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(access_token_expiry_key))).WillOnce(Return(true));
-
+  std::vector<std::string> list_of_token_response_keys_without_id_token =
+      {access_token_key, refresh_token_key, access_token_expiry_key};
+  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(list_of_token_response_keys_without_id_token))).WillOnce(Return(true));
   EXPECT_CALL(*redis_wrapper_mock_, hsetnx(Eq(session_id), Eq(time_added_key), Eq("1000"))).WillOnce(Return(true));
-
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("995"));
-
   EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1042))).Times(1);
 
   redis_session_store->SetTokenResponse(session_id, std::make_shared<oidc::TokenResponse>(id_token_jwt));
@@ -182,16 +201,61 @@ TEST_F(RedisSessionStoreTest, SetAuthorizationState) {
 }
 
 TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenNotPresent) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(state_key))).WillOnce(Return(false));
+  std::unordered_map<std::string, absl::optional<std::string>> auth_state_map = {
+      {state_key, absl::nullopt},
+      {nonce_key, absl::nullopt},
+      {requested_url_key, absl::nullopt}
+  };
+  std::vector<std::string> auth_state_keys({state_key, nonce_key, requested_url_key});
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(auth_state_keys))).WillOnce(Return(auth_state_map));
+
+  ASSERT_EQ(nullptr, redis_session_store->GetAuthorizationState(session_id));
+}
+
+TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenOnlyStateNotPresent) {
+  std::unordered_map<std::string, absl::optional<std::string>> auth_state_map = {
+      {state_key, absl::nullopt},
+      {nonce_key, nonce},
+      {requested_url_key, requested_url}
+  };
+  std::vector<std::string> auth_state_keys({state_key, nonce_key, requested_url_key});
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(auth_state_keys))).WillOnce(Return(auth_state_map));
+
+  ASSERT_EQ(nullptr, redis_session_store->GetAuthorizationState(session_id));
+}
+
+TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenOnlyNonceNotPresent) {
+  std::unordered_map<std::string, absl::optional<std::string>> auth_state_map = {
+      {state_key, state},
+      {nonce_key, absl::nullopt},
+      {requested_url_key, requested_url}
+  };
+  std::vector<std::string> auth_state_keys({state_key, nonce_key, requested_url_key});
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(auth_state_keys))).WillOnce(Return(auth_state_map));
+
+  ASSERT_EQ(nullptr, redis_session_store->GetAuthorizationState(session_id));
+}
+
+TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenOnlyRequestedUrlNotPresent) {
+  std::unordered_map<std::string, absl::optional<std::string>> auth_state_map = {
+      {state_key, state},
+      {nonce_key, nonce},
+      {requested_url_key, absl::nullopt}
+  };
+  std::vector<std::string> auth_state_keys({state_key, nonce_key, requested_url_key});
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(auth_state_keys))).WillOnce(Return(auth_state_map));
 
   ASSERT_EQ(nullptr, redis_session_store->GetAuthorizationState(session_id));
 }
 
 TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenValuesPresent) {
-  EXPECT_CALL(*redis_wrapper_mock_, hexists(Eq(session_id), Eq(state_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(state_key))).WillOnce(Return(state));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(nonce_key))).WillOnce(Return(nonce));
-  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(requested_url_key))).WillOnce(Return(requested_url));
+  std::unordered_map<std::string, absl::optional<std::string>> auth_state_map = {
+      {state_key, state},
+      {nonce_key, nonce},
+      {requested_url_key, requested_url}
+  };
+  std::vector<std::string> auth_state_keys({state_key, nonce_key, requested_url_key});
+  EXPECT_CALL(*redis_wrapper_mock_, hmget(Eq(session_id), Eq(auth_state_keys))).WillOnce(Return(auth_state_map));
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1042))).Times(1);
@@ -204,9 +268,9 @@ TEST_F(RedisSessionStoreTest, GetAuthorizationState_WhenValuesPresent) {
 }
 
 TEST_F(RedisSessionStoreTest, ClearAuthorizationState) {
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(state_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(nonce_key))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hdel(Eq(session_id), Eq(requested_url_key))).WillOnce(Return(true));
+  EXPECT_CALL(*redis_wrapper_mock_,
+              hdel(Eq(session_id), Eq(std::vector<std::string>{state_key, nonce_key, requested_url_key}))).WillOnce(
+      Return(true));
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillOnce(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1042))).Times(1);

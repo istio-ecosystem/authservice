@@ -14,6 +14,25 @@ absl::optional<std::string> oidc::RedisWrapper::hget(const absl::string_view key
   return hget_value ? absl::optional<std::string>(hget_value->data()) : absl::nullopt;
 }
 
+std::unordered_map<std::string, absl::optional<std::string>> oidc::RedisWrapper::hmget(const absl::string_view key, const std::vector<std::string>& fields) {
+  std::vector<sw::redis::OptionalString> vals;
+  redis_->hmget(key.data(), fields.begin(), fields.end(), std::back_inserter(vals));
+  std::unordered_map<std::string, absl::optional<std::string>> output_map;
+
+  for (auto tup : boost::combine(fields, vals)) {
+    std::string field;
+    sw::redis::OptionalString val;
+    boost::tie(field, val) = tup;
+    if (val) {
+      output_map.insert({field, absl::optional<std::string>(val.value())});
+    } else {
+      output_map.insert({field, absl::nullopt});
+    }
+  }
+
+  return output_map;
+}
+
 bool RedisWrapper::hset(const absl::string_view key, const absl::string_view field, const absl::string_view val) {
   return redis_->hset(sw::redis::StringView(key.data()), sw::redis::StringView(field.data()), sw::redis::StringView(val.data()));
 }
@@ -29,8 +48,13 @@ long long RedisWrapper::del(const absl::string_view key) {
 bool RedisWrapper::expireat(const absl::string_view key, long long timestamp) {
   return redis_->expireat(sw::redis::StringView(key.data()), timestamp);
 }
-long long RedisWrapper::hdel(const absl::string_view key, const absl::string_view field) {
-  return redis_->hdel(sw::redis::StringView(key.data()), sw::redis::StringView(field.data()));
+long long RedisWrapper::hdel(absl::string_view key, std::vector<std::string>& fields) {
+//  std::vector<sw::redis::StringView> field_strings;
+//  field_strings.reserve(fields.size());
+//  for (auto field : fields) {
+//    field_strings.emplace_back(field);
+//  }
+  return redis_->hdel(sw::redis::StringView(key.data()), fields.begin(), fields.end());
 }
 
 } //oidc
