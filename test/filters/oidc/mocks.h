@@ -12,6 +12,27 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
+class SessionStoreMock final : public SessionStore {
+
+ public:
+
+  MOCK_METHOD2(SetTokenResponse, void(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response));
+
+  MOCK_METHOD1(GetTokenResponse, std::shared_ptr<TokenResponse>(absl::string_view session_id));
+
+  MOCK_METHOD2(SetAuthorizationState,
+               void(absl::string_view session_id, std::shared_ptr<AuthorizationState> authorization_state));
+
+  MOCK_METHOD1(GetAuthorizationState, std::shared_ptr<AuthorizationState>(absl::string_view session_id));
+
+  MOCK_METHOD1(ClearAuthorizationState, void(absl::string_view session_id));
+
+  MOCK_METHOD1(RemoveSession, void(absl::string_view session_id));
+
+  MOCK_METHOD0(RemoveAllExpired, void());
+
+};
+
 class TokenResponseParserMock final : public TokenResponseParser {
 
  public:

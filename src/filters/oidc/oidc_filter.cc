@@ -80,7 +80,11 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info("{}: Handling logout", __func__);
     if (session_id_optional.has_value()) {
       spdlog::info("{}: Removing session info from session store during logout", __func__);
-      session_store_->RemoveSession(session_id_optional.value());
+      try {
+        session_store_->RemoveSession(session_id_optional.value());
+      } catch (SessionError &err) {
+        return SessionErrorResponse(response, err);
+      }
     }
     SetLogoutHeaders(response);
     spdlog::info("{}: Logout complete. Sending user to re-authenticate.", __func__);
@@ -113,7 +117,12 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
-  auto token_response_ptr = session_store_->GetTokenResponse(session_id);
+  std::shared_ptr<TokenResponse> token_response_ptr;
+  try {
+    token_response_ptr = session_store_->GetTokenResponse(session_id);
+  } catch (SessionError &err) {
+    return SessionErrorResponse(response, err);
+  }
 
   // If the user has a session_id cookie but there are no required tokens in the session store associated with it,
   // then redirect for login.
@@ -142,12 +151,15 @@ google::rpc::Code OidcFilter::Process(
     return RedirectToIdp(response, httpRequest, session_id);
   }
 
-  // If the user has an unexpired refresh token
-  // then use it to request a fresh token_response,
-  // then, if successful, allow the request to proceed; if unsuccessful, redirect for login.
+  // If the user has an unexpired refresh token then use it to request a fresh token_response.
+  // If successful, allow the request to proceed. If unsuccessful, redirect for login.
   auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
   if (refreshed_token_response) {
-    session_store_->SetTokenResponse(session_id, refreshed_token_response);
+    try {
+      session_store_->SetTokenResponse(session_id, refreshed_token_response);
+    } catch (SessionError &err) {
+      return SessionErrorResponse(response, err);
+    }
     spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
                  __func__);
     AddTokensToRequestHeaders(response, *refreshed_token_response);
@@ -160,13 +172,25 @@ google::rpc::Code OidcFilter::Process(
   }
 }
 
+google::rpc::Code OidcFilter::SessionErrorResponse(CheckResponse *response, const SessionError &err) {
+  spdlog::error("{}: Could not RemoveSession from session store: {}", __func__, err.what());
+  response->mutable_denied_response()->mutable_status()->set_code(envoy::type::Unauthorized);
+  response->mutable_denied_response()->mutable_body()->append(
+      "There was an error accessing your session data. Try again later.");
+  return google::rpc::UNAUTHENTICATED;
+}
+
 google::rpc::Code OidcFilter::RedirectToIdp(
     CheckResponse *response,
     const AttributeContext_HttpRequest &httpRequest,
     absl::optional<std::string> old_session_id) {
   if (old_session_id.has_value()) {
-    // remove old session and regenerate session_id to prevent session fixation attacks
-    session_store_->RemoveSession(old_session_id.value());
+    try {
+      // remove old session and regenerate session_id to prevent session fixation attacks
+      session_store_->RemoveSession(old_session_id.value());
+    } catch (SessionError &err) {
+      return SessionErrorResponse(response, err);
+    }
   }
 
   auto session_id = session_string_generator_->GenerateSessionId();
@@ -193,8 +217,14 @@ google::rpc::Code OidcFilter::RedirectToIdp(
   auto redirect_location = absl::StrJoin({idp_config_.authorization_uri(), query}, "?");
   SetRedirectHeaders(redirect_location, response);
 
-  session_store_->SetAuthorizationState(session_id.data(),
-                                        std::make_shared<AuthorizationState>(state, nonce, GetRequestUrl(httpRequest)));
+  try {
+    session_store_->SetAuthorizationState(session_id.data(),
+                                          std::make_shared<AuthorizationState>(state,
+                                                                               nonce,
+                                                                               GetRequestUrl(httpRequest)));
+  } catch (SessionError &err) {
+    return SessionErrorResponse(response, err);
+  }
 
   SetSessionIdCookie(response, session_id.data());
 
@@ -483,7 +513,13 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
-  auto authorization_state = session_store_->GetAuthorizationState(session_id);
+  std::shared_ptr<AuthorizationState> authorization_state;
+  try {
+    authorization_state = session_store_->GetAuthorizationState(session_id);
+  } catch (SessionError &err) {
+    return SessionErrorResponse(response, err);
+  }
+
   if (!authorization_state) {
     spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect.", __func__);
     response->mutable_denied_response()->mutable_status()->set_code(envoy::type::StatusCode::BadRequest);
@@ -541,10 +577,18 @@ google::rpc::Code OidcFilter::RetrieveToken(
       }
     }
 
-    session_store_->ClearAuthorizationState(session_id);
+    try {
+      session_store_->ClearAuthorizationState(session_id);
+    } catch (SessionError &err) {
+      return SessionErrorResponse(response, err);
+    }
 
     spdlog::info("{}: Saving token response to session store", __func__);
-    session_store_->SetTokenResponse(session_id, token_response);
+    try {
+      session_store_->SetTokenResponse(session_id, token_response);
+    } catch (SessionError &err) {
+      return SessionErrorResponse(response, err);
+    }
 
     SetRedirectHeaders(authorization_state->GetRequestedUrl(), response);
     return google::rpc::Code::UNAUTHENTICATED;

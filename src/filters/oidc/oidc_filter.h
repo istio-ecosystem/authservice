@@ -60,6 +60,8 @@ class OidcFilter final : public filters::Filter {
 
   void SetLogoutHeaders(CheckResponse *response);
 
+  google::rpc::Code SessionErrorResponse(CheckResponse *response, const SessionError &err);
+
   /** @brief Encode the given timeout as a cookie Max-Age directive.
    *
    * @param timeout the time out in seconds.

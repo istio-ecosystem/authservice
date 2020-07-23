@@ -34,6 +34,7 @@ namespace oidc {
 
 using ::testing::_;
 using ::testing::Eq;
+using ::testing::Throw;
 using ::testing::StrEq;
 using ::testing::AnyOf;
 using ::testing::AllOf;
@@ -75,6 +76,7 @@ class OidcFilterTest : public ::testing::Test {
   std::shared_ptr<TokenResponseParserMock> parser_mock_;
   std::shared_ptr<common::session::SessionStringGeneratorMock> session_string_generator_mock_;
   std::shared_ptr<SessionStore> session_store_;
+  std::shared_ptr<SessionStoreMock> session_store_mock_;
   std::shared_ptr<TokenResponse> test_token_response_;
   ::envoy::service::auth::v2::CheckRequest request_;
   ::envoy::service::auth::v2::CheckResponse response_;
@@ -108,6 +110,7 @@ class OidcFilterTest : public ::testing::Test {
     session_store_ = std::static_pointer_cast<SessionStore>(std::make_shared<InMemorySessionStore>(
         std::make_shared<common::utilities::TimeService>(), 1000, 1000)
     );
+    session_store_mock_ = std::make_shared<SessionStoreMock>();
 
     auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
     ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
@@ -137,9 +140,14 @@ class OidcFilterTest : public ::testing::Test {
 
   void MockSessionGenerator(absl::string_view session_id, absl::string_view state, absl::string_view nonce);
 
+
   static google::rpc::Code ProcessAndWaitForAsio(OidcFilter &filter,
                                                  const ::envoy::service::auth::v2::CheckRequest *request,
                                                  ::envoy::service::auth::v2::CheckResponse *response);
+
+  void AssertSessionErrorResponse(google::rpc::Code status);
+
+  google::rpc::Code MakeRequestWhichWillCauseTokenRetrieval(absl::string_view session_id);
 
 };
 
@@ -236,6 +244,29 @@ TEST_F(OidcFilterTest, NoAuthorization) {
                           }
                       })
   );
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorFromRemoveSessionWhileRedirectingToIdp) {
+  auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
+  EXPECT_CALL(*session_store_mock_, RemoveSession(Eq("session123"))).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
+
+  auto status = filter.Process(&request_, &response_);
+
+  AssertSessionErrorResponse(status);
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorFromSetAuthorizationStateWhileRedirectingToIdp) {
+  MockSessionGenerator("session123", "some-state", "some-nonce");
+  EXPECT_CALL(*session_store_mock_, SetAuthorizationState(Eq("session123"), _)).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
+
+  auto status = filter.Process(&request_, &response_);
+
+  AssertSessionErrorResponse(status);
 }
 
 TEST_F(OidcFilterTest, NoAuthorization_WithoutPathOrQueryParameters) {
@@ -400,6 +431,48 @@ TEST_F(OidcFilterTest,
   ASSERT_EQ(stored_token_response->AccessToken(), "expected_refreshed_access_token");
   ASSERT_EQ(stored_token_response->GetAccessTokenExpiry(), 11000000000);
   ASSERT_EQ(stored_token_response->RefreshToken(), "expected_refreshed_refresh_token");
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorDuringRefreshTokenFlow) {
+  EnableAccessTokens(config_);
+
+  auto mocked_http = new common::http::HttpMock();
+  auto *pMessage = new beast::http::response<beast::http::string_body>();
+  auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
+  raw_http_token_response_from_idp->result(beast::http::status::ok);
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), Eq("http://some-proxy-uri.com"), _, _)).WillOnce(
+      Return(ByMove(std::move(raw_http_token_response_from_idp))));
+
+  auto jwt_status = test_id_token_jwt_.parseFromString(test_id_token_jwt_string_);
+  ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
+
+  auto test_refresh_token_response = std::make_shared<TokenResponse>(test_id_token_jwt_);
+  test_refresh_token_response->SetAccessToken("expected_refreshed_access_token");
+  test_refresh_token_response->SetAccessTokenExpiry(11000000000); // July 30, 2318
+  test_refresh_token_response->SetRefreshToken("expected_refreshed_refresh_token");
+
+  EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _))
+      .WillOnce(::testing::Return(test_refresh_token_response));
+
+  auto token_response_from_session = std::make_shared<TokenResponse>(test_id_token_jwt_);
+  token_response_from_session->SetAccessToken("fake_access_token");
+  token_response_from_session->SetRefreshToken("fake_refresh_token");
+  token_response_from_session->SetAccessTokenExpiry(1); // access token already expired
+  EXPECT_CALL(*session_store_mock_, GetTokenResponse(Eq("session123"))).Times(1).WillOnce(
+      Return(token_response_from_session));
+
+  EXPECT_CALL(*session_store_mock_, SetTokenResponse(Eq("session123"), _)).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
+                    session_store_mock_);
+
+  auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
+
+  auto status = filter.Process(&request_, &response_);
+
+  AssertSessionErrorResponse(status);
 }
 
 TEST_F(OidcFilterTest,
@@ -681,6 +754,19 @@ TEST_F(OidcFilterTest,
   );
 }
 
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorWhileTryingToGetTheSession) {
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
+  auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
+
+  EXPECT_CALL(*session_store_mock_, GetTokenResponse(Eq("session123"))).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+
+  auto status = filter.Process(&request_, &response_);
+
+  AssertSessionErrorResponse(status);
+}
+
 TEST_F(OidcFilterTest, LogoutWithCookies) {
   session_store_->SetTokenResponse("session123", test_token_response_);
   config_.mutable_logout()->set_path("/logout");
@@ -709,6 +795,22 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
                               "=deleted; HttpOnly; Max-Age=0; Path=/; SameSite=Lax; Secure")}
                       })
   );
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorDuringLogout) {
+  config_.mutable_logout()->set_path("/logout");
+  config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
+  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
+  auto httpRequest =
+      request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
+  httpRequest->set_path("/logout");
+  EXPECT_CALL(*session_store_mock_, RemoveSession(Eq("session123"))).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+
+  auto status = filter.Process(&request_, &response_);
+
+  AssertSessionErrorResponse(status);
 }
 
 TEST_F(OidcFilterTest, LogoutWithNoCookies) {
@@ -760,14 +862,12 @@ TEST_F(OidcFilterTest, RetrieveToken_RedirectsUser_WithAccessTokenHeaderNameConf
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCannotBeFoundInSession) {
   std::string session_id = "session123";
-  auto oidcConfig = config_;
-  auto callback_host_on_request = callback_host_;
   auto mocked_http = new common::http::HttpMock();
-  OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_, session_string_generator_mock_,
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
                     session_store_);
 
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->set_host(callback_host_on_request);
+  httpRequest->set_host(callback_host_);
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
   std::vector<std::string> parts = {callback_path_, "code=value&state=some-state-value"};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
@@ -783,6 +883,66 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCann
                           {Pragma, StrEq(PragmaDirectives::NoCache)},
                       })
   );
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsError_GettingAuthorizationStateDuringRetrieveToken) {
+  std::string session_id = "session123";
+  auto mocked_http = new common::http::HttpMock();
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
+                    session_store_mock_);
+
+  auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_host(callback_host_);
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id});
+  std::vector<std::string> parts = {callback_path_, "code=value&state=some-state-value"};
+  httpRequest->set_path(absl::StrJoin(parts, "?"));
+  EXPECT_CALL(*session_store_mock_, GetAuthorizationState(Eq("session123"))).Times(1)
+      .WillRepeatedly(Throw(SessionError("session error msg")));
+
+  auto code = filter.Process(&request_, &response_);
+  AssertSessionErrorResponse(code);
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsError_ClearAuthorizationStateDuringRetrieveToken) {
+  std::string session_id = "session123";
+  EXPECT_CALL(*session_store_mock_, ClearAuthorizationState(Eq(session_id))).Times(1)
+      .WillOnce(Throw(SessionError("session error msg")));
+  auto status = MakeRequestWhichWillCauseTokenRetrieval(session_id);
+  AssertSessionErrorResponse(status);
+}
+
+TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsError_SetTokenResponseDuringRetrieveToken) {
+  std::string session_id = "session123";
+  EXPECT_CALL(*session_store_mock_, SetTokenResponse(Eq(session_id), _)).Times(1)
+      .WillOnce(Throw(SessionError("session error msg")));
+  auto status = MakeRequestWhichWillCauseTokenRetrieval(session_id);
+  AssertSessionErrorResponse(status);
+}
+
+google::rpc::Code OidcFilterTest::MakeRequestWhichWillCauseTokenRetrieval(absl::string_view session_id) {
+  config_.set_callback_uri("https://me.tld/callback");
+  auto callback_host_on_request = "me.tld";
+  std::string state = "expectedstate";
+  std::string nonce = "expectednonce";
+  std::string requested_url = "https://example.com/summary";
+  auto authorization_state = std::make_shared<AuthorizationState>(state, nonce, requested_url);
+  EXPECT_CALL(*session_store_mock_, GetAuthorizationState(Eq(session_id))).Times(1)
+      .WillOnce(Return(authorization_state));
+  EXPECT_CALL(*parser_mock_, Parse(config_.client_id(), nonce, ::testing::_))
+      .WillOnce(::testing::Return(test_token_response_));
+  auto mocked_http = new common::http::HttpMock();
+  auto raw_http = common::http::response_t(new beast::http::response<beast::http::string_body>());
+  raw_http->result(beast::http::status::ok);
+  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"), Eq("http://some-proxy-uri.com"), _, _))
+      .WillOnce(Return(ByMove(std::move(raw_http))));
+  OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_, session_string_generator_mock_,
+                    session_store_mock_);
+  auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
+  httpRequest->set_host(callback_host_on_request);
+  httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id.data()});
+  std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
+  httpRequest->set_path(absl::StrJoin(parts, "?"));
+  return filter.Process(&request_, &response_);
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAccessToken) {
@@ -993,7 +1153,7 @@ OidcFilterTest::MockSessionGenerator(absl::string_view session_id, absl::string_
 
 void OidcFilterTest::SetExpiredAccessTokenResponseInSessionStore() {
   TokenResponse expired_token_response(test_id_token_jwt_); // id token, not expired
-  expired_token_response.SetAccessTokenExpiry(1); // acccess token already expired
+  expired_token_response.SetAccessTokenExpiry(1); // access token already expired
   expired_token_response.SetAccessToken("fake_access_token");
   expired_token_response.SetRefreshToken("fake_refresh_token");
   session_store_->SetTokenResponse("session123", std::make_shared<TokenResponse>(expired_token_response));
@@ -1001,6 +1161,13 @@ void OidcFilterTest::SetExpiredAccessTokenResponseInSessionStore() {
 
 void OidcFilterTest::EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig) {
   oidcConfig.mutable_access_token()->set_header("access_token");
+}
+
+void OidcFilterTest::AssertSessionErrorResponse(google::rpc::Code status) {
+  ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
+  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::StatusCode::Unauthorized);
+  ASSERT_EQ(response_.denied_response().body(),
+            "There was an error accessing your session data. Try again later.");
 }
 
 void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig, std::string callback_host_on_request) {
