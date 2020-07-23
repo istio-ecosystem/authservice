@@ -39,6 +39,12 @@ bool RedisWrapper::hset(const absl::string_view key, const absl::string_view fie
                       sw::redis::StringView(field.data()),
                       sw::redis::StringView(val.data()));
 }
+
+void RedisWrapper::hmset(const absl::string_view key,
+                         const std::unordered_map<std::string, std::string> fields_to_values_map) {
+  redis_->hmset(sw::redis::StringView(key.data()), fields_to_values_map.begin(), fields_to_values_map.end());
+}
+
 bool RedisWrapper::hsetnx(const absl::string_view key, const absl::string_view field, const absl::string_view val) {
   return redis_->hsetnx(sw::redis::StringView(key.data()),
                         sw::redis::StringView(field.data()),

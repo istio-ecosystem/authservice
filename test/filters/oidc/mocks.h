@@ -21,6 +21,7 @@ class TokenResponseParserMock final : public TokenResponseParser {
                          const std::string &client_id,
                          const std::string &nonce,
                          const std::string &raw));
+
   MOCK_CONST_METHOD2(ParseRefreshTokenResponse,
                      std::shared_ptr<TokenResponse>(
                          const TokenResponse &existing_token_response,
@@ -33,15 +34,27 @@ class RedisWrapperMock : public RedisWrapper {
  public:
 
   RedisWrapperMock() : RedisWrapper(nullptr) {};
+
   MOCK_METHOD2(hget, absl::optional<std::string>(const absl::string_view, const absl::string_view));
+
   MOCK_METHOD2(hmget,
-               std::unordered_map<std::string, absl::optional<std::string>>(const absl::string_view
-                   key, const std::vector<std::string> &fields));
+               std::unordered_map<std::string, absl::optional<std::string>>(
+                   const absl::string_view key, const std::vector<std::string> &fields));
+
   MOCK_METHOD3(hset, bool(const absl::string_view, const absl::string_view, const absl::string_view));
+
+  MOCK_METHOD2(hmset,
+               void(const absl::string_view key,
+                   const std::unordered_map<std::string, std::string> fields_to_values_map));
+
   MOCK_METHOD3(hsetnx, bool(const absl::string_view, const absl::string_view, const absl::string_view));
+
   MOCK_METHOD2(hexists, bool(const absl::string_view, const absl::string_view));
+
   MOCK_METHOD1(del, long long(const absl::string_view));
+
   MOCK_METHOD2(hdel, long long(const absl::string_view, std::vector<std::string>&));
+
   MOCK_METHOD2(expireat, bool(const absl::string_view, long long));
 
 };

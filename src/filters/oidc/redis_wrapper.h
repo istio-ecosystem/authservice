@@ -27,6 +27,9 @@ class RedisWrapper {
 
   virtual bool hset(const absl::string_view key, const absl::string_view field, const absl::string_view val);
 
+  virtual void hmset(const absl::string_view key,
+                     const std::unordered_map<std::string, std::string> fields_to_values_map);
+
   virtual bool hsetnx(const absl::string_view key, const absl::string_view field, const absl::string_view val);
 
   virtual bool hexists(const absl::string_view key, const absl::string_view field);

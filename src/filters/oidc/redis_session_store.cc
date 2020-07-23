@@ -104,10 +104,12 @@ void RedisSessionStore::RemoveSession(absl::string_view session_id) {
 
 void RedisSessionStore::SetAuthorizationState(absl::string_view session_id,
                                               std::shared_ptr<AuthorizationState> authorization_state) {
-  //TODO: use hmset for the next 3 lines
-  redis_wrapper_->hset(session_id, state_key_, std::string(authorization_state->GetState()));
-  redis_wrapper_->hset(session_id, nonce_key_, authorization_state->GetNonce());
-  redis_wrapper_->hset(session_id, requested_url_key_, authorization_state->GetRequestedUrl());
+  std::unordered_map<std::string, std::string> auth_state_map = {
+      {state_key_, std::string(authorization_state->GetState())},
+      {nonce_key_, authorization_state->GetNonce()},
+      {requested_url_key_, authorization_state->GetRequestedUrl()},
+  };
+  redis_wrapper_->hmset(session_id, auth_state_map);
 
   redis_wrapper_->hsetnx(session_id,
                          time_added_key_,

@@ -209,10 +209,13 @@ TEST_F(RedisSessionStoreTest, RemoveSession) {
 }
 
 TEST_F(RedisSessionStoreTest, SetAuthorizationState) {
-  EXPECT_CALL(*redis_wrapper_mock_, hset(Eq(session_id), Eq(state_key), Eq(state))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_, hset(Eq(session_id), Eq(nonce_key), Eq(nonce))).WillOnce(Return(true));
-  EXPECT_CALL(*redis_wrapper_mock_,
-              hset(Eq(session_id), Eq(requested_url_key), Eq(requested_url))).WillOnce(Return(true));
+  std::unordered_map<std::string, std::string> auth_state_map = {
+      {state_key, state},
+      {nonce_key, nonce},
+      {requested_url_key, requested_url}
+  };
+
+  EXPECT_CALL(*redis_wrapper_mock_, hmset(Eq(session_id), Eq(auth_state_map))).Times(1);
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hsetnx(Eq(session_id), Eq(time_added_key), Eq("1000"))).WillOnce(Return(true));
