@@ -253,7 +253,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorFromRemove
       .WillRepeatedly(Throw(SessionError("session error msg")));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);;
 
   AssertSessionErrorResponse(status);
 }
@@ -264,7 +264,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorFromSetAut
       .WillRepeatedly(Throw(SessionError("session error msg")));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_mock_);
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);;
 
   AssertSessionErrorResponse(status);
 }
@@ -470,7 +470,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorDuringRefr
   auto httpRequest = request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + "session123"});
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);;
 
   AssertSessionErrorResponse(status);
 }
@@ -762,7 +762,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorWhileTryin
   EXPECT_CALL(*session_store_mock_, GetTokenResponse(Eq("session123"))).Times(1)
       .WillRepeatedly(Throw(SessionError("session error msg")));
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);;
 
   AssertSessionErrorResponse(status);
 }
@@ -808,7 +808,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsErrorDuringLogo
   EXPECT_CALL(*session_store_mock_, RemoveSession(Eq("session123"))).Times(1)
       .WillRepeatedly(Throw(SessionError("session error msg")));
 
-  auto status = filter.Process(&request_, &response_);
+  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);;
 
   AssertSessionErrorResponse(status);
 }
@@ -899,7 +899,7 @@ TEST_F(OidcFilterTest, ReturnsUnauthorized_WhenSessionStoreThrowsError_GettingAu
   EXPECT_CALL(*session_store_mock_, GetAuthorizationState(Eq("session123"))).Times(1)
       .WillRepeatedly(Throw(SessionError("session error msg")));
 
-  auto code = filter.Process(&request_, &response_);
+  auto code = ProcessAndWaitForAsio(filter, &request_, &response_);;
   AssertSessionErrorResponse(code);
 }
 
@@ -942,7 +942,7 @@ google::rpc::Code OidcFilterTest::MakeRequestWhichWillCauseTokenRetrieval(absl::
   httpRequest->mutable_headers()->insert({Cookie, expected_session_cookie_name + "=" + session_id.data()});
   std::vector<std::string> parts = {callback_path_, "code=value&state=" + state};
   httpRequest->set_path(absl::StrJoin(parts, "?"));
-  return filter.Process(&request_, &response_);
+  return ProcessAndWaitForAsio(filter, &request_, &response_);;
 }
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenTokenResponseIsMissingAccessToken) {

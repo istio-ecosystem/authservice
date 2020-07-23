@@ -124,7 +124,7 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(config::Config config)
       interval_in_seconds_(60),
       timer_(*io_context_, interval_in_seconds_) {
   for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
     chains_.push_back(std::move(chain));
   }
   grpc::ServerBuilder builder;
