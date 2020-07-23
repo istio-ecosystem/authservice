@@ -43,7 +43,7 @@ absl::optional<std::string> oidc::RedisWrapper::hget(const absl::string_view key
     spdlog::trace("{}: redis connection closed error, retrying", __func__);
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -56,7 +56,7 @@ oidc::RedisWrapper::hmget(const absl::string_view key, const std::vector<std::st
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error:  {}", __func__, err.what());
     throw RedisError(err.what());
   }
 
@@ -84,7 +84,7 @@ bool RedisWrapper::hset(const absl::string_view key, const absl::string_view fie
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -96,7 +96,7 @@ void RedisWrapper::hmset(const absl::string_view key,
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -109,7 +109,7 @@ bool RedisWrapper::hsetnx(const absl::string_view key, const absl::string_view f
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -120,7 +120,7 @@ long long RedisWrapper::del(const absl::string_view key) {
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -131,7 +131,7 @@ bool RedisWrapper::expireat(const absl::string_view key, long long timestamp) {
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
@@ -142,7 +142,7 @@ long long RedisWrapper::hdel(absl::string_view key, std::vector<std::string> &fi
   } catch (const sw::redis::ClosedError &err) {
     throw RedisClosedError(err.what());
   } catch (const sw::redis::Error &err) {
-    spdlog::error("{}: redis error {}", __func__, err.what());
+    spdlog::error("{}: redis error: {}", __func__, err.what());
     throw RedisError(err.what());
   }
 }
