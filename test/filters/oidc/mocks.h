@@ -3,7 +3,6 @@
 
 #include "gmock/gmock.h"
 #include "src/filters/oidc/token_response.h"
-#include "redis.h"
 #include "src/filters/oidc/redis_wrapper.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -55,7 +54,7 @@ class RedisWrapperMock : public RedisWrapper {
  public:
 
   // The Redis constructor will parse this url but not open a connection, so this is just enough to satisfy the constructor
-  RedisWrapperMock() : RedisWrapper("tcp://127.0.0.1") {};
+  RedisWrapperMock() : RedisWrapper("tcp://127.0.0.1", 6) {};
 
   MOCK_METHOD2(hget, absl::optional<std::string>(const absl::string_view, const absl::string_view));
 
@@ -70,8 +69,6 @@ class RedisWrapperMock : public RedisWrapper {
                    const std::unordered_map<std::string, std::string> fields_to_values_map));
 
   MOCK_METHOD3(hsetnx, bool(const absl::string_view, const absl::string_view, const absl::string_view));
-
-  MOCK_METHOD2(hexists, bool(const absl::string_view, const absl::string_view));
 
   MOCK_METHOD1(del, long long(const absl::string_view));
 

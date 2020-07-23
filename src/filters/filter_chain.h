@@ -43,11 +43,12 @@ public:
 
 class FilterChainImpl : public FilterChain {
 private:
+  unsigned int threads_;
   config::FilterChain config_;
   std::shared_ptr<oidc::SessionStore> oidc_session_store_;
 
 public:
-  explicit FilterChainImpl(config::FilterChain config);
+  explicit FilterChainImpl(config::FilterChain config, unsigned int threads);
 
   const std::string &Name() const override;
 

@@ -13,11 +13,23 @@ class RedisWrapper {
 
  private:
 
+  sw::redis::ConnectionOptions connection_options_;
+  sw::redis::ConnectionPoolOptions pool_options_;
   sw::redis::Redis redis_;
+
+  static sw::redis::ConnectionOptions &fillInConnectionOptions(sw::redis::ConnectionOptions &connection_options,
+                                                               bool keep_alive,
+                                                               int connect_timeout_ms,
+                                                               int socket_timeout_ms);
+
+  static sw::redis::ConnectionPoolOptions &fillInPoolOptions(sw::redis::ConnectionPoolOptions &pool_options,
+                                                             std::size_t pool_size,
+                                                             int wait_timeout_ms,
+                                                             int connection_lifetime_ms);
 
  public:
 
-  explicit RedisWrapper(const absl::string_view redis_sever_uri);
+  explicit RedisWrapper(const absl::string_view redis_sever_uri, unsigned int threads);
 
   virtual absl::optional<std::string> hget(const absl::string_view key, const absl::string_view value);
 
@@ -30,8 +42,6 @@ class RedisWrapper {
                      const std::unordered_map<std::string, std::string> fields_to_values_map);
 
   virtual bool hsetnx(const absl::string_view key, const absl::string_view field, const absl::string_view val);
-
-  virtual bool hexists(const absl::string_view key, const absl::string_view field);
 
   virtual long long del(const absl::string_view key);
 

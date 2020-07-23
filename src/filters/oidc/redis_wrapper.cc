@@ -6,7 +6,34 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-RedisWrapper::RedisWrapper(const absl::string_view redis_sever_uri) : redis_(redis_sever_uri.data()) {}
+// redis_sever_uri is of the form: tcp://[[username:]password@]host[:port][/db]
+RedisWrapper::RedisWrapper(const absl::string_view redis_sever_uri, unsigned int threads)
+    : connection_options_(std::string(redis_sever_uri.data())),
+      pool_options_(),
+      redis_(
+          fillInConnectionOptions(connection_options_, false, 10000, 10000),
+          fillInPoolOptions(pool_options_, threads, 10000, 0)
+      ) {}
+
+sw::redis::ConnectionOptions &RedisWrapper::fillInConnectionOptions(sw::redis::ConnectionOptions &connection_options,
+                                                                    bool keep_alive,
+                                                                    int connect_timeout_ms,
+                                                                    int socket_timeout_ms) {
+  connection_options.keep_alive = keep_alive;
+  connection_options.connect_timeout = std::chrono::milliseconds(connect_timeout_ms);
+  connection_options.socket_timeout = std::chrono::milliseconds(socket_timeout_ms);
+  return connection_options;
+}
+
+sw::redis::ConnectionPoolOptions &RedisWrapper::fillInPoolOptions(sw::redis::ConnectionPoolOptions &pool_options,
+                                                                  std::size_t pool_size,
+                                                                  int wait_timeout_ms,
+                                                                  int connection_lifetime_ms) {
+  pool_options.size = pool_size;
+  pool_options.wait_timeout = std::chrono::milliseconds(wait_timeout_ms);
+  pool_options.connection_lifetime = std::chrono::milliseconds(connection_lifetime_ms);
+  return pool_options;
+}
 
 absl::optional<std::string> oidc::RedisWrapper::hget(const absl::string_view key, const absl::string_view val) {
   try {
@@ -67,14 +94,6 @@ bool RedisWrapper::hsetnx(const absl::string_view key, const absl::string_view f
     return redis_.hsetnx(sw::redis::StringView(key.data()),
                          sw::redis::StringView(field.data()),
                          sw::redis::StringView(val.data()));
-  } catch (const sw::redis::Error &err) {
-    throw SessionError(err.what());
-  }
-}
-
-bool RedisWrapper::hexists(const absl::string_view key, const absl::string_view field) {
-  try {
-    return redis_.hexists(sw::redis::StringView(key.data()), sw::redis::StringView(field.data()));
   } catch (const sw::redis::Error &err) {
     throw SessionError(err.what());
   }
