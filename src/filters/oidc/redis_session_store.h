@@ -44,7 +44,11 @@ class RedisSessionStore : public SessionStore {
 
   virtual void RemoveAllExpired() override;
 
+ protected:
+
   virtual void RefreshExpiration(absl::string_view session_id);
+
+  virtual void RefreshExpiration(absl::string_view session_id, absl::optional<std::string> time_added_opt);
 
 };
 

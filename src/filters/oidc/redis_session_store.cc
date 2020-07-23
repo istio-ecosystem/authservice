@@ -60,7 +60,7 @@ void RedisSessionStore::SetTokenResponse(absl::string_view session_id, std::shar
 
 std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_view session_id) {
   const auto fields = std::vector<std::string>(
-      {id_token_key_, access_token_key_, refresh_token_key_, access_token_expiry_key_}
+      {id_token_key_, access_token_key_, refresh_token_key_, access_token_expiry_key_, time_added_key_}
   );
   auto token_response_map = redis_wrapper_->hmget(session_id, fields);
 
@@ -93,7 +93,7 @@ std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_
     token_response->SetRefreshToken(absl::string_view(refresh_token.value()));
   }
 
-  RefreshExpiration(session_id);
+  RefreshExpiration(session_id, token_response_map.at(time_added_key_));
 
   return token_response;
 }
@@ -117,8 +117,7 @@ void RedisSessionStore::SetAuthorizationState(absl::string_view session_id,
 }
 
 std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(absl::string_view session_id) {
-  // TODO use hmget and check for all nil values, instead of hexists followed by multiple hgets
-  const auto fields = std::vector<std::string>({state_key_, nonce_key_, requested_url_key_});
+  const auto fields = std::vector<std::string>({state_key_, nonce_key_, requested_url_key_, time_added_key_});
   auto auth_state_map = redis_wrapper_->hmget(session_id, fields);
 
   auto state = auth_state_map.at(state_key_);
@@ -129,7 +128,7 @@ std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(abs
     return nullptr;
   }
 
-  RefreshExpiration(session_id);
+  RefreshExpiration(session_id, auth_state_map.at(time_added_key_));
 
   return std::make_shared<AuthorizationState>(state.value(), nonce.value(), requested_url.value());
 }
@@ -141,8 +140,11 @@ void RedisSessionStore::ClearAuthorizationState(absl::string_view session_id) {
 }
 
 void RedisSessionStore::RefreshExpiration(absl::string_view session_id) {
-  //TODO: callers should use hmget and send the time added to this function
   auto time_added_opt = redis_wrapper_->hget(session_id, time_added_key_);
+  RefreshExpiration(session_id, time_added_opt);
+}
+
+void RedisSessionStore::RefreshExpiration(absl::string_view session_id, absl::optional<std::string> time_added_opt) {
   if (!time_added_opt.has_value()) {
     redis_wrapper_->del(session_id); //TODO: instead of deleting the session, perhaps use 0? signal back to caller things aren't ok?
     return;
