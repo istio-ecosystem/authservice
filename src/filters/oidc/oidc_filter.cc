@@ -83,6 +83,7 @@ google::rpc::Code OidcFilter::Process(
       try {
         session_store_->RemoveSession(session_id_optional.value());
       } catch (SessionError &err) {
+        spdlog::error("{}: Session error in RemoveSession: {}", __func__, err.what());
         return SessionErrorResponse(response, err);
       }
     }
@@ -121,6 +122,7 @@ google::rpc::Code OidcFilter::Process(
   try {
     token_response_ptr = session_store_->GetTokenResponse(session_id);
   } catch (SessionError &err) {
+    spdlog::error("{}: Session error in GetTokenResponse: {}", __func__, err.what());
     return SessionErrorResponse(response, err);
   }
 
@@ -158,6 +160,7 @@ google::rpc::Code OidcFilter::Process(
     try {
       session_store_->SetTokenResponse(session_id, refreshed_token_response);
     } catch (SessionError &err) {
+      spdlog::error("{}: Session error in SetTokenResponse: {}", __func__, err.what());
       return SessionErrorResponse(response, err);
     }
     spdlog::info("{}: Updated session store with newly refreshed access token. Allowing request to proceed.",
@@ -173,7 +176,6 @@ google::rpc::Code OidcFilter::Process(
 }
 
 google::rpc::Code OidcFilter::SessionErrorResponse(CheckResponse *response, const SessionError &err) {
-  spdlog::error("{}: Could not RemoveSession from session store: {}", __func__, err.what());
   response->mutable_denied_response()->mutable_status()->set_code(envoy::type::Unauthorized);
   response->mutable_denied_response()->mutable_body()->append(
       "There was an error accessing your session data. Try again later.");
@@ -189,6 +191,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
       // remove old session and regenerate session_id to prevent session fixation attacks
       session_store_->RemoveSession(old_session_id.value());
     } catch (SessionError &err) {
+      spdlog::error("{}: Session error in RemoveSession: {}", __func__, err.what());
       return SessionErrorResponse(response, err);
     }
   }
@@ -223,6 +226,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
                                                                                nonce,
                                                                                GetRequestUrl(httpRequest)));
   } catch (SessionError &err) {
+    spdlog::error("{}: Session error in SetAuthorizationState: {}", __func__, err.what());
     return SessionErrorResponse(response, err);
   }
 
@@ -517,6 +521,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
   try {
     authorization_state = session_store_->GetAuthorizationState(session_id);
   } catch (SessionError &err) {
+    spdlog::error("{}: Session error in GetAuthorizationState: {}", __func__, err.what());
     return SessionErrorResponse(response, err);
   }
 
@@ -580,6 +585,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     try {
       session_store_->ClearAuthorizationState(session_id);
     } catch (SessionError &err) {
+      spdlog::error("{}: Session error in ClearAuthorizationState: {}", __func__, err.what());
       return SessionErrorResponse(response, err);
     }
 
@@ -587,6 +593,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
     try {
       session_store_->SetTokenResponse(session_id, token_response);
     } catch (SessionError &err) {
+      spdlog::error("{}: Session error in SetTokenResponse: {}", __func__, err.what());
       return SessionErrorResponse(response, err);
     }
 
