@@ -43,7 +43,6 @@ xx_library(
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
-#        "@boost//:all",
     ],
 )
 

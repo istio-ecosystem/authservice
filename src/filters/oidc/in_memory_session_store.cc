@@ -6,13 +6,16 @@ namespace filters {
 namespace oidc {
 
 class Session {
-private:
+
+ private:
+
   std::shared_ptr<TokenResponse> token_response_;
   std::shared_ptr<AuthorizationState> authorization_state_;
   uint32_t time_added_;
   uint32_t time_accessed_;
 
-public:
+ public:
+
   explicit Session(uint32_t time_added);
 
   inline uint32_t GetTimeAdded() {
@@ -46,6 +49,7 @@ public:
   inline void ClearAuthorizationState() {
     authorization_state_ = nullptr;
   }
+
 };
 
 Session::Session(uint32_t time_added)
@@ -59,7 +63,8 @@ InMemorySessionStore::InMemorySessionStore(std::shared_ptr<common::utilities::Ti
     absolute_session_timeout_in_seconds_(absolute_session_timeout_in_seconds),
     idle_session_timeout_in_seconds_(idle_session_timeout_in_seconds) {}
 
-void InMemorySessionStore::SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) {
+void InMemorySessionStore::SetTokenResponse(absl::string_view session_id,
+                                            std::shared_ptr<TokenResponse> token_response) {
   std::function<void(Session &)> token_response_setter = [&token_response](Session &session) {
     session.SetTokenResponse(token_response);
   };
@@ -152,7 +157,7 @@ void InMemorySessionStore::ClearAuthorizationState(absl::string_view session_id)
   }
 }
 
-void InMemorySessionStore::Set(absl::string_view session_id, std::function<void(Session& session)> &lambda) {
+void InMemorySessionStore::Set(absl::string_view session_id, std::function<void(Session &session)> &lambda) {
   synchronized(mutex_) {
     auto session_optional = FindSession(session_id);
     if (session_optional.has_value()) {

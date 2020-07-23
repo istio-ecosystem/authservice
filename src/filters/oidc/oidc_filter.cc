@@ -26,7 +26,7 @@ const int64_t NO_TIMEOUT = -1;
 
 const std::map<const char *, const char *> standard_headers = {
     {common::http::headers::CacheControl, common::http::headers::CacheControlDirectives::NoCache},
-    {common::http::headers::Pragma,       common::http::headers::PragmaDirectives::NoCache},
+    {common::http::headers::Pragma, common::http::headers::PragmaDirectives::NoCache},
 };
 }  // namespace
 
@@ -181,11 +181,11 @@ google::rpc::Code OidcFilter::RedirectToIdp(
   auto encoded_scopes = absl::StrJoin(scopes, " ");
   std::multimap<absl::string_view, absl::string_view> params = {
       {"response_type", "code"},
-      {"scope",         encoded_scopes},
-      {"client_id",     idp_config_.client_id()},
-      {"nonce",         nonce},
-      {"state",         state},
-      {"redirect_uri",  idp_config_.callback_uri()}};
+      {"scope", encoded_scopes},
+      {"client_id", idp_config_.client_id()},
+      {"nonce", nonce},
+      {"state", state},
+      {"redirect_uri", idp_config_.callback_uri()}};
   auto query = common::http::Http::EncodeQueryData(params);
 
   SetStandardResponseHeaders(response);
@@ -194,7 +194,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
   SetRedirectHeaders(redirect_location, response);
 
   session_store_->SetAuthorizationState(session_id.data(),
-      std::make_shared<AuthorizationState>(state, nonce, GetRequestUrl(httpRequest)));
+                                        std::make_shared<AuthorizationState>(state, nonce, GetRequestUrl(httpRequest)));
 
   SetSessionIdCookie(response, session_id.data());
 
@@ -248,7 +248,7 @@ std::string OidcFilter::GetCookieName(const std::string &cookie) const {
     return "__Host-authservice-" + cookie + "-cookie";
   }
   return "__Host-" + idp_config_.cookie_name_prefix() + "-authservice-" +
-         cookie + "-cookie";
+      cookie + "-cookie";
 }
 
 std::string OidcFilter::GetSessionIdCookieName() const {
@@ -333,7 +333,7 @@ void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, TokenRespons
 
 bool OidcFilter::RequiredTokensPresent(std::shared_ptr<TokenResponse> token_response) {
   return token_response &&
-         (!idp_config_.has_access_token() || token_response->AccessToken().has_value());
+      (!idp_config_.has_access_token() || token_response->AccessToken().has_value());
 }
 
 bool OidcFilter::RequiredTokensExpired(TokenResponse &token_response) {
@@ -384,13 +384,13 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   bool path_matches = request_path_parts.Path() == configured_path;
 
   bool host_matches = request_host == configured_callback_host_with_port ||
-                      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
+      (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
 
   return host_matches && path_matches;
 }
 
 absl::optional<std::string> OidcFilter::GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
-    ::std::string> &headers) {
+                                                                                             ::std::string> &headers) {
   auto cookie_name = GetSessionIdCookieName();
   auto cookie = CookieFromHeaders(headers, cookie_name);
   if (cookie.has_value()) {
@@ -429,9 +429,9 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
   };
 
   std::multimap<absl::string_view, absl::string_view> params = {
-      {"client_id",     idp_config_.client_id()},
+      {"client_id", idp_config_.client_id()},
       {"client_secret", idp_config_.client_secret()},
-      {"grant_type",    "refresh_token"},
+      {"grant_type", "refresh_token"},
       {"refresh_token", refresh_token},
       // according to this link, omitting the `scope` param should return new
       // tokens with the previously requested `scope`
@@ -500,15 +500,15 @@ google::rpc::Code OidcFilter::RetrieveToken(
   // Build headers
   auto authorization = common::http::Http::EncodeBasicAuth(idp_config_.client_id(), idp_config_.client_secret());
   std::map<absl::string_view, absl::string_view> headers = {
-      {common::http::headers::ContentType,   common::http::headers::ContentTypeDirectives::FormUrlEncoded},
+      {common::http::headers::ContentType, common::http::headers::ContentTypeDirectives::FormUrlEncoded},
       {common::http::headers::Authorization, authorization},
   };
 
   // Build body
   std::multimap<absl::string_view, absl::string_view> params = {
-      {"code",         code_from_request->second},
+      {"code", code_from_request->second},
       {"redirect_uri", idp_config_.callback_uri()},
-      {"grant_type",   "authorization_code"},
+      {"grant_type", "authorization_code"},
   };
 
   auto retrieve_token_response = http_ptr_->Post(

@@ -13,13 +13,16 @@ namespace oidc {
 class Session;
 
 class RedisSessionStore : public SessionStore {
-private:
+
+ private:
+
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t absolute_session_timeout_in_seconds_;
   uint32_t idle_session_timeout_in_seconds_;
   std::shared_ptr<RedisWrapper> redis_wrapper_;
 
-public:
+ public:
+
   RedisSessionStore(
       std::shared_ptr<common::utilities::TimeService> time_service,
       uint32_t absolute_session_timeout_in_seconds,
@@ -30,7 +33,8 @@ public:
 
   virtual std::shared_ptr<TokenResponse> GetTokenResponse(absl::string_view session_id) override;
 
-  virtual void SetAuthorizationState(absl::string_view session_id, std::shared_ptr<AuthorizationState> authorization_state) override;
+  virtual void SetAuthorizationState(absl::string_view session_id,
+                                     std::shared_ptr<AuthorizationState> authorization_state) override;
 
   virtual std::shared_ptr<AuthorizationState> GetAuthorizationState(absl::string_view session_id) override;
 
@@ -41,6 +45,7 @@ public:
   virtual void RemoveAllExpired() override;
 
   virtual void RefreshExpiration(absl::string_view session_id);
+
 };
 
 }  // namespace oidc

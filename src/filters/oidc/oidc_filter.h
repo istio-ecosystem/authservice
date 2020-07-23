@@ -23,7 +23,9 @@ namespace oidc {
  * https://openid.net/specs/openid-connect-core-1_0.html.
  */
 class OidcFilter final : public filters::Filter {
-private:
+
+ private:
+
   common::http::ptr_t http_ptr_;
   const config::oidc::OIDCConfig idp_config_;
   TokenResponseParserPtr parser_;
@@ -143,7 +145,7 @@ private:
    * @return
    */
   absl::optional<std::string> GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
-      ::std::string> &headers);
+                                                                                   ::std::string> &headers);
 
   /**
    * @brief Assemble a URL string from a request
@@ -182,7 +184,8 @@ private:
 
   void AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse);
 
-public:
+ public:
+
   OidcFilter(common::http::ptr_t http_ptr,
              const config::oidc::OIDCConfig &idp_config,
              TokenResponseParserPtr parser,
@@ -202,6 +205,7 @@ public:
 
   /** @brief Get sessionID cookie name */
   std::string GetSessionIdCookieName() const;
+
 };
 
 }  // namespace oidc

@@ -68,7 +68,6 @@ TokenResponseParserImpl::TokenResponseParserImpl(
     google::jwt_verify::JwksPtr keys)
     : keys_(std::move(keys)) {}
 
-
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id,
     const std::string &nonce,
@@ -104,7 +103,7 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
   if (access_token_iter != fields.end()) {
     result->SetAccessToken(access_token_iter->second.string_value());
   }
-  
+
   auto refresh_token_iter = fields.find(refresh_token_field);
   if (refresh_token_iter != fields.end()) {
     result->SetRefreshToken(refresh_token_iter->second.string_value());
