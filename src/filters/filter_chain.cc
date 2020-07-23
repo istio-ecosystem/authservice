@@ -67,7 +67,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
 
       if (filter.oidc().has_redis_session_store_config()) {
         auto redis_sever_uri = filter.oidc().redis_session_store_config().server_uri();
-        auto redis_wrapper =  std::make_shared<oidc::RedisWrapper>(std::make_shared<sw::redis::Redis>(redis_sever_uri));
+        auto redis_wrapper =  std::make_shared<oidc::RedisWrapper>(redis_sever_uri);
 
         oidc_session_store_ = std::static_pointer_cast<oidc::RedisSessionStore>(
             std::make_shared<oidc::RedisSessionStore>(

@@ -33,7 +33,8 @@ class RedisWrapperMock : public RedisWrapper {
 
  public:
 
-  RedisWrapperMock() : RedisWrapper(nullptr) {};
+  // The Redis constructor will parse this url but not open a connection, so this is just enough to satisfy the constructor
+  RedisWrapperMock() : RedisWrapper("tcp://127.0.0.1") {};
 
   MOCK_METHOD2(hget, absl::optional<std::string>(const absl::string_view, const absl::string_view));
 

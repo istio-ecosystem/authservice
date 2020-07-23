@@ -4,7 +4,6 @@
 #include "redis.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include <boost/range/combine.hpp>
 
 namespace authservice {
 namespace filters {
@@ -14,11 +13,11 @@ class RedisWrapper {
 
  private:
 
-  std::shared_ptr<sw::redis::Redis> redis_;
+  sw::redis::Redis redis_;
 
  public:
 
-  explicit RedisWrapper(std::shared_ptr<sw::redis::Redis> redis);
+  explicit RedisWrapper(const absl::string_view redis_sever_uri);
 
   virtual absl::optional<std::string> hget(const absl::string_view key, const absl::string_view value);
 
