@@ -49,7 +49,7 @@ TEST(AsyncServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesP
   config_ = *config::GetConfig("test/fixtures/valid-config.json");
 
   for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
     chains_.push_back(std::move(chain));
   }
 
@@ -74,7 +74,7 @@ TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRules
   config_ = *config::GetConfig("test/fixtures/valid-config.json");
 
   for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
     chains_.push_back(std::move(chain));
   }
 
@@ -99,7 +99,7 @@ TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPat
   config_ = *config::GetConfig("test/fixtures/valid-config.json");
 
   for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
     chains_.push_back(std::move(chain));
   }
 

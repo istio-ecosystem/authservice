@@ -3,6 +3,7 @@
 
 namespace authservice {
 namespace filters {
+
 TEST(PipeTest, Name) {
   Pipe pipe;
   ASSERT_EQ(pipe.Name().compare("pipe"), 0);

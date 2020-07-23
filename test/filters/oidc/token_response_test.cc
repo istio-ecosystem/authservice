@@ -188,7 +188,8 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeB
 }
 
 TEST_F(TokenResponseParserTest, Parse_TokenTypeField_MustBePresent) {
-  const char *response_string = R"({"id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiaWF0IjoxOTAxMDAxMDAxLCJhdWQiOlsiY2xpZW50MSJdLCJub25jZSI6InJhbmRvbSJ9.Qf0vE5QhnqlSpcxNn093d6ko2hOHveSs9ShusFYiUVxzS4J9xjmjTeyKkH7RfWWUL7_tFB6a7PC33BGdhUnCxYaHJbTmvLKDBy-AZyvzszBY35j8Kp1MPU-DPyR2LkwCoHKAD50pEro6iwB3Zd4SB1WE99_1SbJtAzpfdeQSCbcDOZgl2tQsDnB2OskwzjOdrEQyIrRl8vZOGbJyUHkz7pg6qUtnesjVSRWqWglQBXcS3rNpJi5Gt3L00IOqdozOlqS4ShCaLnbGZbCP9qey31d2SKLl6HNzULxa0LExvAqzcVM-f87WUWuVe30g6SBAZGlJA8wxyJgXF3Rrh1iKUg"})";
+  const char *response_string =
+      R"({"id_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3ViIjoidGVzdEBleGFtcGxlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiaWF0IjoxOTAxMDAxMDAxLCJhdWQiOlsiY2xpZW50MSJdLCJub25jZSI6InJhbmRvbSJ9.Qf0vE5QhnqlSpcxNn093d6ko2hOHveSs9ShusFYiUVxzS4J9xjmjTeyKkH7RfWWUL7_tFB6a7PC33BGdhUnCxYaHJbTmvLKDBy-AZyvzszBY35j8Kp1MPU-DPyR2LkwCoHKAD50pEro6iwB3Zd4SB1WE99_1SbJtAzpfdeQSCbcDOZgl2tQsDnB2OskwzjOdrEQyIrRl8vZOGbJyUHkz7pg6qUtnesjVSRWqWglQBXcS3rNpJi5Gt3L00IOqdozOlqS4ShCaLnbGZbCP9qey31d2SKLl6HNzULxa0LExvAqzcVM-f87WUWuVe30g6SBAZGlJA8wxyJgXF3Rrh1iKUg"})";
 
   auto result = parser_->Parse(client_id, nonce, response_string);
 
@@ -240,7 +241,7 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_TokenTypeField_MustBeP
 }
 
 TEST_F(TokenResponseParserTest,
-     ParseRefreshTokenResponse_ReturnsAnEmptyOptional_WhenTheExpiresInFieldIsInvalid_ByHavingAnInvalidValueOfZero) {
+       ParseRefreshTokenResponse_ReturnsAnEmptyOptional_WhenTheExpiresInFieldIsInvalid_ByHavingAnInvalidValueOfZero) {
 
   auto existing_token_response = ValidTokenResponse();
 
@@ -288,17 +289,17 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse) {
   ASSERT_TRUE(refreshed_access_token_expiry.has_value());
 }
 
-TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsRefreshedIdToken_WhenAnIdTokenIsIncludedInTheRefreshTokenResponse) {
+TEST_F(TokenResponseParserTest,
+       ParseRefreshTokenResponse_ReturnsRefreshedIdToken_WhenAnIdTokenIsIncludedInTheRefreshTokenResponse) {
   // id_token exp of May 29, 2062
-  const char* test_refreshed_id_token_jwt_string_ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MTYxMzkwMjJ9.w8Q1JBUHvCj4LDxOM9SiiD9d7XaBzjyle5uoZlvdQFs";
+  const char *test_refreshed_id_token_jwt_string_ =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MTYxMzkwMjJ9.w8Q1JBUHvCj4LDxOM9SiiD9d7XaBzjyle5uoZlvdQFs";
   google::jwt_verify::Jwt test_refreshed_id_token_jwt_;
   auto existing_token_response = ValidTokenResponse();
   auto response_string = R"({"token_type":"bearer",
                                     "id_token":")" + std::string(test_refreshed_id_token_jwt_string_) + "\",\n"
-                                    R"("access_token":"refreshed_access_token_value",
+                                                                                                        R"("access_token":"refreshed_access_token_value",
                                     "refresh_token":"refreshed_refresh_token_value"})";
-
-
 
   auto refreshed_token_response = parser_->ParseRefreshTokenResponse(*existing_token_response, response_string);
 
@@ -307,7 +308,8 @@ TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsRefreshedIdToke
   ASSERT_EQ(expected, actual);
 }
 
-TEST_F(TokenResponseParserTest, ParseRefreshTokenResponse_ReturnsExistingRefreshToken_WhenARefreshTokenIsNotIncludedInTheRefreshTokenResponse) {
+TEST_F(TokenResponseParserTest,
+       ParseRefreshTokenResponse_ReturnsExistingRefreshToken_WhenARefreshTokenIsNotIncludedInTheRefreshTokenResponse) {
   auto existing_token_response = ValidTokenResponseWithRefreshToken();
 
   const char *response_string = valid_token_response_bearer_with_access_token;

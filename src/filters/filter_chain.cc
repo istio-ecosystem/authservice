@@ -4,12 +4,13 @@
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/pipe.h"
 #include "src/filters/oidc/in_memory_session_store.h"
+#include "src/filters/oidc/redis_session_store.h"
 
 namespace authservice {
 namespace filters {
 
-FilterChainImpl::FilterChainImpl(config::FilterChain config) :
-    config_(std::move(config)), oidc_session_store_(nullptr) {}
+FilterChainImpl::FilterChainImpl(config::FilterChain config, unsigned int threads) :
+    threads_(threads), config_(std::move(config)), oidc_session_store_(nullptr) {}
 
 const std::string &FilterChainImpl::Name() const {
   return config_.name();
@@ -62,12 +63,28 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
       // so here we ensure that each instance returned by New() shares the same session store.
       auto absolute_session_timeout = filter.oidc().absolute_session_timeout();
       auto idle_session_timeout = filter.oidc().idle_session_timeout();
-      oidc_session_store_ = std::static_pointer_cast<oidc::SessionStore>(
-          std::make_shared<oidc::InMemorySessionStore>(
-              std::make_shared<common::utilities::TimeService>(),
-              absolute_session_timeout,
-              idle_session_timeout)
-      );
+
+      if (filter.oidc().has_redis_session_store_config()) {
+        auto redis_sever_uri = filter.oidc().redis_session_store_config().server_uri();
+        spdlog::trace("{}: redis configuration found. attempting to connect to: {}", __func__, redis_sever_uri);
+        auto redis_wrapper = std::make_shared<oidc::RedisWrapper>(redis_sever_uri, threads_);
+        auto redis_retry_wrapper = std::make_shared<oidc::RedisRetryWrapper>(redis_wrapper);
+        oidc_session_store_ = std::static_pointer_cast<oidc::RedisSessionStore>(
+            std::make_shared<oidc::RedisSessionStore>(
+                std::make_shared<common::utilities::TimeService>(),
+                absolute_session_timeout,
+                idle_session_timeout,
+                redis_retry_wrapper)
+        );
+      } else {
+        spdlog::trace("{}: using InMemorySession Store", __func__);
+        oidc_session_store_ = std::static_pointer_cast<oidc::SessionStore>(
+            std::make_shared<oidc::InMemorySessionStore>(
+                std::make_shared<common::utilities::TimeService>(),
+                absolute_session_timeout,
+                idle_session_timeout)
+        );
+      }
     }
 
     result->AddFilter(FilterPtr(new oidc::OidcFilter(

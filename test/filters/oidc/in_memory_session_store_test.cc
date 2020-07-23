@@ -11,10 +11,13 @@ namespace oidc {
 using ::testing::Return;
 
 class InMemorySessionStoreTest : public ::testing::Test {
-public:
+
+ public:
+
   InMemorySessionStoreTest();
 
-protected:
+ protected:
+
   google::jwt_verify::Jwt id_token_jwt;
   std::shared_ptr<common::utilities::TimeServiceMock> time_service_mock_;
 
@@ -25,6 +28,7 @@ protected:
   }
 
   std::shared_ptr<TokenResponse> CreateTokenResponse();
+
 };
 
 InMemorySessionStoreTest::InMemorySessionStoreTest()

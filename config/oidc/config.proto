@@ -7,7 +7,7 @@ import "validate/validate.proto";
 // Defines how a token obtained through an OIDC flow is forwarded to services.
 message TokenConfig {
 
-    // The name of the header that authservice adds to the request when forwarding to services.
+    // The name of the header that Authservice adds to the request when forwarding to services.
     // The value of this header will contain the `preamble` and the token.
     // This value is case-insensitive, as http header names are case-insensitive.
     // Note that this value must be `Authorization` for the
@@ -24,12 +24,19 @@ message TokenConfig {
     string preamble = 2;
 }
 
-// When specified, the authservice will destroy the authservice session when a request is
+// When specified, the Authservice will use the configured Redis server to store session data
+message RedisConfig {
+
+    // The Redis server uri, e.g. "tcp://127.0.0.1:6379"
+    string server_uri = 1 [(validate.rules).string.min_len = 1];
+}
+
+// When specified, the Authservice will destroy the Authservice session when a request is
 // made to the configured path.
 message LogoutConfig {
 
-    // A http request path that the authservice matches against to initiate logout.
-    // Whenever a request is made to that path, the authservice will remove the authservice-specific
+    // A http request path that the Authservice matches against to initiate logout.
+    // Whenever a request is made to that path, the Authservice will remove the Authservice-specific
     // cookies and respond with a redirect to the configured `redirect_uri`. Removing the cookies
     // causes the user to be unauthenticated in future requests.
     // If the service application has its own logout controller, then it may be desirable to have its
@@ -38,7 +45,7 @@ message LogoutConfig {
     // Required.
     string path = 1 [(validate.rules).string.min_len = 1];
 
-    // A URI specifying the destination to which the authservice will redirect any request made to the
+    // A URI specifying the destination to which the Authservice will redirect any request made to the
     // logout `path`. For example, it may be desirable to redirect the logged out user to the homepage
     // of the service application, or to the
     // [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout).
@@ -63,7 +70,7 @@ message OIDCConfig {
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider.
     // Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to
-    // the service so that the authservice can intercept the request and handle it
+    // the service so that the Authservice can intercept the request and handle it
     // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)).
     // Required.
     string callback_uri = 3 [(validate.rules).string.min_len = 1];
@@ -93,10 +100,13 @@ message OIDCConfig {
     // Required, but an empty array is allowed.
     repeated string scopes = 7;
 
-    // A unique identifier of the authservice's browser cookies. Can be any string.
-    // Only needed when multiple services in the same domain are each protected by
-    // their own authservice, in which case each service's authservice should have
-    // a unique value to avoid cookie name conflicts.
+    // A unique identifier of the Authservice's browser cookies. Can be any string.
+    // Needed when multiple services in the same domain are each protected by
+    // their own Authservice, in which case each service's Authservice should have
+    // a unique value to avoid cookie name conflicts. Also needed when an Authservice
+    // is configured with multiple `oidc` filters (across multiple `chains`), each
+    // sharing a Redis server for their session storage, to avoid having those
+    // `oidc` filters read/write the same sessions in Redis.
     // Optional.
     string cookie_name_prefix = 8;
 
@@ -108,7 +118,7 @@ message OIDCConfig {
     // Optional.
     TokenConfig access_token = 10;
 
-    // When specified, the authservice will destroy the authservice session when a request is
+    // When specified, the Authservice will destroy the Authservice session when a request is
     // made to the configured path.
     // Optional.
     LogoutConfig logout = 11;
@@ -157,4 +167,8 @@ message OIDCConfig {
     // the OIDC provider. See also the related `trusted_certificate_authority` configuration option.
     // Optional.
     string proxy_uri = 15;
+
+    // When specified, the Authservice will use the configured Redis server to store session data.
+    // Optional.
+    RedisConfig redis_session_store_config = 16;
 }
