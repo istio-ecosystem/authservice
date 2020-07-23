@@ -20,6 +20,13 @@ absl::optional<std::string> oidc::RedisRetryWrapper::hget(const absl::string_vie
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
       throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
+      throw RedisError(err.what());
     }
   }
 }
@@ -36,6 +43,13 @@ oidc::RedisRetryWrapper::hmget(const absl::string_view key, const std::vector<st
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
       throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
+      throw RedisError(err.what());
     }
   }
 }
@@ -50,6 +64,14 @@ bool RedisRetryWrapper::hset(const absl::string_view key, const absl::string_vie
         continue;
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
+      throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
       throw RedisError(err.what());
     }
   }
@@ -68,6 +90,13 @@ void RedisRetryWrapper::hmset(const absl::string_view key,
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
       throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
+      throw RedisError(err.what());
     }
   }
 }
@@ -85,6 +114,13 @@ bool RedisRetryWrapper::hsetnx(const absl::string_view key,
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
       throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
+      throw RedisError(err.what());
     }
   }
 }
@@ -99,6 +135,13 @@ long long RedisRetryWrapper::del(const absl::string_view key) {
         continue;
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
+      throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
       throw RedisError(err.what());
     }
   }
@@ -115,6 +158,13 @@ bool RedisRetryWrapper::expireat(const absl::string_view key, long long timestam
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
       throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
+      throw RedisError(err.what());
     }
   }
 }
@@ -129,6 +179,13 @@ long long RedisRetryWrapper::hdel(absl::string_view key, std::vector<std::string
         continue;
       }
       spdlog::error("{}: redis connection closed error, throwing error", __func__);
+      throw RedisError(err.what());
+    } catch (const RedisIoError &err) {
+      if (retries < 3) {
+        spdlog::trace("{}: redis connection timed out, retrying", __func__);
+        continue;
+      }
+      spdlog::error("{}: redis timed out, throwing error", __func__);
       throw RedisError(err.what());
     }
   }
