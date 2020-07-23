@@ -148,16 +148,24 @@ void RedisSessionStore::RefreshExpiration(absl::string_view session_id) {
 
 void RedisSessionStore::RefreshExpiration(absl::string_view session_id, absl::optional<std::string> time_added_opt) {
   if (!time_added_opt.has_value()) {
-    redis_wrapper_->del(session_id); //TODO: instead of deleting the session, perhaps use 0? signal back to caller things aren't ok?
-    return;
+    redis_wrapper_->del(session_id);
+    throw SessionError("Unexpected error: Session did not contain creation timestamp");
   }
-
   auto time_added = std::stoi(time_added_opt.value());
   auto current_time = time_service_->GetCurrentTimeInSecondsSinceEpoch();
-  auto absolute_end_time = absolute_session_timeout_in_seconds_ + time_added;
-  auto idle_end_time = idle_session_timeout_in_seconds_ + current_time;
-  auto expire_at_time = absolute_end_time < idle_end_time ? absolute_end_time : idle_end_time;
-  redis_wrapper_->expireat(session_id, expire_at_time);
+  if (absolute_session_timeout_in_seconds_ == 0 && idle_session_timeout_in_seconds_ == 0) {
+    return;
+  }
+  if (absolute_session_timeout_in_seconds_ == 0) {
+    redis_wrapper_->expireat(session_id, idle_session_timeout_in_seconds_ + current_time);
+  } else if (idle_session_timeout_in_seconds_ == 0) {
+    redis_wrapper_->expireat(session_id, absolute_session_timeout_in_seconds_ + time_added);
+  } else {
+    auto absolute_end_time = absolute_session_timeout_in_seconds_ + time_added;
+    auto idle_end_time = idle_session_timeout_in_seconds_ + current_time;
+    auto expire_at_time = absolute_end_time < idle_end_time ? absolute_end_time : idle_end_time;
+    redis_wrapper_->expireat(session_id, expire_at_time);
+  }
 }
 
 void RedisSessionStore::RemoveAllExpired() {}

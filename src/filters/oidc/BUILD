@@ -49,8 +49,9 @@ xx_library(
 xx_library(
     name = "redis_wrapper",
     srcs = ["redis_wrapper.cc"],
-    hdrs = ["redis_wrapper.h"],
+    hdrs = ["redis_wrapper.h", "session_store.h"],
     deps = [
+        "//src/filters/oidc:token_response",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",

@@ -4,6 +4,7 @@
 #include "src/filters/oidc/redis_session_store.h"
 #include "test/common/utilities/mocks.h"
 #include "test/filters/oidc/mocks.h"
+#include "test/shared/assertions.h"
 #include <string>
 
 namespace authservice {
@@ -12,6 +13,7 @@ namespace oidc {
 
 using ::testing::Return;
 using ::testing::Eq;
+using test_helpers::ASSERT_THROWS_STD_RUNTIME_ERROR;
 
 class RedisSessionStoreWithProtectedMethodsMadePublic : public RedisSessionStore {
  public:
@@ -196,11 +198,56 @@ TEST_F(RedisSessionStoreTest, RefreshExpiration_NearToAbsoluteTimeout) {
   redis_session_store->RefreshExpiration(session_id);
 }
 
+TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsNoAbsoluteOrIdleTimeout_doesNotCallExpireat) {
+  int absolute_timeout = 0;
+  int idle_timeout = 0;
+  redis_session_store =
+      std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
+                                                                        absolute_timeout,
+                                                                        idle_timeout,
+                                                                        redis_wrapper_mock_);
+
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("900"));
+  redis_session_store->RefreshExpiration(session_id);
+}
+
+TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsOnlyAnIdleTimeout) {
+  int absolute_timeout = 0;
+  int idle_timeout = 20;
+  redis_session_store =
+      std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
+                                                                        absolute_timeout,
+                                                                        idle_timeout,
+                                                                        redis_wrapper_mock_);
+
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("900"));
+  EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1020))).Times(1);
+  redis_session_store->RefreshExpiration(session_id);
+}
+
+TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsOnlyAnAbsoluteTimeout) {
+  int absolute_timeout = 20;
+  int idle_timeout = 0;
+  redis_session_store =
+      std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
+                                                                        absolute_timeout,
+                                                                        idle_timeout,
+                                                                        redis_wrapper_mock_);
+
+  EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
+  EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("990"));
+  EXPECT_CALL(*redis_wrapper_mock_, expireat(Eq(session_id), Eq(1010))).Times(1);
+  redis_session_store->RefreshExpiration(session_id);
+}
+
 TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenTimeAddedIsNull) {
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return(absl::nullopt));
   EXPECT_CALL(*redis_wrapper_mock_, del(Eq(session_id)));
 
-  redis_session_store->RefreshExpiration(session_id);
+  ASSERT_THROWS_STD_RUNTIME_ERROR([this] { redis_session_store->RefreshExpiration(session_id); },
+                                  "Unexpected error: Session did not contain creation timestamp");
 }
 
 TEST_F(RedisSessionStoreTest, RemoveSession) {
