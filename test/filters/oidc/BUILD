@@ -3,6 +3,8 @@ cc_library(
     hdrs = ["mocks.h"],
     deps = [
         "//src/filters/oidc:token_response",
+        "//src/filters/oidc:authorization_state",
+        "//src/filters/oidc:session_store",
         "//src/filters/oidc:redis_wrapper",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@com_github_abseil-cpp//absl/strings:strings",
@@ -43,6 +45,18 @@ cc_test(
         "//test/filters/oidc:mocks",
         "//test/shared:shared_test_helpers",
         "@com_google_googletest//:gtest_main",
+    ],
+    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
+)
+
+cc_test(
+    name = "redis_retry_wrapper_test",
+    srcs = ["redis_retry_wrapper_test.cc"],
+    deps = [
+        "//src/filters/oidc:redis_retry_wrapper",
+        "@com_google_googletest//:gtest_main",
+        "//test/filters/oidc:mocks",
+        "//test/shared:shared_test_helpers",
     ],
     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )

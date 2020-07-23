@@ -4,7 +4,7 @@
 #include "src/filters/oidc/session_store.h"
 #include "src/common/utilities/time_service.h"
 #include "src/common/utilities/synchronized.h"
-#include "src/filters/oidc/redis_wrapper.h"
+#include "src/filters/oidc/redis_retry_wrapper.h"
 
 namespace authservice {
 namespace filters {
@@ -19,7 +19,7 @@ class RedisSessionStore : public SessionStore {
   std::shared_ptr<common::utilities::TimeService> time_service_;
   uint32_t absolute_session_timeout_in_seconds_;
   uint32_t idle_session_timeout_in_seconds_;
-  std::shared_ptr<RedisWrapper> redis_wrapper_;
+  std::shared_ptr<RedisRetryWrapper> redis_wrapper_;
 
  public:
 
@@ -27,7 +27,7 @@ class RedisSessionStore : public SessionStore {
       std::shared_ptr<common::utilities::TimeService> time_service,
       uint32_t absolute_session_timeout_in_seconds,
       uint32_t idle_session_timeout_in_seconds,
-      std::shared_ptr<RedisWrapper> redis_wrapper);
+      std::shared_ptr<RedisRetryWrapper> redis_wrapper);
 
   virtual void SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) override;
 

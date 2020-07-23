@@ -3,6 +3,8 @@
 
 #include "gmock/gmock.h"
 #include "src/filters/oidc/token_response.h"
+#include "src/filters/oidc/authorization_state.h"
+#include "src/filters/oidc/session_store.h"
 #include "src/filters/oidc/redis_wrapper.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"

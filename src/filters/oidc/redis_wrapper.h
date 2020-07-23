@@ -51,6 +51,16 @@ class RedisWrapper {
 
 };
 
+class RedisError : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
+
+class RedisClosedError : public std::runtime_error {
+ public:
+  using std::runtime_error::runtime_error;
+};
+
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice

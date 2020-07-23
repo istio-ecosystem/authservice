@@ -20,51 +20,65 @@ std::string time_added_key_ = "time_added";
 RedisSessionStore::RedisSessionStore(std::shared_ptr<common::utilities::TimeService> time_service,
                                      uint32_t absolute_session_timeout_in_seconds,
                                      uint32_t idle_session_timeout_in_seconds,
-                                     std::shared_ptr<RedisWrapper> redis_wrapper) :
+                                     std::shared_ptr<RedisRetryWrapper> redis_wrapper) :
     time_service_(time_service),
     absolute_session_timeout_in_seconds_(absolute_session_timeout_in_seconds),
     idle_session_timeout_in_seconds_(idle_session_timeout_in_seconds),
     redis_wrapper_(redis_wrapper) {}
 
 void RedisSessionStore::SetTokenResponse(absl::string_view session_id, std::shared_ptr<TokenResponse> token_response) {
-  redis_wrapper_->hset(session_id, id_token_key_, std::string(token_response->IDToken().jwt_));
-  std::vector<std::string> keys_to_be_deleted;
+  //TODO: update tests in this class to throw RedisErrors and ensure they're rethrown as SessionErrors
+  try {
+    redis_wrapper_->hset(session_id, id_token_key_, std::string(token_response->IDToken().jwt_));
+    std::vector<std::string> keys_to_be_deleted;
 
-  if (token_response->AccessToken().has_value()) {
-    redis_wrapper_->hset(session_id, access_token_key_, *token_response->AccessToken());
-  } else {
-    keys_to_be_deleted.emplace_back(access_token_key_);
+    if (token_response->AccessToken().has_value()) {
+      redis_wrapper_->hset(session_id, access_token_key_, *token_response->AccessToken());
+    } else {
+      keys_to_be_deleted.emplace_back(access_token_key_);
+    }
+
+    if (token_response->RefreshToken().has_value()) {
+      redis_wrapper_->hset(session_id, refresh_token_key_, *token_response->RefreshToken());
+    } else {
+      keys_to_be_deleted.emplace_back(refresh_token_key_);
+    }
+
+    if (token_response->GetAccessTokenExpiry().has_value()) {
+      redis_wrapper_->hset(session_id,
+                           access_token_expiry_key_,
+                           std::to_string(*token_response->GetAccessTokenExpiry()));
+    } else {
+      keys_to_be_deleted.emplace_back(access_token_expiry_key_);
+    }
+
+    if (!keys_to_be_deleted.empty()) {
+      redis_wrapper_->hdel(session_id, keys_to_be_deleted);
+    }
+    redis_wrapper_->hsetnx(session_id,
+                           time_added_key_,
+                           std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+
+    RefreshExpiration(session_id);
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
   }
-
-  if (token_response->RefreshToken().has_value()) {
-    redis_wrapper_->hset(session_id, refresh_token_key_, *token_response->RefreshToken());
-  } else {
-    keys_to_be_deleted.emplace_back(refresh_token_key_);
-  }
-
-  if (token_response->GetAccessTokenExpiry().has_value()) {
-    redis_wrapper_->hset(session_id, access_token_expiry_key_, std::to_string(*token_response->GetAccessTokenExpiry()));
-  } else {
-    keys_to_be_deleted.emplace_back(access_token_expiry_key_);
-  }
-
-  if (!keys_to_be_deleted.empty()) {
-    redis_wrapper_->hdel(session_id, keys_to_be_deleted);
-  }
-  redis_wrapper_->hsetnx(session_id,
-                         time_added_key_,
-                         std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
-
-  RefreshExpiration(session_id);
 }
 
 std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_view session_id) {
   const auto fields = std::vector<std::string>(
       {id_token_key_, access_token_key_, refresh_token_key_, access_token_expiry_key_, time_added_key_}
   );
-  auto token_response_map = redis_wrapper_->hmget(session_id, fields);
+
+  std::unordered_map<std::string, absl::optional<std::string>> token_response_map;
+  try {
+    token_response_map = redis_wrapper_->hmget(session_id, fields);
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
+  }
 
   if (!token_response_map.at(id_token_key_)) {
+    spdlog::trace("{}: id_token not found, returning null token_response", __func__);
     return nullptr;
   }
 
@@ -99,46 +113,63 @@ std::shared_ptr<TokenResponse> RedisSessionStore::GetTokenResponse(absl::string_
 }
 
 void RedisSessionStore::RemoveSession(absl::string_view session_id) {
-  redis_wrapper_->del(session_id);
+  try {
+    redis_wrapper_->del(session_id);
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
+  }
 }
 
 void RedisSessionStore::SetAuthorizationState(absl::string_view session_id,
                                               std::shared_ptr<AuthorizationState> authorization_state) {
-  std::unordered_map<std::string, std::string> auth_state_map = {
-      {state_key_, std::string(authorization_state->GetState())},
-      {nonce_key_, authorization_state->GetNonce()},
-      {requested_url_key_, authorization_state->GetRequestedUrl()},
-  };
-  redis_wrapper_->hmset(session_id, auth_state_map);
+  try {
+    std::unordered_map<std::string, std::string> auth_state_map = {
+        {state_key_, std::string(authorization_state->GetState())},
+        {nonce_key_, authorization_state->GetNonce()},
+        {requested_url_key_, authorization_state->GetRequestedUrl()},
+    };
+    redis_wrapper_->hmset(session_id, auth_state_map);
 
-  redis_wrapper_->hsetnx(session_id,
-                         time_added_key_,
-                         std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
+    redis_wrapper_->hsetnx(session_id,
+                           time_added_key_,
+                           std::to_string(time_service_->GetCurrentTimeInSecondsSinceEpoch()));
 
-  RefreshExpiration(session_id);
+    RefreshExpiration(session_id);
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
+  }
 }
 
 std::shared_ptr<AuthorizationState> RedisSessionStore::GetAuthorizationState(absl::string_view session_id) {
-  const auto fields = std::vector<std::string>({state_key_, nonce_key_, requested_url_key_, time_added_key_});
-  auto auth_state_map = redis_wrapper_->hmget(session_id, fields);
+  try {
+    const auto fields = std::vector<std::string>({state_key_, nonce_key_, requested_url_key_, time_added_key_});
 
-  auto state = auth_state_map.at(state_key_);
-  auto nonce = auth_state_map.at(nonce_key_);
-  auto requested_url = auth_state_map.at(requested_url_key_);
+    auto auth_state_map = redis_wrapper_->hmget(session_id, fields);
 
-  if (!state || !nonce || !requested_url) {
-    return nullptr;
+    auto state = auth_state_map.at(state_key_);
+    auto nonce = auth_state_map.at(nonce_key_);
+    auto requested_url = auth_state_map.at(requested_url_key_);
+
+    if (!state || !nonce || !requested_url) {
+      return nullptr;
+    }
+
+    RefreshExpiration(session_id, auth_state_map.at(time_added_key_));
+
+    return std::make_shared<AuthorizationState>(state.value(), nonce.value(), requested_url.value());
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
   }
-
-  RefreshExpiration(session_id, auth_state_map.at(time_added_key_));
-
-  return std::make_shared<AuthorizationState>(state.value(), nonce.value(), requested_url.value());
 }
 
 void RedisSessionStore::ClearAuthorizationState(absl::string_view session_id) {
-  std::vector<std::string> keys = {state_key_, nonce_key_, requested_url_key_};
-  redis_wrapper_->hdel(session_id, keys);
-  RefreshExpiration(session_id);
+  try {
+    std::vector<std::string> keys = {state_key_, nonce_key_, requested_url_key_};
+    redis_wrapper_->hdel(session_id, keys);
+    RefreshExpiration(session_id);
+  } catch (RedisError &redisError) {
+    throw SessionError(redisError.what());
+  }
 }
 
 void RedisSessionStore::RefreshExpiration(absl::string_view session_id) {

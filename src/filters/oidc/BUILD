@@ -16,11 +16,22 @@ xx_library(
 )
 
 xx_library(
+    name = "authorization_state",
+    srcs = ["authorization_state.cc"],
+    hdrs = ["authorization_state.h"],
+    deps = [
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+    ],
+)
+
+xx_library(
     name = "in_memory_session_store",
     srcs = ["in_memory_session_store.cc"],
     hdrs = ["in_memory_session_store.h", "session_store.h"],
     deps = [
         "//src/filters/oidc:token_response",
+        "//src/filters/oidc:authorization_state",
         "//src/common/utilities:time_service",
         "//src/common/utilities:synchronized",
         "@com_github_abseil-cpp//absl/strings:strings",
@@ -31,14 +42,28 @@ xx_library(
 )
 
 xx_library(
+    name = "session_store",
+    srcs = [],
+    hdrs = ["session_store.h"],
+    deps = [
+        "//src/filters/oidc:token_response",
+        "//src/filters/oidc:authorization_state",
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+    ],
+)
+
+xx_library(
     name = "redis_session_store",
     srcs = ["redis_session_store.cc"],
     hdrs = ["redis_session_store.h", "session_store.h"],
     deps = [
+        "//src/filters/oidc:session_store",
         "//src/filters/oidc:token_response",
+        "//src/filters/oidc:authorization_state",
         "//src/common/utilities:time_service",
         "//src/common/utilities:synchronized",
-        "//src/filters/oidc:redis_wrapper",
+        "//src/filters/oidc:redis_retry_wrapper",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -49,13 +74,26 @@ xx_library(
 xx_library(
     name = "redis_wrapper",
     srcs = ["redis_wrapper.cc"],
-    hdrs = ["redis_wrapper.h", "session_store.h"],
+    hdrs = ["redis_wrapper.h"],
     deps = [
-        "//src/filters/oidc:token_response",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_gabime_spdlog//:spdlog",
         "@com_github_redis_hiredis//:hiredis", # needed for linking
+        "@boost//:all",
+    ],
+)
+
+xx_library(
+    name = "redis_retry_wrapper",
+    srcs = ["redis_retry_wrapper.cc"],
+    hdrs = ["redis_retry_wrapper.h"],
+    deps = [
+        "//src/filters/oidc:redis_wrapper",
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_gabime_spdlog//:spdlog",
         "@boost//:all",
     ],
 )

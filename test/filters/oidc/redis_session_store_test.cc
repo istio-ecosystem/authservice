@@ -22,7 +22,7 @@ class RedisSessionStoreWithProtectedMethodsMadePublic : public RedisSessionStore
       std::shared_ptr<common::utilities::TimeService> time_service,
       uint32_t absolute_session_timeout_in_seconds,
       uint32_t idle_session_timeout_in_seconds,
-      std::shared_ptr<RedisWrapper> redis_wrapper) :
+      std::shared_ptr<RedisRetryWrapper> redis_wrapper) :
       RedisSessionStore{time_service,
                         absolute_session_timeout_in_seconds,
                         idle_session_timeout_in_seconds,
@@ -35,6 +35,7 @@ class RedisSessionStoreTest : public ::testing::Test {
  protected:
   std::shared_ptr<common::utilities::TimeServiceMock> time_service_mock_;
   std::shared_ptr<RedisWrapperMock> redis_wrapper_mock_;
+  std::shared_ptr<RedisRetryWrapper> redis_retry_wrapper_;
   google::jwt_verify::Jwt id_token_jwt;
   std::shared_ptr<RedisSessionStoreWithProtectedMethodsMadePublic> redis_session_store;
 
@@ -64,13 +65,14 @@ class RedisSessionStoreTest : public ::testing::Test {
 
     time_service_mock_ = std::make_shared<testing::NiceMock<common::utilities::TimeServiceMock>>();
     redis_wrapper_mock_ = std::make_shared<testing::StrictMock<RedisWrapperMock>>();
+    redis_retry_wrapper_ = std::make_shared<testing::StrictMock<RedisRetryWrapper>>(redis_wrapper_mock_);
     int absolute_timeout = 128;
     int idle_timeout = 42;
     redis_session_store =
         std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
                                                                           absolute_timeout,
                                                                           idle_timeout,
-                                                                          redis_wrapper_mock_);
+                                                                          redis_retry_wrapper_);
   }
 };
 
@@ -205,7 +207,7 @@ TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsNoAbsoluteOrIdleTimeo
       std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
                                                                         absolute_timeout,
                                                                         idle_timeout,
-                                                                        redis_wrapper_mock_);
+                                                                        redis_retry_wrapper_);
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("900"));
@@ -219,7 +221,7 @@ TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsOnlyAnIdleTimeout) {
       std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
                                                                         absolute_timeout,
                                                                         idle_timeout,
-                                                                        redis_wrapper_mock_);
+                                                                        redis_retry_wrapper_);
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("900"));
@@ -234,7 +236,7 @@ TEST_F(RedisSessionStoreTest, RefreshExpiration_WhenThereIsOnlyAnAbsoluteTimeout
       std::make_shared<RedisSessionStoreWithProtectedMethodsMadePublic>(time_service_mock_,
                                                                         absolute_timeout,
                                                                         idle_timeout,
-                                                                        redis_wrapper_mock_);
+                                                                        redis_retry_wrapper_);
 
   EXPECT_CALL(*time_service_mock_, GetCurrentTimeInSecondsSinceEpoch()).WillRepeatedly(Return(1000));
   EXPECT_CALL(*redis_wrapper_mock_, hget(Eq(session_id), Eq(time_added_key))).WillOnce(Return("990"));

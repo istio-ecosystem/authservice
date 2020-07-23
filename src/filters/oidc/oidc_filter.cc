@@ -118,6 +118,7 @@ google::rpc::Code OidcFilter::Process(
     return RetrieveToken(request, response, session_id, ioc, yield);
   }
 
+  spdlog::trace("{}: attempting session retrieval", __func__);
   std::shared_ptr<TokenResponse> token_response_ptr;
   try {
     token_response_ptr = session_store_->GetTokenResponse(session_id);
@@ -126,6 +127,7 @@ google::rpc::Code OidcFilter::Process(
     return SessionErrorResponse(response, err);
   }
 
+  spdlog::trace("{}: checking retrieved token response for expected tokens", __func__);
   // If the user has a session_id cookie but there are no required tokens in the session store associated with it,
   // then redirect for login.
   if (!RequiredTokensPresent(token_response_ptr)) {
@@ -137,6 +139,7 @@ google::rpc::Code OidcFilter::Process(
 
   // If both ID & Access token are still unexpired,
   // then allow the request to proceed (no need to intervene).
+  spdlog::trace("{}: checking token expiration", __func__);
   if (!RequiredTokensExpired(token_response)) {
     AddTokensToRequestHeaders(response, token_response);
     spdlog::info("{}: Tokens not expired. Allowing request to proceed.", __func__);
@@ -155,9 +158,11 @@ google::rpc::Code OidcFilter::Process(
 
   // If the user has an unexpired refresh token then use it to request a fresh token_response.
   // If successful, allow the request to proceed. If unsuccessful, redirect for login.
+  spdlog::trace("{}: attempting to refresh token", __func__);
   auto refreshed_token_response = RefreshToken(token_response, refresh_token_optional.value(), ioc, yield);
   if (refreshed_token_response) {
     try {
+      spdlog::trace("{}: storing refreshed token", __func__);
       session_store_->SetTokenResponse(session_id, refreshed_token_response);
     } catch (SessionError &err) {
       spdlog::error("{}: Session error in SetTokenResponse: {}", __func__, err.what());
@@ -420,7 +425,11 @@ bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckR
   bool host_matches = request_host == configured_callback_host_with_port ||
       (configured_scheme == "https" && configured_port == 443 && request_host == configured_hostname);
 
-  return host_matches && path_matches;
+  auto matches_callback = path_matches && host_matches;
+
+  spdlog::trace("{}: matches_callback: {} ", __func__, matches_callback);
+
+  return matches_callback;
 }
 
 absl::optional<std::string> OidcFilter::GetSessionIdFromCookie(const ::google::protobuf::Map<::std::string,
