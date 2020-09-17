@@ -3,7 +3,7 @@
 set -eux
 
 script_dir=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd -P )
-cd ${script_dir}/../istio-1.4.0
+cd ${script_dir}/../istio-1.4.10
 
 # Follow quick setup instructions for Istio
 for i in install/kubernetes/helm/istio-init/files/crd*yaml; do
