@@ -183,7 +183,6 @@ void AsyncAuthServiceImpl::Run() {
       // tells us whether there is any kind of event or cq_ is shutting down.
       if(!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
-        break;
       }
 
       static_cast<ServiceState *>(tag)->Proceed();
