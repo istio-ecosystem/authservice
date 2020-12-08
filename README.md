@@ -2,6 +2,10 @@
 An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
 focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
 
+## Maintenance Notice (December 2020)
+
+This project is no longer officially maintained. If you would like to assist with maintenance of this project, please raise an issue using the `Maintenance Volunteer Issue Template`.
+
 ## Introduction
 `authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
 to the Istio mesh. `authservice` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
