@@ -185,6 +185,7 @@ public:
    * @param headers the http headers
    * @param body the http request body
    * @param ca_cert the ca cert to be trusted in the http call
+   * @param skip_tls skips tls verification
    * @return http response.
    */
   virtual response_t Post(absl::string_view uri,
@@ -193,7 +194,8 @@ public:
                           absl::string_view ca_cert,
                           absl::string_view proxy_uri,
                           boost::asio::io_context &ioc,
-                          boost::asio::yield_context yield) const = 0;
+                          boost::asio::yield_context yield,
+                          bool skip_tls) const = 0;
 };
 
 /**
@@ -207,7 +209,8 @@ public:
                   absl::string_view ca_cert,
                   absl::string_view proxy_uri,
                   boost::asio::io_context &ioc,
-                  boost::asio::yield_context yield) const override;
+                  boost::asio::yield_context yield,
+                  bool skip_tls) const override;
 };
 
 }  // namespace http
