@@ -2,6 +2,7 @@
 #include <sstream>
 #include <boost/beast.hpp>
 #include "absl/strings/str_join.h"
+#include "absl/strings/match.h"
 #include "google/rpc/code.pb.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
@@ -72,6 +73,7 @@ google::rpc::Code OidcFilter::Process(
 
   auto httpRequest = request->attributes().request().http();
   auto headers = httpRequest.headers();
+  auto path = httpRequest.path();
   auto session_id_optional = GetSessionIdFromCookie(headers);
 
   // If the request is for the configured logout path,
@@ -98,6 +100,16 @@ google::rpc::Code OidcFilter::Process(
   if (headers.contains(idp_config_.id_token().header())) {
     spdlog::info(
         "{}: ID Token header already present. Allowing request to proceed without adding any additional headers.",
+        __func__);
+    return google::rpc::Code::OK;
+  }
+
+  // If the access_token param exists,
+  // then let request continue.
+  // (It is up to the downstream system to validate the access_token is valid.)
+  if (absl::StrContains(path, "access_token=")) {
+    spdlog::info(
+        "{}: ID Token present as query parameter. Allowing request to proceed without adding any additional headers.",
         __func__);
     return google::rpc::Code::OK;
   }
