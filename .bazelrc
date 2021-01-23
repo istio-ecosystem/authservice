@@ -6,4 +6,4 @@
 #
 # The following workaround was suggested by https://github.com/grpc/grpc/issues/19645
 #
-build --copt -DGRPC_BAZEL_BUILD
+build --copt -DGRPC_BAZEL_BUILD 

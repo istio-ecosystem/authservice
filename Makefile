@@ -3,7 +3,7 @@
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
 TARGET:=//src/main:auth_server
-BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
+BAZEL_FLAGS:= --verbose_failures
 
 all: build test docs
 
