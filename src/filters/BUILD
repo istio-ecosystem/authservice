@@ -10,7 +10,7 @@ xx_library(
         "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_google_googleapis//google/rpc:code_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_grpc",
     ],
 )
 
@@ -42,6 +42,6 @@ xx_library(
         "//src/filters/oidc:redis_session_store",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_grpc",
     ],
 )
