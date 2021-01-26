@@ -1,8 +1,11 @@
-name: Master Commit
+name: authservice CI workflow
 
 on:
-  push:
+  pull_request:
     branches: 
+      - master
+  push:
+    branches:
       - master
 
 jobs:
@@ -10,12 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - name: Install essential packages
-      run: 
     - name: Setup Bazel
       run: sudo build/install-bazel.sh
     - name: Install dependencies
-      run: apt-get update && apt-get -y install make cmake ninja-build build-essential
+      run: sudo apt-get update && sudo apt-get -y install make cmake ninja-build build-essential
     - name: make test
       run: |
        sudo chmod -R a+rxw /home
