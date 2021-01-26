@@ -11,9 +11,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: swaggoner/authservice-build-env:2019-10-24
     steps:
     - uses: actions/checkout@v1
+    - name: Setup Bazel
+      run: sudo build/install-bazel.sh
+    - name: Install dependencies
+      run: apt-get update && apt-get -y install make cmake ninja-build build-essential
     - name: make test
       run: make test
