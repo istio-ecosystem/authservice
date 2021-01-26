@@ -7,8 +7,9 @@ on:
 
 jobs:
   build:
-    using: 'docker'
-    image: 'Dockerfile'
+    runs-on: ubuntu-latest
+    container:
+      image: swaggoner/authservice-build-env:2019-10-24
     steps:
     - uses: actions/checkout@v1
     - name: make test
