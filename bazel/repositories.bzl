@@ -3,7 +3,6 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 def oidcservice_dependencies():
   zlib()
   com_envoyproxy_envoy()
-  rules_proto()
   com_github_grpc_grpc()
   com_google_googletest()
   com_google_abseil()
@@ -15,6 +14,7 @@ def oidcservice_dependencies():
   io_bazel_rules_go()
   bazel_gazelle()
   com_envoyproxy_protoc_gen_validate()
+  rules_foreign_cc()
 
 def com_envoyproxy_envoy():
   http_archive(
@@ -27,20 +27,9 @@ def com_envoyproxy_envoy():
 def com_github_grpc_grpc():
   http_archive(
     name = "com_github_grpc_grpc",
-    sha256 = "50747c8939c535b1059f19534de263eb9b7570b5347390fb24b0bbce8763e9a4",
-    urls = ["https://github.com/grpc/grpc/archive/v1.21.3.tar.gz"],
-    strip_prefix = "grpc-1.21.3",
-  )
-
-def rules_proto():
-  http_archive(
-    name = "rules_proto",
-    sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
-    strip_prefix = "rules_proto-97d8af4dc474595af3900dd85cb3a29ad28cc313",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-        "https://github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-    ],
+    sha256 = "7372a881122cd85a7224435a1d58bc5e11c88d4fb98a64b83f36f3d1c2f16d39",
+    urls = ["https://github.com/grpc/grpc/archive/v1.34.0.tar.gz"],
+    strip_prefix = "grpc-1.34.0",
   )
 
 def com_google_googletest():
@@ -147,4 +136,11 @@ def com_envoyproxy_protoc_gen_validate():
     urls = [
       "https://github.com/envoyproxy/protoc-gen-validate/archive/872b28c457822ed9c2a5405da3c33f386ac0e86f.tar.gz",
     ],
+  )
+
+def rules_foreign_cc():
+  http_archive(
+    name = "io_bazel_rules_foreign_cc",
+    sha256 = "e7446144277c9578141821fc91c55a61df7ae01bda890902f7286f5fd2f6ae46",
+    urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/d54c78ab86b40770ee19f0949db9d74a831ab9f0.tar.gz"]
   )
