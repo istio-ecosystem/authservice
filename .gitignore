@@ -4,3 +4,4 @@
 .DS_Store
 /build_release
 /run/config/config.json
+user.bazelrc

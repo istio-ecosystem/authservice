@@ -146,7 +146,7 @@ TEST_F(TokenResponseParserTest, ParseInvalidJwtEncoding) {
 
 TEST_F(TokenResponseParserTest, ParseInvalidJwtSignature) {
   auto jwks = google::jwt_verify::Jwks::createFrom(invalid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
+  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::JwksPemBadBase64);
   TokenResponseParserImpl parser(std::move(jwks));
   auto result = parser.Parse(client_id, nonce, valid_token_response_Bearer_without_access_token);
   ASSERT_FALSE(result);
