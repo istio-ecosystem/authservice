@@ -11,6 +11,6 @@ xx_binary(
         "@com_github_abseil-cpp//absl/flags:parse",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_grpc_grpc//:grpc++",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
 )

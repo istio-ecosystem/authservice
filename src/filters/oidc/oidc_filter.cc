@@ -44,8 +44,8 @@ OidcFilter::OidcFilter(common::http::ptr_t http_ptr,
 }
 
 google::rpc::Code OidcFilter::Process(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
+    const ::envoy::service::auth::v3::CheckRequest *request,
+    ::envoy::service::auth::v3::CheckResponse *response,
     boost::asio::io_context &ioc,
     boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
@@ -181,7 +181,7 @@ google::rpc::Code OidcFilter::Process(
 }
 
 google::rpc::Code OidcFilter::SessionErrorResponse(CheckResponse *response, const SessionError &err) {
-  response->mutable_denied_response()->mutable_status()->set_code(envoy::type::Unauthorized);
+  response->mutable_denied_response()->mutable_status()->set_code(envoy::type::v3::Unauthorized);
   response->mutable_denied_response()->mutable_body()->append(
       "There was an error accessing your session data. Try again later.");
   return google::rpc::UNAUTHENTICATED;
@@ -253,7 +253,7 @@ std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &http_r
 
 void OidcFilter::SetHeader(
     ::google::protobuf::RepeatedPtrField<
-        ::envoy::api::v2::core::HeaderValueOption> *headers,
+        ::envoy::config::core::v3::HeaderValueOption> *headers,
     absl::string_view name, absl::string_view value) {
   auto header_value_option = headers->Add();
   auto header = header_value_option->mutable_header();
@@ -262,7 +262,7 @@ void OidcFilter::SetHeader(
 }
 
 void OidcFilter::SetStandardResponseHeaders(
-    ::envoy::service::auth::v2::CheckResponse *response) {
+    ::envoy::service::auth::v3::CheckResponse *response) {
   for (auto to_add : standard_headers) {
     SetHeader(response->mutable_denied_response()->mutable_headers(),
               to_add.first, to_add.second);
@@ -271,9 +271,9 @@ void OidcFilter::SetStandardResponseHeaders(
 
 void OidcFilter::SetRedirectHeaders(
     absl::string_view redirect_url,
-    ::envoy::service::auth::v2::CheckResponse *response) {
+    ::envoy::service::auth::v3::CheckResponse *response) {
   response->mutable_denied_response()->mutable_status()->set_code(
-      envoy::type::StatusCode::Found);
+      envoy::type::v3::Found);
   SetHeader(response->mutable_denied_response()->mutable_headers(),
             common::http::headers::Location, redirect_url.data());
 }
@@ -303,7 +303,7 @@ std::string OidcFilter::EncodeHeaderValue(const std::string &preamble,
 }
 
 void OidcFilter::SetCookie(
-    ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+    ::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValueOption> *responseHeaders,
     const std::string &cookie_name,
     absl::string_view value,
     int64_t timeout
@@ -315,7 +315,7 @@ void OidcFilter::SetCookie(
 }
 
 void OidcFilter::DeleteCookie(
-    ::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+    ::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValueOption> *responseHeaders,
     const std::string &cookieName
 ) {
   SetCookie(responseHeaders, cookieName, "deleted", 0);
@@ -389,7 +389,7 @@ bool OidcFilter::RequiredTokensExpired(TokenResponse &token_response) {
   return idp_config_.has_access_token() && accessTokenExpiry.has_value() && accessTokenExpiry.value() < now_seconds;
 }
 
-bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
+bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v3::CheckRequest *request) {
   return idp_config_.has_logout() && RequestPath(request) == idp_config_.logout().path();
 }
 
@@ -401,7 +401,7 @@ std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
   return common::http::PathQueryFragment(request->attributes().request().http().path()).Query();
 }
 
-bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request) {
+bool OidcFilter::MatchesCallbackRequest(const ::envoy::service::auth::v3::CheckRequest *request) {
   auto path = request->attributes().request().http().path();
   auto request_host = request->attributes().request().http().host();
   auto scheme = request->attributes().request().http().scheme();
@@ -444,19 +444,19 @@ absl::optional<std::string> OidcFilter::GetSessionIdFromCookie(const ::google::p
   }
 }
 
-void OidcFilter::SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
+void OidcFilter::SetAccessTokenHeader(::envoy::service::auth::v3::CheckResponse *response,
                                       const std::string &access_token) {
   auto value = EncodeHeaderValue(idp_config_.access_token().preamble(), access_token);
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.access_token().header(), value);
 }
 
-void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *response,
+void OidcFilter::SetIdTokenHeader(::envoy::service::auth::v3::CheckResponse *response,
                                   const std::string &id_token) {
   auto value = EncodeHeaderValue(idp_config_.id_token().preamble(), id_token);
   SetHeader(response->mutable_ok_response()->mutable_headers(), idp_config_.id_token().header(), value);
 }
 
-void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, std::string session_id) {
+void OidcFilter::SetSessionIdCookie(::envoy::service::auth::v3::CheckResponse *response, std::string session_id) {
   SetCookie(response->mutable_denied_response()->mutable_headers(), GetSessionIdCookieName(), session_id, NO_TIMEOUT);
 }
 
@@ -503,8 +503,8 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
 
 // Performs an HTTP POST and prints the response
 google::rpc::Code OidcFilter::RetrieveToken(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
+    const ::envoy::service::auth::v3::CheckRequest *request,
+    ::envoy::service::auth::v3::CheckResponse *response,
     absl::string_view session_id,
     boost::asio::io_context &ioc,
     boost::asio::yield_context yield) {
@@ -536,7 +536,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   if (!authorization_state) {
     spdlog::info("{}: Missing state, nonce, and original url requested by the user. Cannot redirect.", __func__);
-    response->mutable_denied_response()->mutable_status()->set_code(envoy::type::StatusCode::BadRequest);
+    response->mutable_denied_response()->mutable_status()->set_code(envoy::type::v3::BadRequest);
     response->mutable_denied_response()->set_body("Oops, your session has expired. Please try again.");
     return google::rpc::Code::UNAUTHENTICATED;
   }

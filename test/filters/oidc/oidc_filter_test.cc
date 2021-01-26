@@ -10,24 +10,6 @@
 #include "test/filters/oidc/mocks.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 
-namespace envoy {
-namespace api {
-namespace v2 {
-namespace core {
-
-// Used for printing header information on test failures
-void PrintTo(const ::envoy::api::v2::core::HeaderValueOption &header, ::std::ostream *os) {
-  std::string json;
-  google::protobuf::util::MessageToJsonString(header, &json);
-
-  *os << json;
-}
-
-}
-}
-}
-}
-
 namespace authservice {
 namespace filters {
 namespace oidc {
@@ -49,15 +31,15 @@ using namespace common::http::headers;
 
 namespace {
 
-::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>>
+::testing::internal::UnorderedElementsAreArrayMatcher<::testing::Matcher<envoy::config::core::v3::HeaderValueOption>>
 ContainsHeaders(std::vector<std::pair<std::string, ::testing::Matcher<std::string>>> headers) {
-  std::vector<::testing::Matcher<envoy::api::v2::core::HeaderValueOption>> matchers;
+  std::vector<::testing::Matcher<envoy::config::core::v3::HeaderValueOption>> matchers;
 
   for (const auto &header : headers) {
     matchers.push_back(
-        Property(&envoy::api::v2::core::HeaderValueOption::header, AllOf(
-            Property(&envoy::api::v2::core::HeaderValue::key, StrEq(header.first)),
-            Property(&envoy::api::v2::core::HeaderValue::value, header.second)
+        Property(&envoy::config::core::v3::HeaderValueOption::header, AllOf(
+            Property(&envoy::config::core::v3::HeaderValue::key, StrEq(header.first)),
+            Property(&envoy::config::core::v3::HeaderValue::value, header.second)
         )));
   }
 
@@ -78,12 +60,12 @@ class OidcFilterTest : public ::testing::Test {
   std::shared_ptr<SessionStore> session_store_;
   std::shared_ptr<SessionStoreMock> session_store_mock_;
   std::shared_ptr<TokenResponse> test_token_response_;
-  ::envoy::service::auth::v2::CheckRequest request_;
-  ::envoy::service::auth::v2::CheckResponse response_;
+  ::envoy::service::auth::v3::CheckRequest request_;
+  ::envoy::service::auth::v3::CheckResponse response_;
 
   // id_token exp of Feb 2, 2062
   const char *test_id_token_jwt_string_ =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MDYxMzkwMjJ9.jV2_EH7JB30wgg248x2AlCkZnIUH417I_7FPw3nr5BQ";
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTA2MTI5MDIyLCJleHAiOjI5MDYxMzkwMjJ9.jv3_EH7JB30wgg248x2AlCkZnIUH417I_7FPw3nr5BQ";
   const std::string requested_url_ = "https://example.com/summary?foo=bar";
   google::jwt_verify::Jwt test_id_token_jwt_;
   const std::string expected_session_cookie_name = "__Host-cookie-prefix-authservice-session-id-cookie";
@@ -142,8 +124,8 @@ class OidcFilterTest : public ::testing::Test {
 
 
   static google::rpc::Code ProcessAndWaitForAsio(OidcFilter &filter,
-                                                 const ::envoy::service::auth::v2::CheckRequest *request,
-                                                 ::envoy::service::auth::v2::CheckResponse *response);
+                                                 const ::envoy::service::auth::v3::CheckRequest *request,
+                                                 ::envoy::service::auth::v3::CheckResponse *response);
 
   void AssertSessionErrorResponse(google::rpc::Code status);
 
@@ -152,8 +134,8 @@ class OidcFilterTest : public ::testing::Test {
 };
 
 google::rpc::Code OidcFilterTest::ProcessAndWaitForAsio(OidcFilter &filter,
-                                                        const ::envoy::service::auth::v2::CheckRequest *request,
-                                                        ::envoy::service::auth::v2::CheckResponse *response) {
+                                                        const ::envoy::service::auth::v3::CheckRequest *request,
+                                                        ::envoy::service::auth::v3::CheckResponse *response) {
   // Create a new io_context. All of the async IO handled inside the
   // spawn below will be handled by this new io_context.
   boost::asio::io_context ioc;
@@ -196,8 +178,8 @@ TEST_F(OidcFilterTest, GetSessionIdCookieName) {
 TEST_F(OidcFilterTest, NoHttpHeader) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);
 
-  ::envoy::service::auth::v2::CheckRequest request;
-  ::envoy::service::auth::v2::CheckResponse response;
+  ::envoy::service::auth::v3::CheckRequest request;
+  ::envoy::service::auth::v3::CheckResponse response;
   auto status = ProcessAndWaitForAsio(filter, &request, &response);
   ASSERT_EQ(status, google::rpc::Code::INVALID_ARGUMENT);
 }
@@ -205,8 +187,8 @@ TEST_F(OidcFilterTest, NoHttpHeader) {
 /* TODO: Reinstate
 TEST_F(OidcFilterTest, NoHttpSchema) {
   OidcFilter filter(common::http::ptr_t(), config);
-  ::envoy::service::auth::v2::CheckRequest request;
-  ::envoy::service::auth::v2::CheckResponse response;
+  ::envoy::service::auth::v3::CheckRequest request;
+  ::envoy::service::auth::v3::CheckResponse response;
   auto status = ProcessAndWaitForAsio(filter, &request, &response);
   ASSERT_EQ(status.error_code(), ::grpc::StatusCode::INVALID_ARGUMENT);
 }
@@ -223,7 +205,7 @@ TEST_F(OidcFilterTest, NoAuthorization) {
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(),
-            ::envoy::type::StatusCode::Found);
+            ::envoy::type::v3::Found);
 
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(session_id, requested_url_, state, nonce);
 
@@ -783,7 +765,7 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(),
-            ::envoy::type::StatusCode::Found);
+            ::envoy::type::v3::Found);
 
   ASSERT_THAT(
       response_.denied_response().headers(),
@@ -824,7 +806,7 @@ TEST_F(OidcFilterTest, LogoutWithNoCookies) {
 
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
   ASSERT_EQ(response_.denied_response().status().code(),
-            ::envoy::type::StatusCode::Found);
+            ::envoy::type::v3::Found);
 
   ASSERT_THAT(
       response_.denied_response().headers(),
@@ -874,7 +856,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenAuthorizationStateInfoCann
 
   auto code = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(code, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::StatusCode::BadRequest);
+  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::v3::BadRequest);
   ASSERT_EQ(response_.denied_response().body(), "Oops, your session has expired. Please try again.");
   ASSERT_THAT(
       response_.denied_response().headers(),
@@ -1165,7 +1147,7 @@ void OidcFilterTest::EnableAccessTokens(config::oidc::OIDCConfig &oidcConfig) {
 
 void OidcFilterTest::AssertSessionErrorResponse(google::rpc::Code status) {
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::StatusCode::Unauthorized);
+  ASSERT_EQ(response_.denied_response().status().code(), ::envoy::type::v3::Unauthorized);
   ASSERT_EQ(response_.denied_response().body(),
             "There was an error accessing your session data. Try again later.");
 }

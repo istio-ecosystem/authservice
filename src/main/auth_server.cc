@@ -2,7 +2,7 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/strings/str_cat.h"
-#include "envoy/service/auth/v2/external_auth.pb.validate.h"
+#include "envoy/service/auth/v3/external_auth.pb.validate.h"
 #include "spdlog/sinks/stdout_sinks.h"
 #include "spdlog/spdlog.h"
 #include "src/config/get_config.h"

@@ -10,8 +10,8 @@ namespace service {
 using ::testing::HasSubstr;
 
 grpc::Status ProcessAndWaitForAsio(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
+    const ::envoy::service::auth::v3::CheckRequest *request,
+    ::envoy::service::auth::v3::CheckResponse *response,
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config) {
   // Create a new io_context. All of the async IO handled inside the
@@ -35,8 +35,8 @@ grpc::Status ProcessAndWaitForAsio(
 
 TEST(AsyncServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesPath) {
 
-  ::envoy::service::auth::v2::CheckResponse response;
-  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v3::CheckResponse response;
+  ::envoy::service::auth::v3::CheckRequest request;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo#some-fragment"); // this is a matching path for trigger_rules
@@ -60,8 +60,8 @@ TEST(AsyncServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesP
 
 TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRulesPath) {
 
-  ::envoy::service::auth::v2::CheckResponse response;
-  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v3::CheckResponse response;
+  ::envoy::service::auth::v3::CheckRequest request;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/version?some-query"); // this is a non-matching path for trigger_rules
@@ -85,8 +85,8 @@ TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRules
 
 TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPath) {
 
-  ::envoy::service::auth::v2::CheckResponse response;
-  ::envoy::service::auth::v2::CheckRequest request;
+  ::envoy::service::auth::v3::CheckResponse response;
+  ::envoy::service::auth::v3::CheckRequest request;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo?some-query"); // this is a matching path for trigger_rules
@@ -106,7 +106,7 @@ TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPat
   auto status = ProcessAndWaitForAsio(&request, &response, chains_, config_.trigger_rules());
 
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(response.denied_response().status().code(), envoy::type::StatusCode::Found); // redirected for auth
+  EXPECT_EQ(response.denied_response().status().code(), envoy::type::v3::Found); // redirected for auth
 
   bool hasLocation = false;
   for (auto &header : response.denied_response().headers()) {

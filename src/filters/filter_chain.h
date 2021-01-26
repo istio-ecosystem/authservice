@@ -1,7 +1,7 @@
 #ifndef AUTHSERVICE_FILTER_CHAIN_H
 #define AUTHSERVICE_FILTER_CHAIN_H
 
-#include "envoy/service/auth/v2/external_auth.grpc.pb.h"
+#include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/filters/filter.h"
 #include "config/config.pb.h"
 #include "src/filters/oidc/session_store.h"
@@ -27,7 +27,7 @@ public:
    * @param request the request to match against.
    * @return true if that chain should process a request else false.
    */
-  virtual bool Matches(const ::envoy::service::auth::v2::CheckRequest *request) const = 0;
+  virtual bool Matches(const ::envoy::service::auth::v3::CheckRequest *request) const = 0;
 
   /**
    * New creates a new filter instance that can be used to process a request.
@@ -52,7 +52,7 @@ public:
 
   const std::string &Name() const override;
 
-  bool Matches(const ::envoy::service::auth::v2::CheckRequest *request) const override;
+  bool Matches(const ::envoy::service::auth::v3::CheckRequest *request) const override;
 
   std::unique_ptr<Filter> New() override;
 

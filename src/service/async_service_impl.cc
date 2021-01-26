@@ -24,8 +24,8 @@ ProcessingState::ProcessingState(std::vector<std::unique_ptr<filters::FilterChai
 }
 
 ::grpc::Status Check(
-    const ::envoy::service::auth::v2::CheckRequest *request,
-    ::envoy::service::auth::v2::CheckResponse *response,
+    const ::envoy::service::auth::v3::CheckRequest *request,
+    ::envoy::service::auth::v3::CheckResponse *response,
                           std::vector<std::unique_ptr<filters::FilterChain>> &chains,
             const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
             boost::asio::io_context& ioc,

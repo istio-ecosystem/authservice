@@ -38,7 +38,7 @@ class OidcFilter final : public filters::Filter {
    * @param name the name of the header
    * @param value the header value
    */
-  static void SetHeader(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *headers,
+  static void SetHeader(::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValueOption> *headers,
                         absl::string_view name, absl::string_view value);
 
   /** @brief Set standard reply headers.
@@ -47,7 +47,7 @@ class OidcFilter final : public filters::Filter {
    * @param response The response to be augmented.
    */
   static void SetStandardResponseHeaders(
-      ::envoy::service::auth::v2::CheckResponse *response);
+      ::envoy::service::auth::v3::CheckResponse *response);
 
   /** @brief Set redirect headers.
    *
@@ -56,7 +56,7 @@ class OidcFilter final : public filters::Filter {
    */
   static void SetRedirectHeaders(
       absl::string_view redirect_url,
-      ::envoy::service::auth::v2::CheckResponse *response);
+      ::envoy::service::auth::v3::CheckResponse *response);
 
   void SetLogoutHeaders(CheckResponse *response);
 
@@ -76,7 +76,7 @@ class OidcFilter final : public filters::Filter {
    * @param value The value of the cookie.
    * @param timeout The lifetime in seconds the cookie is valid for before browsers should not honor this cookie.
    */
-  void SetCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+  void SetCookie(::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValueOption> *responseHeaders,
                  const std::string &cookie_name, absl::string_view value, int64_t timeout);
 
   /** @brief Extract the requested cookie from the given headers
@@ -96,8 +96,8 @@ class OidcFilter final : public filters::Filter {
 
   /** @brief Retrieve tokens from OIDC token endpoint */
   google::rpc::Code RetrieveToken(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response,
+      const ::envoy::service::auth::v3::CheckRequest *request,
+      ::envoy::service::auth::v3::CheckResponse *response,
       absl::string_view session_id,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield);
@@ -122,7 +122,7 @@ class OidcFilter final : public filters::Filter {
    * @param response the outgoing response
    * @param id_token the ID token
    */
-  void SetIdTokenHeader(::envoy::service::auth::v2::CheckResponse *response, const std::string &id_token);
+  void SetIdTokenHeader(::envoy::service::auth::v3::CheckResponse *response, const std::string &id_token);
 
   /**
    * @brief Given an access token, put it in a request header for the application to consume
@@ -130,7 +130,7 @@ class OidcFilter final : public filters::Filter {
    * @param response the outgoing response
    * @param access_token the access token
    */
-  void SetAccessTokenHeader(::envoy::service::auth::v2::CheckResponse *response, const std::string &access_token);
+  void SetAccessTokenHeader(::envoy::service::auth::v3::CheckResponse *response, const std::string &access_token);
 
   /**
    * @brief Given a session id, put it in a request header for the application to consume
@@ -138,7 +138,7 @@ class OidcFilter final : public filters::Filter {
    * @param response the outgoing response
    * @param session_id the session id
    */
-  void SetSessionIdCookie(::envoy::service::auth::v2::CheckResponse *response, std::string session_id);
+  void SetSessionIdCookie(::envoy::service::auth::v3::CheckResponse *response, std::string session_id);
 
   /**
    * @brief Retrieve and decrypt the sessionId from cookies
@@ -165,14 +165,14 @@ class OidcFilter final : public filters::Filter {
    */
   std::set<std::string> GetCookieDirectives(int64_t timeout);
 
-  void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::api::v2::core::HeaderValueOption> *responseHeaders,
+  void DeleteCookie(::google::protobuf::RepeatedPtrField<::envoy::config::core::v3::HeaderValueOption> *responseHeaders,
                     const std::string &cookieName);
 
   /** @brief Check if the request appears to be the callback request. */
-  bool MatchesCallbackRequest(const ::envoy::service::auth::v2::CheckRequest *request);
+  bool MatchesCallbackRequest(const ::envoy::service::auth::v3::CheckRequest *request);
 
   /** @brief Check if the request appears to be the logout request. */
-  bool MatchesLogoutRequest(const ::envoy::service::auth::v2::CheckRequest *request);
+  bool MatchesLogoutRequest(const ::envoy::service::auth::v3::CheckRequest *request);
 
   /** @brief get the path from the request sans query string */
   std::string RequestPath(const CheckRequest *request);
@@ -195,8 +195,8 @@ class OidcFilter final : public filters::Filter {
              SessionStorePtr session_store);
 
   google::rpc::Code Process(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response,
+      const ::envoy::service::auth::v3::CheckRequest *request,
+      ::envoy::service::auth::v3::CheckResponse *response,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield) override;
 
