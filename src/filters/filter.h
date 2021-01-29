@@ -7,8 +7,6 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio.hpp>
 
-using namespace envoy::service::auth::v3;
-
 namespace authservice {
 namespace filters {
 /**

@@ -3,107 +3,128 @@
 #include "src/filters/filter_chain.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
+#include "common/config/version_converter.h"
+
+#include <boost/type_traits/is_default_constructible.hpp>
+#include <gtest/gtest-typed-test.h>
+#include <type_traits>
 
 namespace authservice {
 namespace service {
 
 using ::testing::HasSubstr;
 
-grpc::Status ProcessAndWaitForAsio(
-    const ::envoy::service::auth::v3::CheckRequest *request,
-    ::envoy::service::auth::v3::CheckResponse *response,
-    std::vector<std::unique_ptr<filters::FilterChain>> &chains,
-    const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config) {
-  // Create a new io_context. All of the async IO handled inside the
-  // spawn below will be handled by this new io_context.
-  boost::asio::io_context ioc;
-  grpc::Status status;
+template <class T>
+class AsyncServiceImplTest : public ::testing::Test {
+ public:
+  grpc::Status check(typename T::first_type* request, typename T::second_type* response) {
+    using RequestType = typename T::first_type;
+    using ResponseType = typename T::second_type;
 
-  // Spawn a co-routine to run the filter.
-  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
-    status = authservice::service::Check(request, response, chains, trigger_rules_config, ioc, yield);
-//    this->responder_.Finish(response, grpc::Status::OK, new CompleteState(this));
-  });
+    // Create a new io_context. All of the async IO handled inside the
+    // spawn below will be handled by this new io_context.
+    boost::asio::io_context ioc;
+    grpc::Status status;
 
-  // Run the I/O context to completion, on the current thread.
-  // This consumes the current thread until all of the async
-  // I/O from the above spawn is finished.
-  ioc.run();
+    // Spawn a co-routine to run the filter.
+    boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
+      if constexpr (std::is_same_v<RequestType, ::envoy::service::auth::v2::CheckRequest>) {
+        envoy::service::auth::v3::CheckResponse response_v3;
+        envoy::service::auth::v3::CheckRequest request_v3;
 
-  return status;
-}
+        Envoy::Config::VersionConverter::upgrade(
+          static_cast<const google::protobuf::Message&>(*request), request_v3);
 
-TEST(AsyncServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesPath) {
+        status = authservice::service::Check(
+          &request_v3, &response_v3, chains_, trigger_rules_config_, ioc, yield);
 
-  ::envoy::service::auth::v3::CheckResponse response;
-  ::envoy::service::auth::v3::CheckRequest request;
+        auto dynamic_response = Envoy::Config::VersionConverter::downgrade(
+            static_cast<const google::protobuf::Message&>(response_v3));
+        response->CopyFrom(*dynamic_response->msg_);
+      } else if (std::is_same_v<RequestType, ::envoy::service::auth::v3::CheckRequest>) {
+        status = authservice::service::Check(request, response, chains_, trigger_rules_config_, ioc, yield);
+      }
+    });
+
+    // Run the I/O context to completion, on the current thread.
+    // This consumes the current thread until all of the async
+    // I/O from the above spawn is finished.
+    ioc.run();
+
+    return status;
+  }
+
+  std::vector<std::unique_ptr<filters::FilterChain>> chains_;
+  google::protobuf::RepeatedPtrField<config::TriggerRule> trigger_rules_config_;
+};
+
+using test_types = ::testing::Types<
+  std::pair<::envoy::service::auth::v3::CheckRequest, ::envoy::service::auth::v3::CheckResponse>, 
+  std::pair<::envoy::service::auth::v2::CheckRequest, ::envoy::service::auth::v2::CheckResponse>>;
+
+TYPED_TEST_CASE(AsyncServiceImplTest, test_types);
+
+TYPED_TEST(AsyncServiceImplTest, CheckUnmatchedTenantRequest_ForAMatchingTriggerRulesPath) {
+  typename TypeParam::first_type request;
+  typename TypeParam::second_type response;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo#some-fragment"); // this is a matching path for trigger_rules
   auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   request_headers->insert({"x-tenant-identifier", "unknown-tenant"});
 
-  std::vector<std::unique_ptr<filters::FilterChain>> chains_;
-  config::Config config_;
+  config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
+  this->trigger_rules_config_ = config.trigger_rules();
 
-  config_ = *config::GetConfig("test/fixtures/valid-config.json");
-
-  for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
-    chains_.push_back(std::move(chain));
+  for (const auto &chain_config : config.chains()) {
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config.threads()));
+    this->chains_.push_back(std::move(chain));
   }
 
-  auto status = ProcessAndWaitForAsio(&request, &response, chains_, config_.trigger_rules());
+  auto status = this->check(&request, &response);
   EXPECT_TRUE(status.ok());
   EXPECT_FALSE(response.has_denied_response()); // request allowed to proceed (not redirected for auth)
 }
 
-TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRulesPath) {
-
-  ::envoy::service::auth::v3::CheckResponse response;
-  ::envoy::service::auth::v3::CheckRequest request;
+TYPED_TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForANonMatchingTriggerRulesPath) {
+  typename TypeParam::first_type request;
+  typename TypeParam::second_type response;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/version?some-query"); // this is a non-matching path for trigger_rules
   auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   request_headers->insert({"x-tenant-identifier", "tenant1"});
 
-  std::vector<std::unique_ptr<filters::FilterChain>> chains_;
-  config::Config config_;
+  config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
+  this->trigger_rules_config_ = config.trigger_rules();
 
-  config_ = *config::GetConfig("test/fixtures/valid-config.json");
-
-  for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
-    chains_.push_back(std::move(chain));
+  for (const auto &chain_config : config.chains()) {
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config.threads()));
+    this->chains_.push_back(std::move(chain));
   }
 
-  auto status = ProcessAndWaitForAsio(&request, &response, chains_, config_.trigger_rules());
+  auto status = this->check(&request, &response);
   EXPECT_TRUE(status.ok());
   EXPECT_FALSE(response.has_denied_response()); // request allowed to proceed (not redirected for auth)
 }
 
-TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPath) {
-
-  ::envoy::service::auth::v3::CheckResponse response;
-  ::envoy::service::auth::v3::CheckRequest request;
+TYPED_TEST(AsyncServiceImplTest, CheckMatchedTenantRequest_ForAMatchingTriggerRulesPath) {
+  typename TypeParam::first_type request;
+  typename TypeParam::second_type response;
 
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme("https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path("/status/foo?some-query"); // this is a matching path for trigger_rules
   auto request_headers = request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   request_headers->insert({"x-tenant-identifier", "tenant1"});
 
-  std::vector<std::unique_ptr<filters::FilterChain>> chains_;
-  config::Config config_;
+  config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
 
-  config_ = *config::GetConfig("test/fixtures/valid-config.json");
-
-  for (const auto &chain_config : config_.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config_.threads()));
-    chains_.push_back(std::move(chain));
+  for (const auto &chain_config : config.chains()) {
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(chain_config, config.threads()));
+    this->chains_.push_back(std::move(chain));
   }
 
-  auto status = ProcessAndWaitForAsio(&request, &response, chains_, config_.trigger_rules());
+  auto status = this->check(&request, &response);
 
   EXPECT_TRUE(status.ok());
   EXPECT_EQ(response.denied_response().status().code(), envoy::type::v3::Found); // redirected for auth

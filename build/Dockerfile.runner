@@ -14,4 +14,4 @@ RUN chgrp auth-server-grp /app/* && chown auth-server-usr /app/* && chmod u+x /a
 
 USER auth-server-usr
 WORKDIR /app
-ENTRYPOINT ["/app/auth_server"]
+ENTRYPOINT ["GRPC_VERBOSITY=debug", "/app/auth_server"]

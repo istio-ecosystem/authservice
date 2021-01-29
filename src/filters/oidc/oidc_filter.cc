@@ -180,7 +180,7 @@ google::rpc::Code OidcFilter::Process(
   }
 }
 
-google::rpc::Code OidcFilter::SessionErrorResponse(CheckResponse *response, const SessionError &err) {
+google::rpc::Code OidcFilter::SessionErrorResponse(envoy::service::auth::v3::CheckResponse *response, const SessionError &err) {
   response->mutable_denied_response()->mutable_status()->set_code(envoy::type::v3::Unauthorized);
   response->mutable_denied_response()->mutable_body()->append(
       "There was an error accessing your session data. Try again later.");
@@ -188,8 +188,8 @@ google::rpc::Code OidcFilter::SessionErrorResponse(CheckResponse *response, cons
 }
 
 google::rpc::Code OidcFilter::RedirectToIdp(
-    CheckResponse *response,
-    const AttributeContext_HttpRequest &httpRequest,
+    envoy::service::auth::v3::CheckResponse *response,
+    const ::envoy::service::auth::v3::AttributeContext_HttpRequest &httpRequest,
     absl::optional<std::string> old_session_id) {
   if (old_session_id.has_value()) {
     try {
@@ -240,7 +240,7 @@ google::rpc::Code OidcFilter::RedirectToIdp(
   return google::rpc::UNAUTHENTICATED;
 }
 
-std::string OidcFilter::GetRequestUrl(const AttributeContext_HttpRequest &http_request) {
+std::string OidcFilter::GetRequestUrl(const ::envoy::service::auth::v3::AttributeContext_HttpRequest &http_request) {
   auto request_without_query =
       std::string(https_scheme_) + "://" + http_request.host() + http_request.path();
 
@@ -355,14 +355,14 @@ absl::optional<std::string> OidcFilter::CookieFromHeaders(
   return absl::nullopt;
 }
 
-void OidcFilter::SetLogoutHeaders(CheckResponse *response) {
+void OidcFilter::SetLogoutHeaders(envoy::service::auth::v3::CheckResponse *response) {
   SetRedirectHeaders(idp_config_.logout().redirect_uri(), response);
   SetStandardResponseHeaders(response);
   auto responseHeaders = response->mutable_denied_response()->mutable_headers();
   DeleteCookie(responseHeaders, GetSessionIdCookieName());
 }
 
-void OidcFilter::AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse) {
+void OidcFilter::AddTokensToRequestHeaders(envoy::service::auth::v3::CheckResponse *response, TokenResponse &tokenResponse) {
   auto id_token = tokenResponse.IDToken().jwt_;
   SetIdTokenHeader(response, id_token);
   if (idp_config_.has_access_token() && tokenResponse.AccessToken().has_value()) {
@@ -393,11 +393,11 @@ bool OidcFilter::MatchesLogoutRequest(const ::envoy::service::auth::v3::CheckReq
   return idp_config_.has_logout() && RequestPath(request) == idp_config_.logout().path();
 }
 
-std::string OidcFilter::RequestPath(const CheckRequest *request) {
+std::string OidcFilter::RequestPath(const envoy::service::auth::v3::CheckRequest *request) {
   return common::http::PathQueryFragment(request->attributes().request().http().path()).Path();
 }
 
-std::string OidcFilter::RequestQueryString(const CheckRequest *request) {
+std::string OidcFilter::RequestQueryString(const envoy::service::auth::v3::CheckRequest *request) {
   return common::http::PathQueryFragment(request->attributes().request().http().path()).Query();
 }
 

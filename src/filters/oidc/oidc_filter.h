@@ -58,9 +58,9 @@ class OidcFilter final : public filters::Filter {
       absl::string_view redirect_url,
       ::envoy::service::auth::v3::CheckResponse *response);
 
-  void SetLogoutHeaders(CheckResponse *response);
+  void SetLogoutHeaders(envoy::service::auth::v3::CheckResponse *response);
 
-  google::rpc::Code SessionErrorResponse(CheckResponse *response, const SessionError &err);
+  google::rpc::Code SessionErrorResponse(envoy::service::auth::v3::CheckResponse *response, const SessionError &err);
 
   /** @brief Encode the given timeout as a cookie Max-Age directive.
    *
@@ -90,8 +90,8 @@ class OidcFilter final : public filters::Filter {
       const std::string &cookie);
 
   google::rpc::Code RedirectToIdp(
-      CheckResponse *response,
-      const AttributeContext_HttpRequest &httpRequest,
+      envoy::service::auth::v3::CheckResponse *response,
+      const ::envoy::service::auth::v3::AttributeContext_HttpRequest &httpRequest,
       absl::optional<std::string> old_session_id = absl::nullopt);
 
   /** @brief Retrieve tokens from OIDC token endpoint */
@@ -155,7 +155,7 @@ class OidcFilter final : public filters::Filter {
    * @param The http request
    * @return The requested Url from the http request as a string
    */
-  static std::string GetRequestUrl(const AttributeContext_HttpRequest &http_request);
+  static std::string GetRequestUrl(const ::envoy::service::auth::v3::AttributeContext_HttpRequest &http_request);
 
   /**
    * @brief Get the directives that should be used when setting a cookie
@@ -175,16 +175,16 @@ class OidcFilter final : public filters::Filter {
   bool MatchesLogoutRequest(const ::envoy::service::auth::v3::CheckRequest *request);
 
   /** @brief get the path from the request sans query string */
-  std::string RequestPath(const CheckRequest *request);
+  std::string RequestPath(const envoy::service::auth::v3::CheckRequest *request);
 
   /** @brief get the query string from the request sans path */
-  std::string RequestQueryString(const CheckRequest *request);
+  std::string RequestQueryString(const envoy::service::auth::v3::CheckRequest *request);
 
   bool RequiredTokensPresent(std::shared_ptr<TokenResponse> token_response);
 
   bool RequiredTokensExpired(TokenResponse &token_response);
 
-  void AddTokensToRequestHeaders(CheckResponse *response, TokenResponse &tokenResponse);
+  void AddTokensToRequestHeaders(envoy::service::auth::v3::CheckResponse *response, TokenResponse &tokenResponse);
 
  public:
 

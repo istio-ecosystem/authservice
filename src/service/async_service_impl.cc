@@ -5,23 +5,12 @@
 #include <grpcpp/server_builder.h>
 #include "src/common/http/http.h"
 #include "src/common/utilities/trigger_rules.h"
+#include <memory>
+#include "common/config/version_converter.h"
+#include "envoy/common/exception.h"
 
 namespace authservice {
 namespace service {
-
-ProcessingState::ProcessingState(std::vector<std::unique_ptr<filters::FilterChain>> &chains,
-                const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
-                Authorization::AsyncService &service,
-                grpc::ServerCompletionQueue &cq,
-                boost::asio::io_context &io_context) : chains_(chains),
-                                                      trigger_rules_config_(trigger_rules_config),
-                                                      service_(service),
-                                                      cq_(cq),
-                                                      responder_(&ctx_),
-                                                      io_context_(io_context) {
-  spdlog::trace("Creating processor state");
-  service.RequestCheck(&ctx_, &request_, &responder_, &cq_, &cq_, this);
-}
 
 ::grpc::Status Check(
     const ::envoy::service::auth::v3::CheckRequest *request,
@@ -89,21 +78,72 @@ ProcessingState::ProcessingState(std::vector<std::unique_ptr<filters::FilterChai
   return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
 }
 
+ProcessingStateV2::ProcessingStateV2(ProcessingStateFactory& parent, 
+      envoy::service::auth::v2::Authorization::AsyncService &service) 
+  : parent_(parent), service_(service), responder_(&ctx_) {
+  spdlog::warn("Creating V2 request processor state. V2 will be deprecated in 2021 Q1");
+  service_.RequestCheck(&ctx_, &request_, &responder_, &parent_.cq_, &parent_.cq_, this);
+}
+
+void ProcessingStateV2::Proceed() {
+  // Spawn a new instance to serve new clients while we process this one
+  // This will later be pulled off the queue for processing and ultimately deleted in the destructor
+  // of CompleteState
+  parent_.createV2(service_);
+
+  spdlog::trace("Launching V2 request processor worker");
+
+  boost::asio::spawn(parent_.io_context_, [this](boost::asio::yield_context yield) {
+    spdlog::trace("Processing V2 request");
+
+    envoy::service::auth::v3::CheckResponse response_v3;
+    envoy::service::auth::v3::CheckRequest request_v3;
+
+    Envoy::Config::VersionConverter::upgrade(
+      static_cast<const google::protobuf::Message&>(request_), request_v3);
+
+    authservice::service::Check(
+      &request_v3, &response_v3, parent_.chains_, parent_.trigger_rules_config_, parent_.io_context_, yield);
+
+    try {
+      auto dynamic_response = Envoy::Config::VersionConverter::downgrade(
+        static_cast<const google::protobuf::Message&>(response_v3));
+      envoy::service::auth::v2::CheckResponse response_v2;
+      dynamic_response->msg_->CopyFrom(response_v2);
+
+      this->responder_.Finish(response_v2, grpc::Status::OK, new CompleteState(this));
+    } catch (Envoy::EnvoyException&) {
+      this->responder_.Finish(envoy::service::auth::v2::CheckResponse(), 
+        grpc::Status::CANCELLED, new CompleteState(this));
+    }
+
+    spdlog::trace("Request processing complete");
+  });
+}
+
+ProcessingState::ProcessingState(ProcessingStateFactory& parent, 
+      envoy::service::auth::v3::Authorization::AsyncService &service)
+  : parent_(parent), service_(service), responder_(&ctx_) {
+  spdlog::trace("Creating V3 request processor state");
+  service_.RequestCheck(&ctx_, &request_, &responder_, &parent_.cq_, &parent_.cq_, this);
+}
+
 void ProcessingState::Proceed() {
   // Spawn a new instance to serve new clients while we process this one
   // This will later be pulled off the queue for processing and ultimately deleted in the destructor
   // of CompleteState
-  new ProcessingState(chains_, trigger_rules_config_, service_, cq_, io_context_);
+  parent_.create(service_);
 
   spdlog::trace("Launching request processor worker");
 
   // The actual processing.
   // Invokes this lambda on any available thread running the run() method of this io_context_ instance.
-  boost::asio::spawn(io_context_, [this](boost::asio::yield_context yield) {
+  boost::asio::spawn(parent_.io_context_, [this](boost::asio::yield_context yield) {
     spdlog::trace("Processing request");
 
-    CheckResponse response;
-    authservice::service::Check(&request_, &response, chains_, trigger_rules_config_, this->io_context_, yield);
+    envoy::service::auth::v3::CheckResponse response;
+    authservice::service::Check(&request_, &response, 
+      parent_.chains_, parent_.trigger_rules_config_, parent_.io_context_, yield);
 
     this->responder_.Finish(response, grpc::Status::OK, new CompleteState(this));
 
@@ -114,8 +154,22 @@ void ProcessingState::Proceed() {
 void CompleteState::Proceed() {
   spdlog::trace("Processing completion and deleting state");
 
-  delete processor_;
+  delete processor_v2_;
+  delete processor_v3_;
   delete this;
+}
+
+ProcessingStateFactory::ProcessingStateFactory(std::vector<std::unique_ptr<filters::FilterChain>> &chains,
+                  const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
+                  grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context)
+  : cq_(cq), io_context_(io_context), chains_(chains), trigger_rules_config_(trigger_rules_config) {}
+
+ProcessingStateV2* ProcessingStateFactory::createV2(envoy::service::auth::v2::Authorization::AsyncService &service) {
+  return new ProcessingStateV2(*this, service);
+}
+
+ProcessingState* ProcessingStateFactory::create(envoy::service::auth::v3::Authorization::AsyncService &service) {
+  return new ProcessingState(*this, service);
 }
 
 AsyncAuthServiceImpl::AsyncAuthServiceImpl(config::Config config)
@@ -130,8 +184,12 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(config::Config config)
   grpc::ServerBuilder builder;
   builder.AddListeningPort(config::GetConfiguredAddress(config_), grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
+  builder.RegisterService(&service_v2_);
   cq_ = builder.AddCompletionQueue();
   server_ = builder.BuildAndStart();
+
+  state_factory_ = std::make_unique<ProcessingStateFactory>(
+    chains_, config_.trigger_rules(), *cq_, *io_context_);
 }
 
 void AsyncAuthServiceImpl::Run() {
@@ -171,7 +229,8 @@ void AsyncAuthServiceImpl::Run() {
     // Spawn a new state instance to serve new clients
     // This will later be pulled off the queue for processing and ultimately deleted in the destructor
     // of CompleteState
-    new ProcessingState(chains_, config_.trigger_rules(), service_, *cq_, *io_context_);
+    state_factory_->create(service_);
+    state_factory_->createV2(service_v2_);
 
     void *tag;
     bool ok;

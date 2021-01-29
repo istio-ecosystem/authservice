@@ -297,7 +297,7 @@ TEST_F(OidcFilterTest,
 
   TokenResponse token_response(test_id_token_jwt_);
   token_response.SetAccessTokenExpiry(2906139022); //Feb 2, 2062
-  token_response.SetAccessToken(nullptr);
+  token_response.SetAccessToken("");
   session_store_->SetTokenResponse(old_session_id, std::make_shared<TokenResponse>(token_response));
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_, session_string_generator_mock_, session_store_);

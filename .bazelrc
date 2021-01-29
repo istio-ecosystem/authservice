@@ -7,5 +7,6 @@
 # The following workaround was suggested by https://github.com/grpc/grpc/issues/19645
 #
 build --copt -DGRPC_BAZEL_BUILD
-
+build --cxxopt=-std=c++17
+build --test_output=all
 try-import %workspace%/user.bazelrc

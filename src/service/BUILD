@@ -17,6 +17,8 @@ cc_library(
         "@boost//:thread",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_grpc_grpc//:grpc++",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_grpc",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_grpc",
+        "@envoy//source/common/config:version_converter_lib",
     ],
 )

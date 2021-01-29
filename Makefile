@@ -14,6 +14,7 @@ docs:
 
 compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
+	chmod a+rw run/envoy/tls.crt run/envoy/tls.pem
 	docker-compose up --build
 
 docker: build
