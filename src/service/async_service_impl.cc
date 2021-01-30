@@ -12,6 +12,30 @@
 namespace authservice {
 namespace service {
 
+::grpc::Status CheckV2(
+    const ::envoy::service::auth::v2::CheckRequest *request,
+    ::envoy::service::auth::v2::CheckResponse *response,
+                          std::vector<std::unique_ptr<filters::FilterChain>> &chains,
+            const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config,
+            boost::asio::io_context& ioc,
+            boost::asio::yield_context yield) {
+  envoy::service::auth::v3::CheckResponse response_v3;
+  envoy::service::auth::v3::CheckRequest request_v3;
+
+  Envoy::Config::VersionConverter::upgrade(
+      static_cast<const google::protobuf::Message&>(*request), request_v3);
+
+  auto status = authservice::service::Check(
+    &request_v3, &response_v3, chains, trigger_rules_config, ioc, yield);
+
+  auto dynamic_response = Envoy::Config::VersionConverter::downgrade(
+      static_cast<const google::protobuf::Message&>(response_v3));
+
+  response->CopyFrom(*dynamic_response->msg_);
+
+  return status;
+}
+
 ::grpc::Status Check(
     const ::envoy::service::auth::v3::CheckRequest *request,
     ::envoy::service::auth::v3::CheckResponse *response,
@@ -96,22 +120,11 @@ void ProcessingStateV2::Proceed() {
   boost::asio::spawn(parent_.io_context_, [this](boost::asio::yield_context yield) {
     spdlog::trace("Processing V2 request");
 
-    envoy::service::auth::v3::CheckResponse response_v3;
-    envoy::service::auth::v3::CheckRequest request_v3;
-
-    Envoy::Config::VersionConverter::upgrade(
-      static_cast<const google::protobuf::Message&>(request_), request_v3);
-
-    authservice::service::Check(
-      &request_v3, &response_v3, parent_.chains_, parent_.trigger_rules_config_, parent_.io_context_, yield);
-
     try {
-      auto dynamic_response = Envoy::Config::VersionConverter::downgrade(
-        static_cast<const google::protobuf::Message&>(response_v3));
-      envoy::service::auth::v2::CheckResponse response_v2;
-      dynamic_response->msg_->CopyFrom(response_v2);
-
-      this->responder_.Finish(response_v2, grpc::Status::OK, new CompleteState(this));
+      envoy::service::auth::v2::CheckResponse response;
+      authservice::service::CheckV2(
+        &request_, &response, parent_.chains_, parent_.trigger_rules_config_, parent_.io_context_, yield);
+      this->responder_.Finish(response, grpc::Status::OK, new CompleteState(this));
     } catch (Envoy::EnvoyException&) {
       this->responder_.Finish(envoy::service::auth::v2::CheckResponse(), 
         grpc::Status::CANCELLED, new CompleteState(this));
@@ -154,8 +167,12 @@ void ProcessingState::Proceed() {
 void CompleteState::Proceed() {
   spdlog::trace("Processing completion and deleting state");
 
-  delete processor_v2_;
-  delete processor_v3_;
+  if (!processor_v2_)
+    delete processor_v2_;
+
+  if (!processor_v3_)
+    delete processor_v3_;
+
   delete this;
 }
 

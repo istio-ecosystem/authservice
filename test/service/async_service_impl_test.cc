@@ -29,18 +29,8 @@ class AsyncServiceImplTest : public ::testing::Test {
     // Spawn a co-routine to run the filter.
     boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
       if constexpr (std::is_same_v<RequestType, ::envoy::service::auth::v2::CheckRequest>) {
-        envoy::service::auth::v3::CheckResponse response_v3;
-        envoy::service::auth::v3::CheckRequest request_v3;
-
-        Envoy::Config::VersionConverter::upgrade(
-          static_cast<const google::protobuf::Message&>(*request), request_v3);
-
-        status = authservice::service::Check(
-          &request_v3, &response_v3, chains_, trigger_rules_config_, ioc, yield);
-
-        auto dynamic_response = Envoy::Config::VersionConverter::downgrade(
-            static_cast<const google::protobuf::Message&>(response_v3));
-        response->CopyFrom(*dynamic_response->msg_);
+        status = authservice::service::CheckV2(
+          request, response, chains_, trigger_rules_config_, ioc, yield);
       } else if (std::is_same_v<RequestType, ::envoy::service::auth::v3::CheckRequest>) {
         status = authservice::service::Check(request, response, chains_, trigger_rules_config_, ioc, yield);
       }
