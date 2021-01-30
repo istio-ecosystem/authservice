@@ -28,12 +28,7 @@ class AsyncServiceImplTest : public ::testing::Test {
 
     // Spawn a co-routine to run the filter.
     boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
-      if constexpr (std::is_same_v<RequestType, ::envoy::service::auth::v2::CheckRequest>) {
-        status = authservice::service::CheckV2(
-          request, response, chains_, trigger_rules_config_, ioc, yield);
-      } else if (std::is_same_v<RequestType, ::envoy::service::auth::v3::CheckRequest>) {
-        status = authservice::service::Check(request, response, chains_, trigger_rules_config_, ioc, yield);
-      }
+      status = authservice::service::Check(*request, *response, chains_, trigger_rules_config_, ioc, yield);
     });
 
     // Run the I/O context to completion, on the current thread.
