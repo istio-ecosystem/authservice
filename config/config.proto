@@ -53,6 +53,11 @@ message FilterChain {
     // Optional.
     Match match = 2;
 
+    // Global configuration of this filter chain. It will be dismissed when OIDC config set per filter.
+    // Configuration items will be shared with all filters.
+    // Optional.
+    oidc.OIDCConfig global_config = 4;
+
     // The configuration of one of more filters in the filter chain. When the filter chain
     // matches an incoming request, then this list of filters will be applied to the request
     // in the order that they are declared.
