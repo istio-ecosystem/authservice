@@ -53,7 +53,7 @@ message FilterChain {
     // Optional.
     Match match = 2;
 
-    // Global configuration of this filter chain. It will be dismissed when OIDC config set per filter.
+    // Global configuration of this filter chain. It will be ignored when OIDC config set per filter.
     // Configuration items will be shared with all filters.
     // Optional.
     oidc.OIDCConfig global_config = 4;
