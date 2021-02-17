@@ -16,7 +16,7 @@ const std::string &FilterChainImpl::Name() const {
   return config_.name();
 }
 
-bool FilterChainImpl::Matches(const ::envoy::service::auth::v2::CheckRequest *request) const {
+bool FilterChainImpl::Matches(const ::envoy::service::auth::v3::CheckRequest *request) const {
   spdlog::trace("{}", __func__);
   if (config_.has_match()) {
     auto matched = request->attributes().request().http().headers().find(config_.match().header());

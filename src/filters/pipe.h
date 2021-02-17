@@ -24,8 +24,8 @@ class Pipe final : public Filter {
   Pipe *Remove(const std::string &filter);
 
   google::rpc::Code Process(
-          const ::envoy::service::auth::v2::CheckRequest *request,
-          ::envoy::service::auth::v2::CheckResponse *response,
+          const ::envoy::service::auth::v3::CheckRequest *request,
+          ::envoy::service::auth::v3::CheckResponse *response,
           boost::asio::io_context& ioc,
           boost::asio::yield_context yield) override;
 

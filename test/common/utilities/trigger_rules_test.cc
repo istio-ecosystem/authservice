@@ -92,7 +92,6 @@ TEST(TriggerRuleMatchesPath, TriggerWhenAnyRuleMatches_WhenThereAreMultipleRules
 TEST(MatchString, MatchString) {
   config::StringMatch match;
 
-  EXPECT_FALSE(MatchString(nullptr, match));
   EXPECT_FALSE(MatchString("", match));
 
   match.set_exact("exact");

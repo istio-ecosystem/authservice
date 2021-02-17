@@ -2,8 +2,8 @@
 # Install specific bazel version.
 # This script expect to be run with root privileges.
 set -e
-BAZEL_VERSION="0.29.1"
-BAZEL_INSTALLER_SIG="f87f0057cd7d6666e4d371267fbe27a9ed47f42e6663694a1cd755c8c6858baf"
+BAZEL_VERSION="3.7.2"
+BAZEL_INSTALLER_SIG="8416ff3900075ed588869a5b6dcc97844f56834e5a8344a2e27ec34a1eaf847e"
 
 # Required packages.
 apt-get update && apt-get upgrade -y && apt-get install -y wget pkg-config zip g++ zlib1g-dev unzip python3 git make
@@ -25,4 +25,3 @@ chmod u+x bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh
 popd
 
 bazel version
-

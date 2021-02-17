@@ -2,8 +2,8 @@
 version: '3.7'
 services:
   envoy:
-    image: "envoyproxy/envoy:v1.13.0"
-    command: ["envoy", "-c", "/etc/envoy/envoy.yaml", "-l", "trace"]
+    image: "envoyproxy/envoy:v1.17.0"
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
     ports:
       - "8443:8443"
     volumes:

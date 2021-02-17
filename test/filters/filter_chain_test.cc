@@ -14,7 +14,7 @@ TEST(FilterChainTest, Name) {
 
 TEST(FilterChainTest, MatchesWithoutMatchField) {
   auto configuration = std::unique_ptr<config::FilterChain>(new config::FilterChain);
-  ::envoy::service::auth::v2::CheckRequest request1;
+  ::envoy::service::auth::v3::CheckRequest request1;
   FilterChainImpl chain1(*configuration, 1);
   ASSERT_TRUE(chain1.Matches(&request1));
 }
@@ -25,14 +25,14 @@ TEST(FilterChainTest, MatchesPrefix) {
   configuration->mutable_match()->set_prefix("prefixed-");
 
   // invalid prefix case
-  ::envoy::service::auth::v2::CheckRequest request1;
+  ::envoy::service::auth::v3::CheckRequest request1;
   auto headers1 = request1.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   headers1->insert({"x-prefix-header", "not-prefixed-value"});
   FilterChainImpl chain1(*configuration, 1);
   ASSERT_FALSE(chain1.Matches(&request1));
 
   // valid prefix case
-  ::envoy::service::auth::v2::CheckRequest request2;
+  ::envoy::service::auth::v3::CheckRequest request2;
   auto headers2 = request2.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   headers2->insert({"x-prefix-header", "prefixed-value"});
   FilterChainImpl chain2(*configuration, 1);
@@ -45,14 +45,14 @@ TEST(FilterChainTest, MatchesEquality) {
   configuration->mutable_match()->set_equality("exact-value");
 
   // invalid header value case
-  ::envoy::service::auth::v2::CheckRequest request1;
+  ::envoy::service::auth::v3::CheckRequest request1;
   auto headers1 = request1.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   headers1->insert({"x-equality-header", "not-an-exact-value"});
   FilterChainImpl chain1(*configuration, 1);
   ASSERT_FALSE(chain1.Matches(&request1));
 
   // valid header value case
-  ::envoy::service::auth::v2::CheckRequest request2;
+  ::envoy::service::auth::v3::CheckRequest request2;
   auto headers2 = request2.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
   headers2->insert({"x-equality-header", "exact-value"});
   FilterChainImpl chain2(*configuration, 1);

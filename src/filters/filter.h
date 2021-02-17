@@ -2,12 +2,10 @@
 #define AUTHSERVICE_SRC_FILTERS_FILTER_H_
 
 #include "absl/strings/string_view.h"
-#include "envoy/service/auth/v2/external_auth.grpc.pb.h"
+#include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "google/rpc/code.pb.h"
 #include <boost/asio/spawn.hpp>
 #include <boost/asio.hpp>
-
-using namespace envoy::service::auth::v2;
 
 namespace authservice {
 namespace filters {
@@ -47,8 +45,8 @@ class Filter {
    * PERMISSION_DENIED] for indicating successful processing.
    */
   virtual google::rpc::Code Process(
-      const ::envoy::service::auth::v2::CheckRequest *request,
-      ::envoy::service::auth::v2::CheckResponse *response,
+      const ::envoy::service::auth::v3::CheckRequest *request,
+      ::envoy::service::auth::v3::CheckResponse *response,
       boost::asio::io_context &ioc,
       boost::asio::yield_context yield) = 0;
 

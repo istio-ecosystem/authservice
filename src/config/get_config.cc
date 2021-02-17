@@ -45,7 +45,7 @@ unique_ptr<Config> GetConfig(const string &configFileName) {
   unique_ptr<Config> config(new Config);
   auto status = JsonStringToMessage(buf.str(), config.get());
   if (!status.ok()) {
-    throw runtime_error(status.error_message());
+    throw runtime_error(status.error_message().ToString());
   }
 
   string error;

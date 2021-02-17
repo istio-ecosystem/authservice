@@ -10,4 +10,5 @@
 !test
 !Makefile
 !WORKSPACE
-
+!BUILD
+!.bazelrc

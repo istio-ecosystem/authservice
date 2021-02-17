@@ -25,8 +25,8 @@ Pipe *Pipe::Remove(const std::string &filter) {
 }
 
 google::rpc::Code Pipe::Process(
-        const ::envoy::service::auth::v2::CheckRequest *request,
-        ::envoy::service::auth::v2::CheckResponse *response,
+        const ::envoy::service::auth::v3::CheckRequest *request,
+        ::envoy::service::auth::v3::CheckResponse *response,
         boost::asio::io_context& ioc,
         boost::asio::yield_context yield) {
   std::unique_lock<std::mutex> lock(mtx);

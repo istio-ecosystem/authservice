@@ -1,6 +1,8 @@
+.vscode
 .idea
 .clwb
 /bazel-*
 .DS_Store
 /build_release
 /run/config/config.json
+user.bazelrc
