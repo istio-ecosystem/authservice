@@ -358,13 +358,19 @@ response_t HttpImpl::Post(absl::string_view uri,
                           absl::string_view ca_cert,
                           absl::string_view proxy_uri,
                           boost::asio::io_context &ioc,
-                          boost::asio::yield_context yield) const {
+                          boost::asio::yield_context yield,
+                          bool skip_tls) const {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
+    if (skip_tls) {
+      ctx.set_verify_mode(ssl::verify_none);
+    } else {
+      ctx.set_verify_mode(ssl::verify_peer);
+    }
+
     ctx.set_default_verify_paths();
 
     if (!ca_cert.empty()) {

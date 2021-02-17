@@ -171,4 +171,9 @@ message OIDCConfig {
     // When specified, the Authservice will use the configured Redis server to store session data.
     // Optional.
     RedisConfig redis_session_store_config = 16;
+
+    // When specified, the Authservice will not validate OIDC Identity Provider certificate.
+    // Default is false.
+    // Optional.
+    bool skip_openid_provider_tls_verify = 17;
 }
