@@ -9,6 +9,17 @@ on:
       - master
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup clang-format
+      run: |
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        tar -xvf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        PATH=$PATH:${PWD}/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/bin
+    - name: Run clang-format
+      run: make format
   build:
     runs-on: ubuntu-latest
     steps:
