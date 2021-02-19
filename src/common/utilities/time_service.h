@@ -8,7 +8,7 @@ namespace common {
 namespace utilities {
 
 class TimeService {
-public:
+ public:
   virtual int64_t GetCurrentTimeInSecondsSinceEpoch();
 };
 
@@ -16,4 +16,4 @@ public:
 }  // namespace common
 }  // namespace authservice
 
-#endif //AUTHSERVICE_TIME_SERVICE_H
+#endif  // AUTHSERVICE_TIME_SERVICE_H

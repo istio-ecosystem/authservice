@@ -9,7 +9,7 @@ namespace common {
 namespace session {
 
 class SessionStringGeneratorMock final : public SessionStringGenerator {
-public:
+ public:
   MOCK_METHOD(std::string, GenerateSessionId, ());
   MOCK_METHOD(std::string, GenerateState, ());
   MOCK_METHOD(std::string, GenerateNonce, ());

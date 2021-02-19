@@ -1,10 +1,10 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_PIPE_H_
 #define AUTHSERVICE_SRC_FILTERS_PIPE_H_
+#include <boost/asio.hpp>
+#include <boost/asio/spawn.hpp>
 #include <memory>
 #include <mutex>
 #include <vector>
-#include <boost/asio/spawn.hpp>
-#include <boost/asio.hpp>
 
 #include "src/filters/filter.h"
 
@@ -24,10 +24,9 @@ class Pipe final : public Filter {
   Pipe *Remove(const std::string &filter);
 
   google::rpc::Code Process(
-          const ::envoy::service::auth::v3::CheckRequest *request,
-          ::envoy::service::auth::v3::CheckResponse *response,
-          boost::asio::io_context& ioc,
-          boost::asio::yield_context yield) override;
+      const ::envoy::service::auth::v3::CheckRequest *request,
+      ::envoy::service::auth::v3::CheckResponse *response,
+      boost::asio::io_context &ioc, boost::asio::yield_context yield) override;
 
   // Required to inherit the 2-argument version of Process from the base class
   using filters::Filter::Process;

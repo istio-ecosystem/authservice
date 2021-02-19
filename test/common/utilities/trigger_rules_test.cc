@@ -1,4 +1,5 @@
 #include "src/common/utilities/trigger_rules.h"
+
 #include "gtest/gtest.h"
 
 namespace authservice {
@@ -70,7 +71,8 @@ TEST(TriggerRuleMatchesPath, AlwaysTriggerWhenNoRules) {
   EXPECT_TRUE(TriggerRuleMatchesPath("/test", trigger_rules_list));
 }
 
-TEST(TriggerRuleMatchesPath, TriggerWhenAnyRuleMatches_WhenThereAreMultipleRules) {
+TEST(TriggerRuleMatchesPath,
+     TriggerWhenAnyRuleMatches_WhenThereAreMultipleRules) {
   google::protobuf::RepeatedPtrField<config::TriggerRule> trigger_rules_list;
 
   // Add a rule that triggers on everything except /hello.
@@ -118,7 +120,7 @@ TEST(MatchString, MatchString) {
   EXPECT_FALSE(MatchString("1-ac-1", match));
 }
 
-} // namespace trigger_rules
+}  // namespace trigger_rules
 }  // namespace utilities
 }  // namespace common
 }  // namespace authservice
