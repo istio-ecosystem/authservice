@@ -6,3 +6,4 @@
 /build_release
 /run/config/config.json
 user.bazelrc
+compile_commands.json

@@ -1,4 +1,6 @@
 #include "filter_chain.h"
+#include "config/config.pb.h"
+#include "config/oidc/config.pb.h"
 #include "spdlog/spdlog.h"
 #include "absl/strings/match.h"
 #include "src/filters/oidc/oidc_filter.h"
@@ -11,6 +13,10 @@ namespace filters {
 
 FilterChainImpl::FilterChainImpl(config::FilterChain config, unsigned int threads) :
     threads_(threads), config_(std::move(config)), oidc_session_store_(nullptr) {}
+
+FilterChainImpl::FilterChainImpl(config::oidc::OIDCConfig default_oidc_config, config::FilterChain config, unsigned int threads) 
+  : threads_(threads), config_(std::move(config)), oidc_session_store_(nullptr), 
+    default_oidc_config_(default_oidc_config) {}
 
 const std::string &FilterChainImpl::Name() const {
   return config_.name();
@@ -39,14 +45,20 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
   int oidc_filter_count = 0;
-  for (const auto &filter : config_.filters()) {
-    if (!filter.has_oidc()) {
-      throw std::runtime_error("unsupported filter type");
+  for (auto &filter : *config_.mutable_filters()) {
+    if (filter.has_oidc()) {
+      ++oidc_filter_count;
+    } else if (filter.has_oidc_override()) {
+      if (default_oidc_config_.DebugString().empty()) {
+        throw std::runtime_error("has_oidc_override config must be used with default_oidc_config");
+      }
+      auto new_filter = default_oidc_config_;
+      dynamic_cast<google::protobuf::Message*>(&new_filter)->MergeFrom(filter.oidc_override());
+      filter.clear_oidc_override();
+      *filter.mutable_oidc() = new_filter;
+      ++oidc_filter_count;
     } else {
-      oidc_filter_count++;
-    }
-    if (oidc_filter_count > 1) {
-      throw std::runtime_error("only one filter of type \"oidc\" is allowed in a chain");
+      throw std::runtime_error("unsupported filter type");
     }
 
     auto token_request_parser =
