@@ -50,7 +50,7 @@ coverage:
 	bazel coverage $(BAZEL_FLAGS) --instrumentation_filter=//src/ //...
 
 format:
-	clang-format -i -sort-includes $(SRCS) $(HDRS)
+	clang-format -i $(SRCS) $(HDRS)
 
 clean:
 	bazel clean --expunge --async

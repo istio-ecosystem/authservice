@@ -89,10 +89,10 @@ template <class RequestType, class ResponseType>
         // status codes should be handled
         switch (status) {
           case google::rpc::Code::OK:  // The request was successful
-          case google::rpc::Code::UNAUTHENTICATED:  // A filter indicated the
-                                                    // request had no
-                                                    // authentication but was
-                                                    // processed correctly.
+          case google::rpc::Code::UNAUTHENTICATED:    // A filter indicated the
+                                                      // request had no
+                                                      // authentication but was
+                                                      // processed correctly.
           case google::rpc::Code::PERMISSION_DENIED:  // A filter indicated
             // insufficient permissions
             // for the authenticated

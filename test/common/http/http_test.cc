@@ -280,10 +280,11 @@ TEST(Http, ParseUri) {
       "port not valid in uri: https://host:a8/path");  // port not an int
   ASSERT_THROWS_STD_RUNTIME_ERROR(
       []() -> void { Uri("https://host:65536/path"); },
-      "port value must be between 0 and 65535: https://host:65536/path");  // port
-                                                                           // int
-                                                                           // too
-                                                                           // large
+      "port value must be between 0 and 65535: "
+      "https://host:65536/path");  // port
+                                   // int
+                                   // too
+                                   // large
   ASSERT_THROWS_STD_RUNTIME_ERROR(
       []() -> void { Uri("https://host:-1/path"); },
       "port value must be between 0 and 65535: https://host:-1/path");  // port

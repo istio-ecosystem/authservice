@@ -17,9 +17,11 @@ jobs:
       run: |
         wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
         tar -xvf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-        PATH=$PATH:${PWD}/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/bin
+        sudo mv ./clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format /usr/local/bin
+        rm -rf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/
+        git clone https://github.com/Sarcasm/run-clang-format.git
     - name: Run clang-format
-      run: make format
+      run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py
   build:
     runs-on: ubuntu-latest
     steps:
