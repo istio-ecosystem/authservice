@@ -1,4 +1,5 @@
 #include "pipe.h"
+
 #include "google/rpc/code.pb.h"
 #include "grpcpp/support/status.h"
 
@@ -25,10 +26,9 @@ Pipe *Pipe::Remove(const std::string &filter) {
 }
 
 google::rpc::Code Pipe::Process(
-        const ::envoy::service::auth::v3::CheckRequest *request,
-        ::envoy::service::auth::v3::CheckResponse *response,
-        boost::asio::io_context& ioc,
-        boost::asio::yield_context yield) {
+    const ::envoy::service::auth::v3::CheckRequest *request,
+    ::envoy::service::auth::v3::CheckResponse *response,
+    boost::asio::io_context &ioc, boost::asio::yield_context yield) {
   std::unique_lock<std::mutex> lock(mtx);
   for (auto &filter : filters_) {
     auto result = filter->Process(request, response, ioc, yield);
