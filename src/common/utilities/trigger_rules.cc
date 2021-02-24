@@ -1,5 +1,7 @@
-#include <regex>
 #include "trigger_rules.h"
+
+#include <regex>
+
 #include "absl/strings/match.h"
 
 namespace authservice {
@@ -57,8 +59,8 @@ static bool matchRule(absl::string_view path, const config::TriggerRule& rule) {
 
 bool TriggerRuleMatchesPath(
     absl::string_view path,
-    const google::protobuf::RepeatedPtrField<config::TriggerRule> &trigger_rules_config) {
-
+    const google::protobuf::RepeatedPtrField<config::TriggerRule>&
+        trigger_rules_config) {
   // If the path is empty which shouldn't happen for a HTTP request or if
   // there are no trigger rules at all, then simply return true as if there're
   // no per-path jwt support.
@@ -73,7 +75,7 @@ bool TriggerRuleMatchesPath(
   return false;
 }
 
-} // namespace trigger_rules
+}  // namespace trigger_rules
 }  // namespace utilities
 }  // namespace common
 }  // namespace authservice

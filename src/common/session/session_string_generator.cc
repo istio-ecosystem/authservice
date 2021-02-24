@@ -1,4 +1,5 @@
 #include "session_string_generator.h"
+
 #include "src/common/utilities/random.h"
 
 namespace authservice {
@@ -22,6 +23,6 @@ std::string SessionStringGenerator::GenerateRandomString(int size) {
   return generator.Generate(size).Str();
 }
 
-}  // namespace utilities
-}  // namespace common
 }  // namespace session
+}  // namespace common
+}  // namespace authservice

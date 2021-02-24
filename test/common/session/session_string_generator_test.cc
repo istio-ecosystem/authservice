@@ -1,4 +1,5 @@
 #include "src/common/session/session_string_generator.h"
+
 #include "gtest/gtest.h"
 
 namespace authservice {

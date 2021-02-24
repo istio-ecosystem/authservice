@@ -1,6 +1,8 @@
 #include "random.h"
+
 #include <iomanip>
 #include <sstream>
+
 #include "absl/strings/escaping.h"
 #include "openssl/crypto.h"
 #include "openssl/rand.h"

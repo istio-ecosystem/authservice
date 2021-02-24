@@ -1,5 +1,7 @@
 #include "src/common/utilities/random.h"
+
 #include <algorithm>
+
 #include "gtest/gtest.h"
 
 namespace authservice {

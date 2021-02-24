@@ -1,13 +1,15 @@
 #include "http.h"
+
 #include <boost/algorithm/string.hpp>
+#include <boost/asio/spawn.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
-#include <boost/asio/spawn.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <sstream>
-#include "absl/strings/match.h"
+
 #include "absl/strings/escaping.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
@@ -225,7 +227,8 @@ absl::optional<std::map<std::string, std::string>> Http::DecodeCookies(
   std::map<std::string, std::string> result;
   std::vector<absl::string_view> cookie_list = absl::StrSplit(cookies, "; ");
   for (auto cookie : cookie_list) {
-    std::vector<absl::string_view> cookie_parts = absl::StrSplit(cookie, absl::MaxSplits('=', 1));
+    std::vector<absl::string_view> cookie_parts =
+        absl::StrSplit(cookie, absl::MaxSplits('=', 1));
     if (cookie_parts.size() != 2) {
       // Invalid cookie encoding. Must Name=Value
       return absl::nullopt;
@@ -245,7 +248,8 @@ Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
     scheme_ = "http";
     scheme_prefix = http_prefix_;
   } else {
-    throw std::runtime_error(absl::StrCat("uri must be http or https scheme: ", uri));
+    throw std::runtime_error(
+        absl::StrCat("uri must be http or https scheme: ", uri));
   }
   if (uri.length() == scheme_prefix.length()) {
     throw std::runtime_error(absl::StrCat("no host in uri: ", uri));
@@ -253,17 +257,21 @@ Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
   auto uri_without_scheme = uri.substr(scheme_prefix.length());
 
   std::string host_and_port;
-  auto positions = {uri_without_scheme.find('/'), uri_without_scheme.find('?'), uri_without_scheme.find('#')};
-  absl::string_view::size_type end_of_host_and_port_index = uri_without_scheme.length();
+  auto positions = {uri_without_scheme.find('/'), uri_without_scheme.find('?'),
+                    uri_without_scheme.find('#')};
+  absl::string_view::size_type end_of_host_and_port_index =
+      uri_without_scheme.length();
   for (auto ptr = positions.begin(); ptr < positions.end(); ptr++) {
     if (*ptr == absl::string_view::npos) {
       continue;
     }
     end_of_host_and_port_index = std::min(end_of_host_and_port_index, *ptr);
   }
-  host_and_port = std::string(uri_without_scheme.substr(0, end_of_host_and_port_index).data(),
-                              end_of_host_and_port_index);
-  pathQueryFragmentString_ = std::string(uri_without_scheme.substr(end_of_host_and_port_index).data());
+  host_and_port = std::string(
+      uri_without_scheme.substr(0, end_of_host_and_port_index).data(),
+      end_of_host_and_port_index);
+  pathQueryFragmentString_ =
+      std::string(uri_without_scheme.substr(end_of_host_and_port_index).data());
   if (!absl::StartsWith(pathQueryFragmentString_, "/")) {
     pathQueryFragmentString_ = "/" + pathQueryFragmentString_;
   }
@@ -282,9 +290,11 @@ Uri::Uri(absl::string_view uri) : pathQueryFragment_("/") {
       throw std::runtime_error(absl::StrCat("port not valid in uri: ", uri));
     }
     if (port_ > 65535 || port_ < 0) {
-      throw std::runtime_error(absl::StrCat("port value must be between 0 and 65535: ", uri));
+      throw std::runtime_error(
+          absl::StrCat("port value must be between 0 and 65535: ", uri));
     }
-    host_ = std::string(host_and_port.substr(0, colon_position).data(), colon_position);
+    host_ = std::string(host_and_port.substr(0, colon_position).data(),
+                        colon_position);
   } else {
     host_ = host_and_port;
     if (scheme_ == "http") {
@@ -312,53 +322,61 @@ Uri::Uri(const Uri &uri)
       scheme_(uri.scheme_),
       port_(uri.port_),
       pathQueryFragmentString_(uri.pathQueryFragmentString_),
-      pathQueryFragment_(uri.pathQueryFragment_) {
-}
+      pathQueryFragment_(uri.pathQueryFragment_) {}
 
-std::string Uri::GetPath() {
-  return pathQueryFragment_.Path();
-}
+std::string Uri::GetPath() { return pathQueryFragment_.Path(); }
 
-std::string Uri::GetFragment() {
-  return pathQueryFragment_.Fragment();
-}
+std::string Uri::GetFragment() { return pathQueryFragment_.Fragment(); }
 
-std::string Uri::GetQuery() {
-  return pathQueryFragment_.Query();
-}
+std::string Uri::GetQuery() { return pathQueryFragment_.Query(); }
 
 PathQueryFragment::PathQueryFragment(absl::string_view path_query_fragment) {
-  // See https://tools.ietf.org/html/rfc3986#section-3.4 and https://tools.ietf.org/html/rfc3986#section-3.5
+  // See https://tools.ietf.org/html/rfc3986#section-3.4 and
+  // https://tools.ietf.org/html/rfc3986#section-3.5
   auto question_mark_position = path_query_fragment.find('?');
   auto hashtag_position = path_query_fragment.find("#");
-  if (question_mark_position == absl::string_view::npos && hashtag_position == absl::string_view::npos) {
+  if (question_mark_position == absl::string_view::npos &&
+      hashtag_position == absl::string_view::npos) {
     path_ = std::string(path_query_fragment.data());
   } else if (question_mark_position == absl::string_view::npos) {
-    path_ = std::string(path_query_fragment.substr(0, hashtag_position).data(), hashtag_position);
-    fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
+    path_ = std::string(path_query_fragment.substr(0, hashtag_position).data(),
+                        hashtag_position);
+    fragment_ =
+        std::string(path_query_fragment.substr(hashtag_position + 1).data());
   } else if (hashtag_position == absl::string_view::npos) {
-    path_ = std::string(path_query_fragment.substr(0, question_mark_position).data(), question_mark_position);
-    query_ = std::string(path_query_fragment.substr(question_mark_position + 1).data());
+    path_ = std::string(
+        path_query_fragment.substr(0, question_mark_position).data(),
+        question_mark_position);
+    query_ = std::string(
+        path_query_fragment.substr(question_mark_position + 1).data());
   } else {
     if (question_mark_position < hashtag_position) {
       auto query_length = hashtag_position - question_mark_position - 1;
-      path_ = std::string(path_query_fragment.substr(0, question_mark_position).data(), question_mark_position);
-      query_ = std::string(path_query_fragment.substr(question_mark_position + 1, query_length).data(), query_length);
-      fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
+      path_ = std::string(
+          path_query_fragment.substr(0, question_mark_position).data(),
+          question_mark_position);
+      query_ = std::string(
+          path_query_fragment.substr(question_mark_position + 1, query_length)
+              .data(),
+          query_length);
+      fragment_ =
+          std::string(path_query_fragment.substr(hashtag_position + 1).data());
     } else {
-      path_ = std::string(path_query_fragment.substr(0, hashtag_position).data(), hashtag_position);
-      fragment_ = std::string(path_query_fragment.substr(hashtag_position + 1).data());
+      path_ =
+          std::string(path_query_fragment.substr(0, hashtag_position).data(),
+                      hashtag_position);
+      fragment_ =
+          std::string(path_query_fragment.substr(hashtag_position + 1).data());
     }
   }
 }
 
-response_t HttpImpl::Post(absl::string_view uri,
-                          const std::map<absl::string_view, absl::string_view> &headers,
-                          absl::string_view body,
-                          absl::string_view ca_cert,
-                          absl::string_view proxy_uri,
-                          boost::asio::io_context &ioc,
-                          boost::asio::yield_context yield) const {
+response_t HttpImpl::Post(
+    absl::string_view uri,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    absl::string_view body, absl::string_view ca_cert,
+    absl::string_view proxy_uri, boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;
@@ -390,16 +408,19 @@ response_t HttpImpl::Post(absl::string_view uri,
     if (!proxy_uri.empty()) {
       auto parsed_proxy_uri = http::Uri(proxy_uri);
 
-      const auto results = resolver.async_resolve(parsed_proxy_uri.GetHost(), std::to_string(parsed_proxy_uri.GetPort()), yield);
-      spdlog::info("{}: opening connection to proxy {} for request to destination {}:{}",
-                   __func__,
-                   proxy_uri.data(),
-                   parsed_uri.GetHost(),
-                   parsed_uri.GetPort());
+      const auto results = resolver.async_resolve(
+          parsed_proxy_uri.GetHost(),
+          std::to_string(parsed_proxy_uri.GetPort()), yield);
+      spdlog::info(
+          "{}: opening connection to proxy {} for request to destination {}:{}",
+          __func__, proxy_uri.data(), parsed_uri.GetHost(),
+          parsed_uri.GetPort());
       beast::get_lowest_layer(stream).async_connect(results, yield);
 
-      std::string target = absl::StrCat(parsed_uri.GetHost(), ":", std::to_string(parsed_uri.GetPort()));
-      beast::http::request<beast::http::string_body> http_connect_req{beast::http::verb::connect, target, version};
+      std::string target = absl::StrCat(parsed_uri.GetHost(), ":",
+                                        std::to_string(parsed_uri.GetPort()));
+      beast::http::request<beast::http::string_body> http_connect_req{
+          beast::http::verb::connect, target, version};
       http_connect_req.set(beast::http::field::host, target);
 
       // Send the HTTP connect request to the remote host
@@ -409,18 +430,22 @@ response_t HttpImpl::Post(absl::string_view uri,
       boost::beast::flat_buffer http_connect_buffer;
       beast::http::response<beast::http::empty_body> http_connect_res;
       beast::http::parser<false, beast::http::empty_body> p(http_connect_res);
-      p.skip(true); // skip reading the body of the response because there won't be a body
+      p.skip(true);  // skip reading the body of the response because there
+                     // won't be a body
 
-      beast::http::async_read(stream.next_layer(), http_connect_buffer, p, yield);
+      beast::http::async_read(stream.next_layer(), http_connect_buffer, p,
+                              yield);
       if (http_connect_res.result() != beast::http::status::ok) {
         throw std::runtime_error(
-            absl::StrCat("http connect failed with status: ", http_connect_res.result_int())
-        );
+            absl::StrCat("http connect failed with status: ",
+                         http_connect_res.result_int()));
       }
 
     } else {
-      spdlog::info("{}: opening connection to {}:{}", __func__, parsed_uri.GetHost(), parsed_uri.GetPort());
-      const auto results = resolver.async_resolve(parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
+      spdlog::info("{}: opening connection to {}:{}", __func__,
+                   parsed_uri.GetHost(), parsed_uri.GetPort());
+      const auto results = resolver.async_resolve(
+          parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
       beast::get_lowest_layer(stream).async_connect(results, yield);
     }
 
@@ -446,16 +471,18 @@ response_t HttpImpl::Post(absl::string_view uri,
     beast::http::async_read(stream, buffer, *res, yield);
 
     // Gracefully close the socket.
-    // Receive an error code instead of throwing an exception if this fails, so we can ignore some
-    // expected not_connected errors.
+    // Receive an error code instead of throwing an exception if this fails, so
+    // we can ignore some expected not_connected errors.
     boost::system::error_code ec;
     stream.async_shutdown(yield[ec]);
 
     if (ec) {
       // not_connected happens sometimes so don't bother reporting it.
-      // stream_truncated also happens sometime and we choose to ignore the stream_truncated error,
-      // as recommended by the github thread: https://github.com/boostorg/beast/issues/824
-      if (ec != beast::errc::not_connected && ec != boost::asio::ssl::error::stream_truncated) {
+      // stream_truncated also happens sometime and we choose to ignore the
+      // stream_truncated error, as recommended by the github thread:
+      // https://github.com/boostorg/beast/issues/824
+      if (ec != beast::errc::not_connected &&
+          ec != boost::asio::ssl::error::stream_truncated) {
         spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
         return response_t();
       }

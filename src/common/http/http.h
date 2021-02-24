@@ -2,13 +2,14 @@
 #define AUTHSERVICE_SRC_COMMON_HTTP_HTTP_H_
 
 #include <array>
-#include <boost/beast.hpp>
 #include <boost/asio/spawn.hpp>
+#include <boost/beast.hpp>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <vector>
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -25,46 +26,37 @@ typedef std::unique_ptr<beast::http::response<beast::http::string_body>>
     response_t;
 
 class PathQueryFragment {
-private:
+ private:
   std::string path_;
   std::string query_;
   std::string fragment_;
 
-public:
+ public:
   explicit PathQueryFragment(absl::string_view path_query_fragment);
 
-  inline const std::string &Path() const {
-    return path_;
-  }
+  inline const std::string &Path() const { return path_; }
 
-  inline const std::string &Query() const {
-    return query_;
-  }
+  inline const std::string &Query() const { return query_; }
 
-  inline bool HasQuery() const {
-    return !query_.empty();
-  }
+  inline bool HasQuery() const { return !query_.empty(); }
 
-  inline const std::string &Fragment() const {
-    return fragment_;
-  }
+  inline const std::string &Fragment() const { return fragment_; }
 
-  inline bool HasFragment() const {
-    return !fragment_.empty();
-  }
+  inline bool HasFragment() const { return !fragment_.empty(); }
 };
 
 class Uri {
-private:
+ private:
   static const std::string https_prefix_;
   static const std::string http_prefix_;
   std::string host_;
   std::string scheme_;
   int32_t port_;
-  std::string pathQueryFragmentString_; // includes the path, query, and fragment (if any)
+  std::string pathQueryFragmentString_;  // includes the path, query, and
+                                         // fragment (if any)
   PathQueryFragment pathQueryFragment_;
 
-public:
+ public:
   explicit Uri(absl::string_view uri);
 
   Uri(const Uri &uri);
@@ -91,7 +83,7 @@ public:
 };
 
 class Http {
-public:
+ public:
   /**
    *
    * encode the given url for use e.g. in an http query field.
@@ -179,34 +171,31 @@ public:
    */
   virtual ~Http() = default;
 
-  /** @brief Asynchronously send a Post http message with a certificate authority.
-   * To be used inside a Boost co-routine.
+  /** @brief Asynchronously send a Post http message with a certificate
+   * authority. To be used inside a Boost co-routine.
    * @param endpoint the endpoint to call
    * @param headers the http headers
    * @param body the http request body
    * @param ca_cert the ca cert to be trusted in the http call
    * @return http response.
    */
-  virtual response_t Post(absl::string_view uri,
-                          const std::map<absl::string_view, absl::string_view> &headers,
-                          absl::string_view body,
-                          absl::string_view ca_cert,
-                          absl::string_view proxy_uri,
-                          boost::asio::io_context &ioc,
-                          boost::asio::yield_context yield) const = 0;
+  virtual response_t Post(
+      absl::string_view uri,
+      const std::map<absl::string_view, absl::string_view> &headers,
+      absl::string_view body, absl::string_view ca_cert,
+      absl::string_view proxy_uri, boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const = 0;
 };
 
 /**
  * HTTP request implementation
  */
 class HttpImpl : public Http {
-public:
+ public:
   response_t Post(absl::string_view uri,
                   const std::map<absl::string_view, absl::string_view> &headers,
-                  absl::string_view body,
-                  absl::string_view ca_cert,
-                  absl::string_view proxy_uri,
-                  boost::asio::io_context &ioc,
+                  absl::string_view body, absl::string_view ca_cert,
+                  absl::string_view proxy_uri, boost::asio::io_context &ioc,
                   boost::asio::yield_context yield) const override;
 };
 
