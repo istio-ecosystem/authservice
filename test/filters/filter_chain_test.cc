@@ -94,8 +94,7 @@ TEST(FilterChainTest, Override) {
   default_config.set_token_uri("https://istio.io/token");
   default_config.set_jwks("default_jwk");
 
-  auto configuration =
-      std::unique_ptr<config::FilterChain>(new config::FilterChain);
+  auto configuration = std::make_unique<config::FilterChain>();
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc_override()->set_jwks("some-value");
   filter_config->mutable_oidc_override()->set_proxy_uri("https://proxy.io");
