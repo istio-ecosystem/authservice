@@ -42,6 +42,17 @@ void ValidateUri(absl::string_view uri, absl::string_view uri_name,
   }
 }
 
+void validateOIDCConfig(const config::oidc::OIDCConfig &config) {
+  ValidateUri(config.authorization_uri(), "authorization_uri", "https");
+  ValidateUri(config.callback_uri(), "callback_uri", "https");
+  ValidateUri(config.token_uri(), "token_uri", "https");
+
+  const auto proxy_uri = config.proxy_uri();
+  if (!proxy_uri.empty()) {
+    ValidateUri(proxy_uri, "proxy_uri", "http");
+  }
+}
+
 unique_ptr<Config> GetConfig(const string &configFileName) {
   ifstream configFile(configFileName);
   if (!configFile) {
@@ -63,14 +74,8 @@ unique_ptr<Config> GetConfig(const string &configFileName) {
   }
 
   for (const auto &chain : config->chains()) {
-    ValidateUri(chain.filters(0).oidc().authorization_uri(),
-                "authorization_uri", "https");
-    ValidateUri(chain.filters(0).oidc().callback_uri(), "callback_uri",
-                "https");
-    ValidateUri(chain.filters(0).oidc().token_uri(), "token_uri", "https");
-    const auto proxy_uri = chain.filters(0).oidc().proxy_uri();
-    if (!proxy_uri.empty()) {
-      ValidateUri(proxy_uri, "proxy_uri", "http");
+    if (chain.filters(0).has_oidc()) {
+      validateOIDCConfig(chain.filters(0).oidc());
     }
   }
 

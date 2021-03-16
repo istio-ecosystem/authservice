@@ -172,3 +172,120 @@ message OIDCConfig {
     // Optional.
     RedisConfig redis_session_store_config = 16;
 }
+
+// This OIDC config doesn't need to be validate. It is introduced to use with `default_oidc_config` and `oidc_override`
+// LooseOIDCConfig will be merged to construct OIDC Config and validated.
+message LooseOIDCConfig {
+  // The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint).
+  string authorization_uri = 1;
+
+  // The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint).
+  // Required.
+  string token_uri = 2;
+
+  // This value will be used as the `redirect_uri` param of the authorization code grant
+  // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+  // This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider.
+  // Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to
+  // the service so that the Authservice can intercept the request and handle it
+  // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)).
+  // Required.
+  string callback_uri = 3;
+
+  // The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in
+  // the OIDC provider's
+  // [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse).
+  // Note that this JSON value must be escaped when embedded in a json configmap
+  // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)).
+  // Used during token verification.
+  // Required.
+  string jwks = 4;
+
+  // The OIDC client ID assigned to the filter to be used in the
+  // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+  // Required.
+  string client_id = 5;
+
+  // The OIDC client secret assigned to the filter to be used in the
+  // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+  // Required.
+  string client_secret = 6;
+
+  // Additional scopes passed to the OIDC Provider in the
+  // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+  // The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here.
+  // Required, but an empty array is allowed.
+  repeated string scopes = 7;
+
+  // A unique identifier of the Authservice's browser cookies. Can be any string.
+  // Needed when multiple services in the same domain are each protected by
+  // their own Authservice, in which case each service's Authservice should have
+  // a unique value to avoid cookie name conflicts. Also needed when an Authservice
+  // is configured with multiple `oidc` filters (across multiple `chains`), each
+  // sharing a Redis server for their session storage, to avoid having those
+  // `oidc` filters read/write the same sessions in Redis.
+  // Optional.
+  string cookie_name_prefix = 8;
+
+  // The configuration for adding ID Tokens as headers to requests forwarded to a service.
+  // Required.
+  TokenConfig id_token = 9;
+
+  // The configuration for adding Access Tokens as headers to requests forwarded to a service.
+  // Optional.
+  TokenConfig access_token = 10;
+
+  // When specified, the Authservice will destroy the Authservice session when a request is
+  // made to the configured path.
+  // Optional.
+  LogoutConfig logout = 11;
+
+  // The Authservice associates obtained OIDC tokens with a session ID in a session store.
+  // It also stores some temporary information during the login process into the session store,
+  // which will be removed when the user finishes the login.
+  // This configuration option sets the number of seconds since a user's session with the Authservice has started
+  // until that session should expire.
+  // When configured to `0`, which is the default value, the session will never timeout based on the time
+  // that it was started, but can still timeout due to being idle.
+  // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
+  // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
+  // Optional.
+  uint32 absolute_session_timeout = 12;
+
+  // The Authservice associates obtained OIDC tokens with a session ID in a session store.
+  // It also stores some temporary information during the login process into the session store,
+  // which will be removed when the user finishes the login.
+  // This configuration option sets the number of seconds since the most recent incoming request from that user
+  // until the user's session with the Authservice should expire.
+  // When configured to `0`, which is the default value, session expiration will not consider idle time,
+  // but can still consider timeout based on maximum absolute time since added.
+  // When both `absolute_session_timeout` and `idle_session_timeout` are zero, then sessions will never
+  // expire. These settings do not affect how quickly the OIDC tokens contained inside the user's session expire.
+  // Optional.
+  uint32 idle_session_timeout = 13;
+
+  // When specified, the Authservice will trust the specified Certificate Authority when performing HTTPS calls to
+  // the Token Endpoint of the OIDC Identity Provider.
+  // Optional.
+  string trusted_certificate_authority = 14;
+
+  // The Authservice makes two kinds of direct network connections directly to the OIDC Provider.
+  // Both are POST requests to the configured `token_uri` of the OIDC Provider.
+  // The first is to exchange the authorization code for tokens, and the other is to use the
+  // refresh token to obtain new tokens. Configure the `proxy_uri` when
+  // both of these requests should be made through a web proxy. The format of `proxy_uri` is
+  // `http://proxyserver.example.com:8080`, where `:<port_number>` is optional.
+  // Userinfo (usernames and passwords) in the `proxy_uri` setting are not yet supported.
+  // The `proxy_uri` should always start with `http://`.
+  // The Authservice will upgrade the connection to the OIDC provider to HTTPS using
+  // an HTTP CONNECT request to the proxy server. The proxy server will see the hostname and port number
+  // of the OIDC provider in plain text in the CONNECT request, but all other communication will occur
+  // over an encrypted HTTPS connection negotiated directly between the Authservice and
+  // the OIDC provider. See also the related `trusted_certificate_authority` configuration option.
+  // Optional.
+  string proxy_uri = 15;
+
+  // When specified, the Authservice will use the configured Redis server to store session data.
+  // Optional.
+  RedisConfig redis_session_store_config = 16;
+}

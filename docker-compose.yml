@@ -5,7 +5,7 @@ services:
     image: "envoyproxy/envoy:v1.17.0"
     command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
     ports:
-      - "8443:8443"
+      - "9000:9000"
     volumes:
       - ./run/envoy:/etc/envoy:ro
   auth:

@@ -89,15 +89,21 @@ TEST(FilterChainTest, New) {
 }
 
 TEST(FilterChainTest, Override) {
-  auto default_config = config::oidc::OIDCConfig();
+  auto default_config = config::oidc::LooseOIDCConfig();
   default_config.set_authorization_uri("https://istio.io/auth/default");
   default_config.set_token_uri("https://istio.io/token");
   default_config.set_jwks("default_jwk");
+  default_config.mutable_id_token()->set_header("authorization");
+  default_config.mutable_id_token()->set_preamble("Bearer");
+  default_config.set_client_id("test-istio");
+  default_config.set_client_secret("xxxxx-yyyyy-zzzzz");
 
   auto configuration = std::make_unique<config::FilterChain>();
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc_override()->set_jwks("some-value");
-  filter_config->mutable_oidc_override()->set_proxy_uri("https://proxy.io");
+  filter_config->mutable_oidc_override()->set_proxy_uri("http://proxy.io");
+  filter_config->mutable_oidc_override()->set_callback_uri(
+      "https://localhost:8080");
 
   FilterChainImpl chain(default_config, *configuration, 1);
   auto instance = chain.New();
@@ -108,7 +114,12 @@ TEST(FilterChainTest, Override) {
   oidc_filter.set_authorization_uri("https://istio.io/auth/default");
   oidc_filter.set_token_uri("https://istio.io/token");
   oidc_filter.set_jwks("some-value");
-  oidc_filter.set_proxy_uri("https://proxy.io");
+  oidc_filter.set_proxy_uri("http://proxy.io");
+  oidc_filter.set_callback_uri("https://localhost:8080");
+  oidc_filter.set_client_id("test-istio");
+  oidc_filter.set_client_secret("xxxxx-yyyyy-zzzzz");
+  oidc_filter.mutable_id_token()->set_header("authorization");
+  oidc_filter.mutable_id_token()->set_preamble("Bearer");
   *expected_filter_chain.mutable_filters()->Add()->mutable_oidc() = oidc_filter;
 
   EXPECT_EQ(expected_filter_chain.DebugString(), chain.Config().DebugString());
