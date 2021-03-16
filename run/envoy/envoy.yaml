@@ -9,19 +9,19 @@ static_resources:
       address:
         socket_address: { address: 0.0.0.0, port_value: 9000 }
       filter_chains:
-        # - transport_socket:
-        #     name: envoy.transport_sockets.tls
-        #     typed_config:
-        #       "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
-        #       common_tls_context:
-        #         tls_params:
-        #           tls_minimum_protocol_version: TLSv1_2
-        #         tls_certificates:
-        #           private_key:
-        #             filename: "/etc/envoy/tls.pem"
-        #           certificate_chain:
-        #             filename: "/etc/envoy/tls.crt"
-        #         alpn_protocols: "h2,http/1.1"
+        - transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
+              common_tls_context:
+                tls_params:
+                  tls_minimum_protocol_version: TLSv1_2
+                tls_certificates:
+                  private_key:
+                    filename: "/etc/envoy/tls.pem"
+                  certificate_chain:
+                    filename: "/etc/envoy/tls.crt"
+                alpn_protocols: "h2,http/1.1"
           filters:
             - name: envoy.http_connection_manager
               typed_config:
