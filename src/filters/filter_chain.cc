@@ -21,39 +21,6 @@ FilterChainImpl::FilterChainImpl(config::FilterChain config,
       config_(std::move(config)),
       oidc_session_store_(nullptr) {}
 
-FilterChainImpl::FilterChainImpl(
-    config::oidc::LooseOIDCConfig default_oidc_config,
-    config::FilterChain config, unsigned int threads)
-    : threads_(threads),
-      config_(std::move(config)),
-      oidc_session_store_(nullptr),
-      default_oidc_config_(default_oidc_config) {
-  for (auto &filter : *config_.mutable_filters()) {
-    if (filter.has_oidc_override()) {
-      if (default_oidc_config_.DebugString().empty()) {
-        throw std::runtime_error(
-            "has_oidc_override config must be used with default_oidc_config");
-      }
-
-      config::oidc::LooseOIDCConfig new_filter_loose = default_oidc_config_;
-      dynamic_cast<google::protobuf::Message *>(&new_filter_loose)
-          ->MergeFrom(filter.oidc_override());
-      filter.clear_oidc_override();
-      config::oidc::OIDCConfig new_filter;
-      new_filter.ParseFromString(new_filter_loose.SerializeAsString());
-
-      std::string error;
-      if (!Validate(new_filter, &error)) {
-        throw std::runtime_error(
-            absl::StrCat("Merged OIDCConfig failed to validate", error));
-      }
-      config::validateOIDCConfig(new_filter);
-
-      *filter.mutable_oidc() = new_filter;
-    }
-  }
-}
-
 const std::string &FilterChainImpl::Name() const { return config_.name(); }
 
 bool FilterChainImpl::Matches(

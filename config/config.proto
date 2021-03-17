@@ -42,7 +42,7 @@ message Filter {
         // This value will be used when `default_oidc_config` exists. 
         // It will override values of them. If that doesn't exists, 
         // this configuration will be rejected.
-        oidc.LooseOIDCConfig oidc_override = 2;
+        oidc.OIDCConfig oidc_override = 2;
     }
 }
 
@@ -115,7 +115,7 @@ message Config {
     // Global configuration of OIDC. This value will be applied to all filter definition 
     // when it defined as `oidc_override`.
     // Optional.
-    oidc.LooseOIDCConfig default_oidc_config = 10;
+    oidc.OIDCConfig default_oidc_config = 10;
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if

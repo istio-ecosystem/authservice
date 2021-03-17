@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread/thread.hpp>
 #include <memory>
+#include <stdexcept>
 
 #include "src/common/http/http.h"
 #include "src/config/get_config.h"
@@ -112,22 +113,20 @@ ProcessingState *ProcessingStateFactory::create(
   return new ProcessingState(*this, service);
 }
 
-AsyncAuthServiceImpl::AsyncAuthServiceImpl(config::Config config)
-    : config_(std::move(config)),
+AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
+    : address_and_port_(
+          fmt::format("{}:{}", config.listen_address(), config.listen_port())),
+      config_(config),
       io_context_(std::make_shared<boost::asio::io_context>()),
       interval_in_seconds_(60),
       timer_(*io_context_, interval_in_seconds_) {
   for (const auto &chain_config : config_.chains()) {
-    auto chain =
-        config_.has_default_oidc_config()
-            ? std::make_unique<filters::FilterChainImpl>(
-                  config_.default_oidc_config(), chain_config, config.threads())
-            : std::make_unique<filters::FilterChainImpl>(chain_config,
-                                                         config.threads());
+    auto chain = std::make_unique<filters::FilterChainImpl>(chain_config,
+                                                            config_.threads());
     chains_.push_back(std::move(chain));
   }
   grpc::ServerBuilder builder;
-  builder.AddListeningPort(config::GetConfiguredAddress(config_),
+  builder.AddListeningPort(address_and_port_,
                            grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
   builder.RegisterService(&service_v2_);
@@ -173,8 +172,7 @@ void AsyncAuthServiceImpl::Run() {
     });
   }
 
-  spdlog::info("{}: Server listening on {}", __func__,
-               config::GetConfiguredAddress(config_));
+  spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
   try {
     // Spawn a new state instance to serve new clients

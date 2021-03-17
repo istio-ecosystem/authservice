@@ -1,6 +1,7 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 
+#include "google/protobuf/util/json_util.h"
 #include "gtest/gtest.h"
 #include "src/config/get_config.h"
 #include "test/shared/assertions.h"
@@ -332,6 +333,208 @@ TEST_F(GetConfigTest, ValidatesTheUris_WhenThereAreMultipleChains) {
   ASSERT_THROWS_STD_RUNTIME_ERROR(
       [this] { GetConfig(tmp_filename); },
       "invalid proxy_uri: uri must be http scheme: https://proxy");
+}
+
+TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
+  const std::string target_config = R"(
+  {
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "default_oidc_config": {
+      "authorization_uri": "https://istio.io/auth/default",
+      "token_uri": "https://istio.io/token",
+      "jwks": "default_jwk",
+      "id_token": {
+        "preamble": "Bearer",
+        "header": "authorization"
+      },
+      "client_id": "test-istio",
+      "client_secret": "xxxxx-yyyyy-zzzzz"
+    },
+    "chains": [
+      {
+        "name": "test-chain",
+        "filters": [
+          {
+            "oidc_override": {
+              "jwks": "some-value",
+              "callback_uri": "https://ingress/callback",
+              "proxy_uri": "http://proxy.io"
+            }
+          },
+          {
+            "oidc_override": {
+              "jwks": "some-value-2",
+              "callback_uri": "https://ingress2/callback",
+            }
+          },
+          {
+            "oidc": {
+              "authorization_uri": "https://istio.io/auth/default",
+              "token_uri": "https://istio.io/token",
+              "callback_uri": "https://ingress3/callback",
+              "jwks": "default_jwk",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  )";
+  const std::string expected_config = R"(
+  {
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "chains": [
+      {
+        "name": "test-chain",
+        "filters": [
+          {
+            "oidc": {
+              "authorization_uri": "https://istio.io/auth/default",
+              "token_uri": "https://istio.io/token",
+              "jwks": "default_jwk",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz",
+              "jwks": "some-value",
+              "callback_uri": "https://ingress/callback",
+              "proxy_uri": "http://proxy.io"
+            }
+          },
+          {
+            "oidc": {
+              "authorization_uri": "https://istio.io/auth/default",
+              "token_uri": "https://istio.io/token",
+              "jwks": "default_jwk",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz",
+              "jwks": "some-value-2",
+              "callback_uri": "https://ingress2/callback",
+            }
+          },
+          {
+            "oidc": {
+              "authorization_uri": "https://istio.io/auth/default",
+              "token_uri": "https://istio.io/token",
+              "callback_uri": "https://ingress3/callback",
+              "jwks": "default_jwk",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  )";
+
+  write_test_file(target_config);
+  ASSERT_NO_THROW(GetConfig(tmp_filename));
+
+  config::Config expected_config_msg;
+  google::protobuf::util::JsonStringToMessage(expected_config,
+                                              &expected_config_msg);
+  auto loaded_config = GetConfig(tmp_filename);
+  EXPECT_EQ(expected_config_msg.DebugString(), loaded_config->DebugString());
+}
+
+TEST_F(GetConfigTest, OverrideOIDCConfigFailedWithInvalidUsage) {
+  const std::string target_config = R"(
+  {
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "default_oidc_config": {
+      "authorization_uri": "https://istio.io/auth/default",
+      "token_uri": "https://istio.io/token",
+      "jwks": "default_jwk",
+      "id_token": {
+        "preamble": "Bearer",
+        "header": "authorization"
+      },
+      "client_id": "test-istio",
+      "client_secret": "xxxxx-yyyyy-zzzzz"
+    },
+    "chains": [
+      {
+        "name": "test-chain",
+        "filters": [
+          {
+            "oidc": {
+              "jwks": "some-value",
+              "callback_uri": "https://myself/callback",
+              "proxy_uri": "http://proxy.io"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  )";
+
+  write_test_file(target_config);
+  EXPECT_THROW(GetConfig(tmp_filename), std::runtime_error);
+}
+
+TEST_F(GetConfigTest, OverrideOIDCConfigFailedWithMissingRequiredField) {
+  const std::string target_config = R"(
+  {
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "default_oidc_config": {
+      "authorization_uri": "https://istio.io/auth/default",
+      "jwks": "default_jwk",
+      "id_token": {
+        "preamble": "Bearer",
+        "header": "authorization"
+      },
+      "client_id": "test-istio",
+      "client_secret": "xxxxx-yyyyy-zzzzz"
+    },
+    "chains": [
+      {
+        "name": "test-chain",
+        "filters": [
+          {
+            "oidc_override": {
+              "jwks": "some-value",
+              "callback_uri": "https://myself/callback",
+              "proxy_uri": "http://proxy.io"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  )";
+
+  write_test_file(target_config);
+  EXPECT_THROW(GetConfig(tmp_filename), std::runtime_error);
 }
 
 }  // namespace config
