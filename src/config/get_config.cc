@@ -49,7 +49,7 @@ void ConfigValidator::ValidateUri(absl::string_view uri,
                                   absl::string_view required_scheme) {
   std::unique_ptr<common::http::Uri> parsed_uri;
   try {
-    parsed_uri = std::unique_ptr<common::http::Uri>(new common::http::Uri(uri));
+    parsed_uri = std::make_unique<common::http::Uri>(uri);
   } catch (std::runtime_error& e) {
     if (std::string(e.what()).find("uri must be http or https scheme") !=
         std::string::npos) {
