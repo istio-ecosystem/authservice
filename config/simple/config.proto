@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package authservice.config.simple;
+
+import "validate/validate.proto";
+
+// Simple filter config. The only thing which can be defined is whether it
+// allows or rejects any request it matches.
+message SimpleConfig {
+    // Boolean specifying whether the filter should return OK for any
+    // request it matches. Defaults to false (not OK).
+    bool allow = 1;
+}
