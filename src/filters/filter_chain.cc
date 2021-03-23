@@ -11,6 +11,7 @@
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/oidc/redis_session_store.h"
 #include "src/filters/pipe.h"
+#include "src/filters/simple/simple_filter.h"
 
 namespace authservice {
 namespace filters {
@@ -52,6 +53,9 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   for (auto &filter : *config_.mutable_filters()) {
     if (filter.has_oidc()) {
       ++oidc_filter_count;
+    } else if (filter.has_simple()) {
+      result->AddFilter(FilterPtr(new simple::SimpleFilter(filter.simple())));
+      continue;
     } else {
       throw std::runtime_error("unsupported filter type");
     }

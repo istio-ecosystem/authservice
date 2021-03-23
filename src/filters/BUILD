@@ -38,6 +38,7 @@ xx_library(
         "//src/filters:filter",
         "//src/filters:pipe",
         "//src/filters/oidc:oidc_filter",
+        "//src/filters/simple:simple_filter",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "//src/filters/oidc:redis_wrapper",
         "//src/filters/oidc:redis_session_store",
