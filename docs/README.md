@@ -23,9 +23,10 @@ A filter configuration.
 
 | Field | Description | Type |
 | ----- | ----------- | ---- |
-| type | The type of filter. Currently, the only valid type is `oidc`. Required. | oneof |
+| type | The type of filter. Currently, the only valid types are `oidc` and `simple`. Required. | oneof |
 | oidc | An OpenID Connect filter configuration. | oidc.OIDCConfig |
 | oidc_override | This value will be used when `default_oidc_config` exists. It will override values of them. If that doesn't exists, this configuration will be rejected. | oidc.OIDCConfig |
+| simple | Simple filter configuration for testing and letting AuthService run even if no OIDC providers are configured. | simple.SimpleConfig |
 
 
 
@@ -97,6 +98,16 @@ When specified, the Authservice will use the configured Redis server to store se
 | Field | Description | Type |
 | ----- | ----------- | ---- |
 | server_uri | The Redis server uri, e.g. "tcp://127.0.0.1:6379" | string |
+
+
+
+##### message `SimpleConfig` (config/simple/config.proto)
+
+Simple filter config. The only thing which can be defined is whether it allows or rejects any request it matches.
+
+| Field | Description | Type |
+| ----- | ----------- | ---- |
+| allow | Boolean specifying whether the filter should return OK for any request it matches. Defaults to false (not OK). | bool |
 
 
 
