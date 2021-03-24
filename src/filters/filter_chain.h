@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "config/config.pb.h"
+#include "config/oidc/config.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/filters/filter.h"
 #include "src/filters/oidc/session_store.h"
@@ -52,12 +53,9 @@ class FilterChainImpl : public FilterChain {
   unsigned int threads_;
   config::FilterChain config_;
   std::shared_ptr<oidc::SessionStore> oidc_session_store_;
-  config::oidc::OIDCConfig default_oidc_config_;
 
  public:
   explicit FilterChainImpl(config::FilterChain config, unsigned int threads);
-  explicit FilterChainImpl(config::oidc::OIDCConfig default_oidc_config,
-                           config::FilterChain config, unsigned int threads);
 
   const std::string &Name() const override;
 
@@ -67,8 +65,6 @@ class FilterChainImpl : public FilterChain {
   std::unique_ptr<Filter> New() override;
 
   virtual void DoPeriodicCleanup() override;
-
-  const config::FilterChain &Config() const & { return config_; }
 };
 
 }  // namespace filters

@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 
   try {
     auto config = GetConfig(absl::GetFlag(FLAGS_filter_config));
-    console->set_level(GetConfiguredLogLevel(*config));
+    console->set_level(authservice::config::GetConfiguredLogLevel(*config));
     RunServer(*config);
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());

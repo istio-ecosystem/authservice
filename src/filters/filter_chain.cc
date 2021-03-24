@@ -1,9 +1,12 @@
 #include "filter_chain.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "config/config.pb.h"
 #include "config/oidc/config.pb.h"
+#include "config/oidc/config.pb.validate.h"
 #include "spdlog/spdlog.h"
+#include "src/config/get_config.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/oidc/redis_session_store.h"
@@ -17,14 +20,6 @@ FilterChainImpl::FilterChainImpl(config::FilterChain config,
     : threads_(threads),
       config_(std::move(config)),
       oidc_session_store_(nullptr) {}
-
-FilterChainImpl::FilterChainImpl(config::oidc::OIDCConfig default_oidc_config,
-                                 config::FilterChain config,
-                                 unsigned int threads)
-    : threads_(threads),
-      config_(std::move(config)),
-      oidc_session_store_(nullptr),
-      default_oidc_config_(default_oidc_config) {}
 
 const std::string &FilterChainImpl::Name() const { return config_.name(); }
 
@@ -56,17 +51,6 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   int oidc_filter_count = 0;
   for (auto &filter : *config_.mutable_filters()) {
     if (filter.has_oidc()) {
-      ++oidc_filter_count;
-    } else if (filter.has_oidc_override()) {
-      if (default_oidc_config_.DebugString().empty()) {
-        throw std::runtime_error(
-            "has_oidc_override config must be used with default_oidc_config");
-      }
-      auto new_filter = default_oidc_config_;
-      dynamic_cast<google::protobuf::Message *>(&new_filter)
-          ->MergeFrom(filter.oidc_override());
-      filter.clear_oidc_override();
-      *filter.mutable_oidc() = new_filter;
       ++oidc_filter_count;
     } else {
       throw std::runtime_error("unsupported filter type");

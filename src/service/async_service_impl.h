@@ -215,11 +215,12 @@ class ProcessingStateFactory {
 
 class AsyncAuthServiceImpl {
  public:
-  explicit AsyncAuthServiceImpl(config::Config config);
+  explicit AsyncAuthServiceImpl(const config::Config &config);
 
   void Run();
 
  private:
+  std::string address_and_port_;
   config::Config config_;
 
   std::vector<std::unique_ptr<filters::FilterChain>> chains_;

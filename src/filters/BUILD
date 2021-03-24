@@ -34,6 +34,7 @@ xx_library(
     ],
     deps = [
         "//config:config_cc",
+        "//src/config",
         "//src/filters:filter",
         "//src/filters:pipe",
         "//src/filters/oidc:oidc_filter",
