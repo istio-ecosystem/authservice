@@ -10,9 +10,10 @@ namespace filters {
 namespace simple {
 
 class SimpleFilter final : public filters::Filter {
-private:
+ private:
   enum google::rpc::Code return_value_;
-public:
+
+ public:
   SimpleFilter(const config::simple::SimpleConfig &simple_config);
 
   google::rpc::Code Process(
@@ -22,7 +23,7 @@ public:
 
   absl::string_view Name() const override;
 };
-}
-}
-}
+}  // namespace simple
+}  // namespace filters
+}  // namespace authservice
 #endif
