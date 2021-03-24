@@ -88,9 +88,8 @@ TEST(FilterChainTest, New) {
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 
-TEST(FilterChainTest, Simple) {
-  auto configuration =
-      std::unique_ptr<config::FilterChain>(new config::FilterChain);
+TEST(FilterChainTest, MockFilter) {
+  auto configuration = std::make_unique<config::FilterChain>();
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_mock()->set_allow(true);
 

@@ -54,7 +54,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     if (filter.has_oidc()) {
       ++oidc_filter_count;
     } else if (filter.has_mock()) {
-      result->AddFilter(FilterPtr(new mock::MockFilter(filter.mock())));
+      result->AddFilter(std::make_unique<mock::MockFilter>(filter.mock()));
       continue;
     } else {
       throw std::runtime_error("unsupported filter type");
