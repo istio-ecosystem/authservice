@@ -6,7 +6,7 @@ pgv_cc_proto_library(
     linkstatic = True,
     visibility = ["//visibility:public"],
     deps = [
-        "//config/simple:config_proto",
+        "//config/mock:config_proto",
     ],
 )
 

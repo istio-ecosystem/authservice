@@ -1,20 +1,20 @@
 
-#ifndef AUTHSERVICE_SRC_FILTERS_SIMPLE_SIMPLE_FILTER_H_
-#define AUTHSERVICE_SRC_FILTERS_SIMPLE_SIMPLE_FILTER_H_
-#include "config/simple/config.pb.h"
+#ifndef AUTHSERVICE_SRC_FILTERS_MOCK_MOCK_FILTER_H_
+#define AUTHSERVICE_SRC_FILTERS_MOCK_MOCK_FILTER_H_
+#include "config/mock/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/filters/filter.h"
 
 namespace authservice {
 namespace filters {
-namespace simple {
+namespace mock {
 
-class SimpleFilter final : public filters::Filter {
+class MockFilter final : public filters::Filter {
  private:
   enum google::rpc::Code return_value_;
 
  public:
-  SimpleFilter(const config::simple::SimpleConfig &simple_config);
+  MockFilter(const config::mock::MockConfig &mock_config);
 
   google::rpc::Code Process(
       const ::envoy::service::auth::v3::CheckRequest *request,
@@ -23,7 +23,7 @@ class SimpleFilter final : public filters::Filter {
 
   absl::string_view Name() const override;
 };
-}  // namespace simple
+}  // namespace mock
 }  // namespace filters
 }  // namespace authservice
 #endif

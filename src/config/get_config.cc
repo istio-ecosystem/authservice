@@ -26,7 +26,7 @@ void ConfigValidator::ValidateAll(const Config& config) {
 
   for (const auto& chain : config.chains()) {
     for (const auto& filter : chain.filters()) {
-      assert(filter.has_oidc() || filter.has_simple());
+      assert(filter.has_oidc() || filter.has_mock());
       if (filter.has_oidc()) {
         ConfigValidator::ValidateOIDCConfig(filter.oidc());
       }

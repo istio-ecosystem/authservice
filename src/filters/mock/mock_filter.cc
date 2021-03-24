@@ -1,16 +1,16 @@
-#include "simple_filter.h"
+#include "mock_filter.h"
 
 #include "spdlog/spdlog.h"
 
 namespace authservice {
 namespace filters {
-namespace simple {
-SimpleFilter::SimpleFilter(const config::simple::SimpleConfig &simple_config) {
+namespace mock {
+MockFilter::MockFilter(const config::mock::MockConfig &mock_config) {
   return_value_ =
-      simple_config.allow() ? google::rpc::OK : google::rpc::PERMISSION_DENIED;
+      mock_config.allow() ? google::rpc::OK : google::rpc::PERMISSION_DENIED;
 }
 
-enum google::rpc::Code SimpleFilter::Process(
+enum google::rpc::Code MockFilter::Process(
     const ::envoy::service::auth::v3::CheckRequest *,
     ::envoy::service::auth::v3::CheckResponse *, boost::asio::io_context &,
     boost::asio::yield_context) {
@@ -19,8 +19,8 @@ enum google::rpc::Code SimpleFilter::Process(
   return return_value_;
 }
 
-absl::string_view SimpleFilter::Name() const { return "simple"; }
+absl::string_view MockFilter::Name() const { return "mock"; }
 
-}  // namespace simple
+}  // namespace mock
 }  // namespace filters
 }  // namespace authservice

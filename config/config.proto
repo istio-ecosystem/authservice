@@ -3,7 +3,7 @@ syntax = "proto3";
 package authservice.config;
 
 import "config/oidc/config.proto";
-import "config/simple/config.proto";
+import "config/mock/config.proto";
 import "validate/validate.proto";
 
 // Specifies how a request can be matched to a filter chain.
@@ -33,7 +33,7 @@ message Match {
 message Filter {
 
     // The type of filter. Currently, the only valid types are `oidc`
-    // and `simple`. Required.
+    // and `mock`. Required.
     oneof type {
         option (validate.required) = true;
 
@@ -45,9 +45,9 @@ message Filter {
         // this configuration will be rejected.
         oidc.OIDCConfig oidc_override = 2;
 
-        // Simple filter configuration for testing and letting
+        // Mock filter configuration for testing and letting
         // AuthService run even if no OIDC providers are configured.
-        simple.SimpleConfig simple = 3;
+        mock.MockConfig mock = 3;
     }
 }
 

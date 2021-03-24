@@ -92,7 +92,7 @@ TEST(FilterChainTest, Simple) {
   auto configuration =
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
-  filter_config->mutable_simple()->set_allow(true);
+  filter_config->mutable_mock()->set_allow(true);
 
   FilterChainImpl chain(*configuration, 1);
   auto instance = chain.New();
