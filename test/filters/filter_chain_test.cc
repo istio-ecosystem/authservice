@@ -88,5 +88,15 @@ TEST(FilterChainTest, New) {
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 
+TEST(FilterChainTest, MockFilter) {
+  auto configuration = std::make_unique<config::FilterChain>();
+  auto filter_config = configuration->mutable_filters()->Add();
+  filter_config->mutable_mock()->set_allow(true);
+
+  FilterChainImpl chain(*configuration, 1);
+  auto instance = chain.New();
+  ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+}
+
 }  // namespace filters
 }  // namespace authservice

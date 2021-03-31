@@ -7,6 +7,7 @@
 #include "config/oidc/config.pb.validate.h"
 #include "spdlog/spdlog.h"
 #include "src/config/get_config.h"
+#include "src/filters/mock/mock_filter.h"
 #include "src/filters/oidc/in_memory_session_store.h"
 #include "src/filters/oidc/oidc_filter.h"
 #include "src/filters/oidc/redis_session_store.h"
@@ -52,6 +53,9 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   for (auto &filter : *config_.mutable_filters()) {
     if (filter.has_oidc()) {
       ++oidc_filter_count;
+    } else if (filter.has_mock()) {
+      result->AddFilter(std::make_unique<mock::MockFilter>(filter.mock()));
+      continue;
     } else {
       throw std::runtime_error("unsupported filter type");
     }
