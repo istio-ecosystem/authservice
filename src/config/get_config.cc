@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "config/config.pb.validate.h"
+#include "envoy/http/header_map.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/http.h"
 
@@ -140,6 +141,15 @@ unique_ptr<Config> GetConfig(const string& configFileName) {
   }
 
   ConfigValidator::ValidateAll(*config);
+
+  // Check case-intensive properties
+  for (auto& filter_chain : *config->mutable_chains()) {
+    for (auto& filter : *filter_chain.mutable_filters()) {
+      const auto lower_header =
+          Envoy::Http::LowerCaseString(filter.oidc().id_token().header());
+      filter.mutable_oidc()->mutable_id_token()->set_header(lower_header.get());
+    }
+  }
 
   return config;
 }

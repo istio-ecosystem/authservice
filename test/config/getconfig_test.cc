@@ -378,7 +378,7 @@ TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
               "jwks": "default_jwk",
               "id_token": {
                 "preamble": "Bearer",
-                "header": "authorization"
+                "header": "Authorization"
               },
               "client_id": "test-istio",
               "client_secret": "xxxxx-yyyyy-zzzzz"
