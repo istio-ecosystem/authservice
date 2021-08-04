@@ -2,21 +2,32 @@
 # A simple example of enabling authentication for some services.
 # See docs: https://istio.io/docs/tasks/security/authentication/authn-policy/#end-user-authentication
 #
-
 ---
-apiVersion: "authentication.istio.io/v1alpha1"
-kind: "Policy"
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
 metadata:
-  name: "bookinfo-authn-policy"
+  name: "bookinfo-request-authn"
   namespace: default
 spec:
-  targets:
-    # Enable authentication for the following services.
-    # Note: `request.auth` only appears on the ServiceRoleBinding's or AuthorizationPolicy's for the following services
-    - name: productpage
-    - name: reviews
-  origins:
-    - jwt:
-        issuer: https://demo.example.replace.me.com/oauth/token
-        jwksUri: https://demo.example.replace.me.com/token_keys
-  principalBinding: USE_ORIGIN
+  selector:
+    matchLabels:
+      app: productpage
+      app: reviews
+  jwtRules:
+    - issuer: https://demo.example.replace.me.com/oauth/token
+      jwksUri: https://demo.example.replace.me.com/token_keys
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: "bookinfo-authz-policy"
+spec:
+  selector:
+    matchLabels:
+      app: productpage
+      app: reviews
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            requestPrincipals: ["*"]
