@@ -19,7 +19,7 @@ compose:
 	docker-compose up --build
 
 docker: build
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build . -f build/Dockerfile.runner -t $(IMAGE) && docker push $(IMAGE)
+	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build . -f build/Dockerfile.runner -t $(IMAGE)
 
 docker-from-scratch:
 	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
