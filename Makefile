@@ -4,6 +4,7 @@ SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
 TARGET:=//src/main:auth_server
 BAZEL_FLAGS:= --verbose_failures
+IMAGE?=authservice:$(USER)
 
 all: build test docs
 
@@ -18,7 +19,7 @@ compose:
 	docker-compose up --build
 
 docker: build
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.runner -t authservice:$(USER) .
+	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build . -f build/Dockerfile.runner -t $(IMAGE) && docker push $(IMAGE)
 
 docker-from-scratch:
 	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
