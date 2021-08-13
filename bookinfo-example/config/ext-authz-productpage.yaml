@@ -1,0 +1,34 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: ext-authz
+spec:
+  selector:
+    matchLabels:
+      app: productpage
+  action: CUSTOM
+  provider:
+    # The provider name must match the extension provider defined in the mesh config.
+    # You can also replace this with sample-ext-authz-http to test the other external authorizer definition.
+    name: sample-ext-authz-grpc
+  rules:
+  - to:
+    - operation:
+        notPaths: ["/public"] # enable all except /public paths.
+---
+# Istio requires the external authz provider to be available in the service registry.
+# See https://github.com/istio/istio/issues/34622.
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: authz-svc
+spec:
+  hosts:
+  - ext.authz.local # not used
+  ports:
+  - number: 10003
+    name: grpc-ext
+    protocol: grpc
+  resolution: STATIC
+  endpoints:
+  - address: 127.0.0.1
