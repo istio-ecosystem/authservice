@@ -25,7 +25,7 @@ spec:
           filter:
             name: "envoy.http_connection_manager"
             subFilter:
-              name: "envoy.filters.http.router" # simplify to not require add jwt policy for now.
+              name: "envoy.filters.http.jwt_authn"
     patch:
       operation: INSERT_BEFORE
       value:
