@@ -4,41 +4,83 @@ This doc shows how to integrate Authservice into an Istio system deployed on Kub
 
 This demo uses the [Istio Bookinfo sample application](https://istio.io/docs/examples/bookinfo/).
 
-This demo takes advantage of an Istio feature set that gives the ability to inject http filters on 
-Sidecars. This feature set was released in Istio 1.3.0.
+This demo takes relies on Istio [external authorization provider](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/), released since 1.9.
 
-Things needed before starting:
-
-- A Kubernetes cluster that is compatible with Istio 1.3 or newer
-- An OIDC provider configured to support Authorization Code grant type. The urls and credentials for this 
-provider will be needed to configure Authservice.
- 
 ### Pre-requisites:
 
-1. Download Istio 1.9 or greater. For example:
+1. Prepare your OIDC provider configuration. In our example, we use Google as identity provider.
+Follow [instructions](https://developers.google.com/identity/protocols/oauth2/openid-connect) to
+create one.
 
-   [`scripts/download-istio-1.4.sh`](scripts/download-istio-1.4.sh)
+   ```shell
+   export OIDC_CLIENT_ID="<your-client-id>"
+   export OIDC_CLIENT_SECRET="<your-client-secret>"
+   ```
 
-1. Install Istio and enable sidecar injection for the namespace where services will be deployed. For example, 
-   one could install the Istio demo like this:
+1. Install Istio for 1.9 or later.
 
-   [`scripts/install-istio.sh`](scripts/install-istio.sh)
-    
-1. If certs signed by a known CA cannot be obtained, generate self signed certs for the ingress gateway. For example:
+   ```shell
+   istioctl install -y
+   kubectl label namespace default istio-injection=enabled --overwrite
+   ```
 
-   [`scripts/generate-self-signed-certs-for-ingress-gateway.sh`](scripts/generate-self-signed-certs-for-ingress-gateway.sh)
+1. In our example, we use a self signed certificate at localhost for easy setup.
+This is used to terminate HTTPS at the ingress gateway since OIDC requires client callback
+URI to be hosted on a protected endpoint.
 
-1. Configure the Istio mesh config with an [external authorization provider](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/) as `sample-ext-authz-grpc`.
+   ```shell
+   bash ./scripts/generate-self-signed-certs-for-ingress-gateway.sh
+   ```
 
+1. Configure the Istio mesh config with an [external authorization provider](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/).
+
+   ```shell
+   kubectl edit cm -n istio-system
+   ```
+   
    ```yaml
    data:
    mesh: |-
       extensionProviders:
-      - name: "sample-ext-authz-grpc"
+      - name: "authservice-grpc"
          envoyExtAuthzGrpc:
-         service: ext.authz.local
+         service: authservice.default.svc.cluster.local
          port: "10003"
    ```
+
+1. Install authservice via Helm.
+
+
+   ```shell
+   helm template authservice \
+      --set oidc.clientID=${OIDC_CLIENT_ID} \
+      --set oidc.clientSecret=${OIDC_CLIENT_SECRET} \
+      | kubectl apply -f -
+   ```
+
+1. Access product page via port-forwarding at local host.
+
+   ```shell
+   kubectl port-forward service/istio-ingressgateway 8443:443 -n istio-system
+   ```
+
+   At your browser visit the page at https://localhost:8443/productpage.
+
+### Further Protect via RequestAuthentication and Authorization Policy
+
+Istio native RequestAuthentication and Authorization policy can be used configure which end user
+can access specific apps, at specific paths. For example, you can apply the sample configuration
+to only allow authenticated request to access productpage service.
+
+```shell
+kubectl apply -f ./config/idtoken-authn-authz.yaml
+```
+
+## Configure OIDC at Ingress Gateway
+
+TODO(incfly): write it up with sample config and setup.
+
+## :warning: The REST documnetation needs updates.
 
 ## Deploy Bookinfo Using the Authservice for Token Acquisition (Sidecar integration)
 

@@ -1,0 +1,11 @@
+image:
+  repository: gcr.io/jianfeih-images-pub/authservice/authservice:0.4.1
+
+oidc:
+  idpURL: https://account.google.com
+  authorizationURI: "https://accounts.google.com/o/oauth2/v2/auth"
+  tokenURI: "https://oauth2.googleapis.com/token"
+  clientID: your-client-id
+  clientSecret: your-client-secret
+  jwks: "json-string-to-bep-pasted-here"
+

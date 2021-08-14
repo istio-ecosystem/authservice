@@ -66,11 +66,11 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     }
 
     auto jwks_keys = google::jwt_verify::Jwks::createFrom(
-            filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
+        filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
     spdlog::debug("status for jwks parsing: {}, {}", __func__,
-      google::jwt_verify::getStatusString(jwks_keys->getStatus()));
-    auto token_request_parser = std::make_shared<oidc::TokenResponseParserImpl>(
-        std::move(jwks_keys));
+                  google::jwt_verify::getStatusString(jwks_keys->getStatus()));
+    auto token_request_parser =
+        std::make_shared<oidc::TokenResponseParserImpl>(std::move(jwks_keys));
     auto session_string_generator =
         std::make_shared<common::session::SessionStringGenerator>();
 

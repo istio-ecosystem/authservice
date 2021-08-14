@@ -1,0 +1,48 @@
+#
+# A ConfigMap which contains the configuration of the authservice.
+# In bookinfo-with-authservice-template.yaml the authservice container is created
+# with this ConfigMap volume mounted inside the container at /etc/authservice, which
+# is the location where the authservice expects the file to exist.
+#
+
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: authservice
+data:
+  config.json: |
+    {
+      "listen_address": "127.0.0.1",
+      "listen_port": "10003",
+      "log_level": "trace",
+      "threads": 8,
+      "chains": [
+        {
+          "name": "idp_filter_chain",
+          "filters": [
+          {
+            "oidc":
+              {
+                "authorization_uri": "{{ .Values.oidc.authorizationURI }}",
+                "token_uri": "{{ .Values.oidc.tokenURI }} ",
+                "callback_uri": "https://localhost:8443/productpage/oauth/callback",
+                "jwks": "{   \"keys\": [     {       \"use\": \"sig\",       \"alg\": \"RS256\",       \"n\": \"7qnlkR2Ysvik__jqELu5__2Ib4_Pix6NEmEYKY80NyIGBhUQ0QDtijFypOk3cN3aRgb1f3741vQu7PQGMr79J8jM4-sA1A6UQNmfjl-thB5JpdfQrS1n3EpsrPMUvf5w-uBMQnxmiM3hrHgjA107-UxLF_xBG8Vp_EXmZI7y6IfUwTHrNotSpLLBSNH77C8ncFcm9ADsdl-Bav2CjOaef6CpGISCscx2T4LZS6DIafU1M_xYcx3aLET9TojymjZJi2hfZDyF9x_qssrlnxqfgrI71warY8HiXsiZzOTNB6s81Fu9AaxV7YckfLHyvXwOX8lQN53c2IiAuk-T7nf69w\",       \"e\": \"AQAB\",       \"kty\": \"RSA\",       \"kid\": \"0fcc014f22934e47480daf107a340c22bd262b6c\"     },     {       \"alg\": \"RS256\",       \"e\": \"AQAB\",       \"kid\": \"462949174f1eedf4f9f9434877be483b324140f5\",       \"kty\": \"RSA\",       \"n\": \"2BHFUUq8NqZ3pxxi_RJcSIMG5nJoZQ8Nbvf-lW5o7hJ9CmLA4SeUmDL2IVK6CSuskTPj_ohAp_gtOg3PCJvn33grPoJQu38MoMB8kDqA4U-u3A86GGEjWtk6LPo7dEkojZNQkzhZCnEMTuRMtBZXsLWNGJpY3UADA3rxnHnBP1wrSt27iXIE0C6-1N5z00R13r3L0aWC0MuAUgjI2H4dGMr8B3niJ-NjOVPCwG7xSWsCwsSitAuhPGHaDtenB23ZsFJjbuTuiguoSJ9A1qo9kzBOg32xda4derbWasu7Tk8p53PFxXDJGR_h7dM-nsJHl7lAUDqL8zOrf9XXlPTjwQ\",       \"use\": \"sig\"     }   ] }",
+                "client_id": "{{ .Values.oidc.clientID }}",
+                "client_secret": "{{ .Values.oidc.clientSecret }}",
+                "scopes": [],
+                "cookie_name_prefix": "productpage",
+                "id_token": {
+                  "preamble": "Bearer",
+                  "header": "Authorization"
+                },
+                "logout": {
+                  "path": "/authservice_logout",
+                  "redirect_uri": "https://localhost:8443/some/logout/path"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }

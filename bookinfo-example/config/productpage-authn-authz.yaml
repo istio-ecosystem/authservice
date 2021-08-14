@@ -1,7 +1,7 @@
 apiVersion: security.istio.io/v1beta1
 kind: RequestAuthentication
 metadata:
-  name: google-idtoken
+  name: productpage-auth
 spec:
   selector:
     matchLabels:
@@ -14,7 +14,7 @@ spec:
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: google-idtoken
+  name: productpage-auth
 spec:
   selector:
     matchLabels:
