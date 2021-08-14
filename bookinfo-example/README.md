@@ -17,7 +17,7 @@ create one.
    export OIDC_CLIENT_SECRET="<your-client-secret>"
    ```
 
-1. Install Istio for 1.9 or later.
+1. Install Istio 1.9 or later.
 
    ```shell
    istioctl install -y
@@ -38,6 +38,8 @@ URI to be hosted on a protected endpoint.
    kubectl edit cm -n istio-system
    ```
    
+   Change the mesh config with the config below.
+
    ```yaml
    data:
    mesh: |-
@@ -49,7 +51,6 @@ URI to be hosted on a protected endpoint.
    ```
 
 1. Install authservice via Helm.
-
 
    ```shell
    helm template authservice \
@@ -73,10 +74,10 @@ can access specific apps, at specific paths. For example, you can apply the samp
 to only allow authenticated request to access productpage service.
 
 ```shell
-kubectl apply -f ./config/idtoken-authn-authz.yaml
+kubectl apply -f ./config/productpage-authn-authz.yaml
 ```
 
-## Configure OIDC at Ingress Gateway
+## Configure OIDC flow at Ingress Gateway
 
 TODO(incfly): write it up with sample config and setup.
 

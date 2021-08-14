@@ -22,8 +22,7 @@ spec:
             name: authservice
       containers:
       - name: authservice # authservice needs to be deployed in the sample Pod as the productpage
-        # TODO(incfly): change to a proper project wide container registry.
-        image: gcr.io/jianfeih-images-pub/authservice/authservice:0.4.1 # Manually docker pull the latest authservice image from https://github.com/istio-ecosystem/authservice/packages and push it to your own image registry (e.g. Docker Hub), and use it here. (The Github Package Registry does not work with k8s yet until this issue is fixed and released: https://github.com/kubernetes-sigs/kind/issues/870)
+        image: {{ .Values.authservice.image }}
         imagePullPolicy: Always
         ports:
           - containerPort: 10003
