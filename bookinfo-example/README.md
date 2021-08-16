@@ -46,8 +46,8 @@ URI to be hosted on a protected endpoint.
       extensionProviders:
       - name: "authservice-grpc"
          envoyExtAuthzGrpc:
-         service: authservice.default.svc.cluster.local
-         port: "10003"
+           service: authservice.default.svc.cluster.local
+           port: "10003"
    ```
 
 1. Install authservice via Helm.
