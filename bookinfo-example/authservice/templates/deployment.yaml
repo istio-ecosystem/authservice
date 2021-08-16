@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authservice
+  # TODO(incfly): change to istio-system when the config map is also updated to that namespace.
+  # namespace: istio-system
+  labels:
+    app: authservice
+spec:
+  replicas: 1 # you can scale up productpage as long as session affinity is enabled via a DestinationRule (see ./config/bookinfo-gateway.yaml)
+  selector:
+    matchLabels:
+      app: authservice
+  template:
+    metadata:
+      labels:
+        app: authservice
+    spec:
+      volumes:
+        - name: authservice-config # declare the volume containing the authservice ConfigMap
+          configMap:
+            name: authservice
+      containers:
+      - name: authservice # authservice needs to be deployed in the sample Pod as the productpage
+        image: {{ .Values.authservice.image }}
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 10003
+        volumeMounts:
+          - name: authservice-config # mount the volume containing the authservice ConfigMap
+            mountPath: /etc/authservice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authservice
+  # namespace: istio-system
+  labels:
+    app: authservice
+spec:
+  ports:
+  - port: 10003
+    name: grpc
+  selector:
+    app: authservice

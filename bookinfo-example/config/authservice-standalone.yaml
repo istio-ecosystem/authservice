@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authservice
+  # TODO(incfly): change to istio-system when the config map is also updated to that namespace.
+  # namespace: istio-system
+  labels:
+    app: authservice
+spec:
+  replicas: 1 # you can scale up productpage as long as session affinity is enabled via a DestinationRule (see ./config/bookinfo-gateway.yaml)
+  selector:
+    matchLabels:
+      app: authservice
+  template:
+    metadata:
+      labels:
+        app: authservice
+    spec:
+      serviceAccountName: bookinfo-productpage
+      volumes:
+        - name: bookinfo-authservice-configmap-volume # declare the volume containing the authservice ConfigMap
+          configMap:
+            name: bookinfo-authservice-configmap
+      containers:
+      - name: authservice # authservice needs to be deployed in the sample Pod as the productpage
+        # TODO(incfly): change to a proper project wide container registry.
+        image: gcr.io/jianfeih-images-pub/authservice/authservice:0.4.1 # Manually docker pull the latest authservice image from https://github.com/istio-ecosystem/authservice/packages and push it to your own image registry (e.g. Docker Hub), and use it here. (The Github Package Registry does not work with k8s yet until this issue is fixed and released: https://github.com/kubernetes-sigs/kind/issues/870)
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 10003
+        volumeMounts:
+          - name: bookinfo-authservice-configmap-volume # mount the volume containing the authservice ConfigMap
+            mountPath: /etc/authservice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authservice
+  # namespace: istio-system
+  labels:
+    app: authservice
+spec:
+  ports:
+  - port: 10003
+    name: grpc
+  selector:
+    app: authservice
