@@ -1,5 +1,6 @@
 #include "src/filters/filter_chain.h"
 
+#include "boost/asio/io_context.hpp"
 #include "config/oidc/config.pb.h"
 #include "gtest/gtest.h"
 #include "src/filters/pipe.h"
@@ -78,23 +79,25 @@ TEST(FilterChainTest, MatchesEquality) {
 }
 
 TEST(FilterChainTest, New) {
+  boost::asio::io_context ctx;
   auto configuration =
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
 
   FilterChainImpl chain(*configuration, 1);
-  auto instance = chain.New();
+  auto instance = chain.New(ctx);
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 
 TEST(FilterChainTest, MockFilter) {
+  boost::asio::io_context ctx;
   auto configuration = std::make_unique<config::FilterChain>();
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_mock()->set_allow(true);
 
   FilterChainImpl chain(*configuration, 1);
-  auto instance = chain.New();
+  auto instance = chain.New(ctx);
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 

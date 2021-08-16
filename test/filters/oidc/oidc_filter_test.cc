@@ -424,8 +424,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status =
@@ -479,8 +480,9 @@ TEST_F(OidcFilterTest,
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status =
@@ -576,8 +578,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _))
@@ -623,8 +626,9 @@ TEST_F(
   SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::HttpMock();
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(nullptr)));
 
   auto old_session_id = std::string("session123");
@@ -669,8 +673,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::bad_request);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   // we want the code to return before attempting to parse the bad response
@@ -1058,8 +1063,9 @@ google::rpc::Code OidcFilterTest::MakeRequestWhichWillCauseTokenRetrieval(
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_);
@@ -1094,8 +1100,9 @@ TEST_F(OidcFilterTest,
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
@@ -1213,8 +1220,9 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
 
   auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t();
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_);
@@ -1250,8 +1258,9 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
   auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_);
@@ -1336,8 +1345,9 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig,
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq("some-ca"),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http, DoRequest(Eq(token_uri), _, _, Eq("some-ca"),
+                                      Eq(beast::http::verb::post),
+                                      Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_,
                     session_string_generator_mock_, session_store_);

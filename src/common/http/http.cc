@@ -4,8 +4,6 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
-#include <boost/beast.hpp>
-#include <boost/beast/ssl.hpp>
 #include <sstream>
 
 #include "absl/strings/escaping.h"
@@ -371,12 +369,12 @@ PathQueryFragment::PathQueryFragment(absl::string_view path_query_fragment) {
   }
 }
 
-response_t HttpImpl::Post(
+response_t HttpImpl::DoRequest(
     absl::string_view uri,
     const std::map<absl::string_view, absl::string_view> &headers,
-    absl::string_view body, absl::string_view ca_cert,
+    absl::string_view body, absl::string_view ca_cert, beast::http::verb method,
     absl::string_view proxy_uri, boost::asio::io_context &ioc,
-    boost::asio::yield_context yield) const {
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
   try {
     int version = 11;
@@ -450,50 +448,111 @@ response_t HttpImpl::Post(
     }
 
     stream.async_handshake(ssl::stream_base::client, yield);
-    // Set up an HTTP POST request message
-    beast::http::request<beast::http::string_body> req{
-        beast::http::verb::post, parsed_uri.GetPathQueryFragment(), version};
-    req.set(beast::http::field::host, parsed_uri.GetHost());
-    for (auto header : headers) {
-      req.set(boost::beast::string_view(header.first.data()),
-              boost::beast::string_view(header.second.data()));
-    }
-    auto &req_body = req.body();
-    req_body.reserve(body.size());
-    req_body.append(body.begin(), body.end());
-    req.prepare_payload();
-    // Send the HTTP request to the remote host
-    beast::http::async_write(stream, req, yield);
 
-    // Read response
-    beast::flat_buffer buffer;
-    response_t res(new beast::http::response<beast::http::string_body>);
-    beast::http::async_read(stream, buffer, *res, yield);
-
-    // Gracefully close the socket.
-    // Receive an error code instead of throwing an exception if this fails, so
-    // we can ignore some expected not_connected errors.
-    boost::system::error_code ec;
-    stream.async_shutdown(yield[ec]);
-
-    if (ec) {
-      // not_connected happens sometimes so don't bother reporting it.
-      // stream_truncated also happens sometime and we choose to ignore the
-      // stream_truncated error, as recommended by the github thread:
-      // https://github.com/boostorg/beast/issues/824
-      if (ec != beast::errc::not_connected &&
-          ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
-        return response_t();
-      }
+    switch (method) {
+      case beast::http::verb::post:
+        return Post(version, parsed_uri, headers, body, stream, yield);
+      case beast::http::verb::get:
+        return Get(version, parsed_uri, headers, stream, yield);
+      default:
+        spdlog::info("unsupported method");
+        return response_t{};
     }
 
-    return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
     spdlog::info("{}: unexpected exception: {}", __func__, e.what());
     return response_t();
   }
+}
+
+response_t HttpImpl::Post(
+    int version, Uri uri,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    absl::string_view body, beast::ssl_stream<beast::tcp_stream> &stream,
+    boost::asio::yield_context &yield) {
+  // Set up an HTTP POST request message
+  beast::http::request<beast::http::string_body> req{
+      beast::http::verb::post, uri.GetPathQueryFragment(), version};
+  req.set(beast::http::field::host, uri.GetHost());
+  for (auto header : headers) {
+    req.set(boost::beast::string_view(header.first.data()),
+            boost::beast::string_view(header.second.data()));
+  }
+  auto &req_body = req.body();
+  req_body.reserve(body.size());
+  req_body.append(body.begin(), body.end());
+  req.prepare_payload();
+  // Send the HTTP request to the remote host
+  beast::http::async_write(stream, req, yield);
+
+  // Read response
+  beast::flat_buffer buffer;
+  response_t res(new beast::http::response<beast::http::string_body>);
+  beast::http::async_read(stream, buffer, *res, yield);
+
+  // Gracefully close the socket.
+  // Receive an error code instead of throwing an exception if this fails, so
+  // we can ignore some expected not_connected errors.
+  boost::system::error_code ec;
+  stream.async_shutdown(yield[ec]);
+
+  if (ec) {
+    // not_connected happens sometimes so don't bother reporting it.
+    // stream_truncated also happens sometime and we choose to ignore the
+    // stream_truncated error, as recommended by the github thread:
+    // https://github.com/boostorg/beast/issues/824
+    if (ec != beast::errc::not_connected &&
+        ec != boost::asio::ssl::error::stream_truncated) {
+      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+      return response_t();
+    }
+  }
+
+  return res;
+}
+
+response_t HttpImpl::Get(
+    int version, Uri uri,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    beast::ssl_stream<beast::tcp_stream> &stream,
+    boost::asio::yield_context &yield) {
+  // Set up an HTTP GET request message
+  beast::http::request<beast::http::string_body> req{
+      beast::http::verb::get, uri.GetPathQueryFragment(), version};
+  req.set(beast::http::field::host, uri.GetHost());
+  for (auto header : headers) {
+    req.set(boost::beast::string_view(header.first.data()),
+            boost::beast::string_view(header.second.data()));
+  }
+  req.prepare_payload();
+  // Send the HTTP request to the remote host
+  beast::http::async_write(stream, req, yield);
+
+  // Read response
+  beast::flat_buffer buffer;
+  response_t res(new beast::http::response<beast::http::string_body>);
+  beast::http::async_read(stream, buffer, *res, yield);
+
+  // Gracefully close the socket.
+  // Receive an error code instead of throwing an exception if this fails, so
+  // we can ignore some expected not_connected errors.
+  boost::system::error_code ec;
+  stream.async_shutdown(yield[ec]);
+
+  if (ec) {
+    // not_connected happens sometimes so don't bother reporting it.
+    // stream_truncated also happens sometime and we choose to ignore the
+    // stream_truncated error, as recommended by the github thread:
+    // https://github.com/boostorg/beast/issues/824
+    if (ec != beast::errc::not_connected &&
+        ec != boost::asio::ssl::error::stream_truncated) {
+      spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+      return response_t();
+    }
+  }
+
+  return res;
 }
 
 }  // namespace http

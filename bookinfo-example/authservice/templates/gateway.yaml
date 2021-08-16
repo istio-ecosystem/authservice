@@ -1,0 +1,70 @@
+#
+# A simple example of a gateway for the bookinfo app.
+#
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: bookinfo-gateway
+spec:
+  selector:
+    istio: ingressgateway # use istio default controller
+  servers:
+    - port:
+        number: 443
+        name: https-443
+        protocol: HTTPS
+      hosts:
+        - "*"
+      tls:
+        mode: SIMPLE
+        credentialName: ingress-tls-cert
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: bookinfo
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - bookinfo-gateway
+  http:
+    - match:
+        - uri:
+            # Allow the Authentication Request Callback to get routed to productpage so it can be intercepted by the authservice
+            prefix: /productpage/oauth
+        - uri:
+            # Allow the authservice logout request to get routed to productpage so it can be intercepted by the authservice
+            exact: /authservice_logout
+        - uri:
+            exact: /productpage
+        - uri:
+            prefix: /static
+        - uri:
+            exact: /login
+        - uri:
+            exact: /logout
+        - uri:
+            prefix: /api/v1/
+      route:
+        - destination:
+            host: productpage
+            port:
+              number: 9080
+---
+# Add a DestinationRule to enable session affinity, which ensures that the requests from the same user-agent reach
+# the same instance of productpage, and hence, the same instance of Sidecar and Authservice. This is required when you
+# deploy multiple instances of productpage because Authservice currently only supports in-memory session storage.
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: bookinfo-dest-rule
+spec:
+  host: productpage.default.svc.cluster.local
+  trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        httpCookie:
+          name: bookinfo-session-affinity-cookie
+          ttl: 0s

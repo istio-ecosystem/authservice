@@ -1,0 +1,15 @@
+authservice:
+  image: ghcr.io/istio-ecosystem/authservice/authservice:0.4.1
+  # How the authservice will be enabled and enforced.
+  # This can be at ingress (by default) or at application sidecar.
+  enforcingMode: ingress
+
+oidc:
+  idpURL: https://account.google.com
+  authorizationURI: "https://accounts.google.com/o/oauth2/v2/auth"
+  tokenURI: "https://oauth2.googleapis.com/token"
+  clientID: your-client-id
+  clientSecret: your-client-secret
+  # JSON string containing the identity provider's public key for validating id token.
+  # jwks: "<>"
+

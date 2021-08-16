@@ -1,7 +1,10 @@
 #include "filter_chain.h"
 
+#include <memory>
+
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "boost/asio/io_context.hpp"
 #include "config/config.pb.h"
 #include "config/oidc/config.pb.h"
 #include "config/oidc/config.pb.validate.h"
@@ -46,7 +49,7 @@ bool FilterChainImpl::Matches(
   return true;
 }
 
-std::unique_ptr<Filter> FilterChainImpl::New() {
+std::unique_ptr<Filter> FilterChainImpl::New(boost::asio::io_context &ioc) {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
   int oidc_filter_count = 0;
@@ -65,12 +68,18 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
           "only one filter of type \"oidc\" is allowed in a chain");
     }
 
-    auto jwks_keys = google::jwt_verify::Jwks::createFrom(
-            filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
-    spdlog::debug("status for jwks parsing: {}, {}", __func__,
-      google::jwt_verify::getStatusString(jwks_keys->getStatus()));
-    auto token_request_parser = std::make_shared<oidc::TokenResponseParserImpl>(
-        std::move(jwks_keys));
+    std::unique_ptr<oidc::JwksStorage> jwks_storage;
+    if (filter.oidc().jwks_config_case() == config::oidc::OIDCConfig::kJwks) {
+      jwks_storage = std::make_unique<oidc::PermanentJwksStorageImpl>(
+          filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
+    } else {
+      jwks_storage = std::make_unique<oidc::NonPermanentJwksStorageImpl>(
+          filter.oidc().jwks_uri(), ioc);
+    }
+
+    auto token_response_parser =
+        std::make_shared<oidc::TokenResponseParserImpl>(
+            std::move(jwks_storage));
     auto session_string_generator =
         std::make_shared<common::session::SessionStringGenerator>();
 
@@ -108,7 +117,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     }
 
     result->AddFilter(FilterPtr(
-        new oidc::OidcFilter(http, filter.oidc(), token_request_parser,
+        new oidc::OidcFilter(http, filter.oidc(), token_response_parser,
                              session_string_generator, oidc_session_store_)));
   }
   return result;

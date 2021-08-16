@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include "boost/asio/io_context.hpp"
 #include "config/config.pb.h"
 #include "config/oidc/config.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
@@ -39,7 +40,7 @@ class FilterChain {
    * New creates a new filter instance that can be used to process a request.
    * @return a new filter instance.
    */
-  virtual std::unique_ptr<Filter> New() = 0;
+  virtual std::unique_ptr<Filter> New(boost::asio::io_context &ioc) = 0;
 
   /**
    * Invoked periodically to give the filter chain a chance to clean up expired
@@ -62,7 +63,7 @@ class FilterChainImpl : public FilterChain {
   bool Matches(
       const ::envoy::service::auth::v3::CheckRequest *request) const override;
 
-  std::unique_ptr<Filter> New() override;
+  std::unique_ptr<Filter> New(boost::asio::io_context &ioc) override;
 
   virtual void DoPeriodicCleanup() override;
 };

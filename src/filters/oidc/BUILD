@@ -7,6 +7,7 @@ xx_library(
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
     deps = [
+        ":jwks_storage",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -115,5 +116,16 @@ xx_library(
         "@com_github_abseil-cpp//absl/time:time",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
+    ],
+)
+
+xx_library(
+    name = "jwks_storage",
+    srcs = ["jwks_storage.cc"],
+    hdrs = ["jwks_storage.h"],
+    deps = [
+        "//src/common/http",
+        "@boost//:all",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
 )
