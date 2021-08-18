@@ -1,7 +1,6 @@
 #
 # A simple example of a gateway for the bookinfo app.
 #
-
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
