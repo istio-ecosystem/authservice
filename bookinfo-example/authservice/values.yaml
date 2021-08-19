@@ -1,6 +1,8 @@
 authservice:
-  # TODO(incfly): change to a proper project wide container registry.
-  image: gcr.io/jianfeih-images-pub/authservice/authservice:0.4.1
+  image: ghcr.io/istio-ecosystem/authservice/authservice:0.4.1
+  # How the authservice will be enabled and enforced.
+  # This can be at ingress (by default) or at application sidecar.
+  enforcingMode: ingress
 
 oidc:
   idpURL: https://account.google.com
