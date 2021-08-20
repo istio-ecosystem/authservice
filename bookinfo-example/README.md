@@ -52,6 +52,18 @@ URI to be hosted on a protected endpoint.
            port: "10003"
    ```
 
+1. Fetch the identity provider public key and populate into the configmap. In our example, run
+`scripts/google-jwks.sh`.
+
+      ```shell
+      bash scripts/google-jwks.sh
+      ```
+   Copy the output JWK (with escape) literally to the [templates/config.yaml](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/authservice/templates/config.yaml#L30)
+   to replace the JWK content.
+
+   TODO(Shikugawa): this is a limitation. We are currently working on making authservice fetch JWK
+   by itself when a jwk URI is provided. See https://github.com/istio-ecosystem/authservice/issues/34.
+
 1. Install authservice via Helm.
 
    ```shell
