@@ -33,8 +33,10 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
     } else {
       jwks_storage_map_.emplace_back(
           std::make_shared<oidc::NonPermanentJwksStorageImpl>(
-              filter.oidc().jwks_uri(),
-              std::chrono::seconds(5) /* TODO(shikugawa): fixme */, ioc));
+              filter.oidc().jwks_fetcher().jwks_uri(),
+              std::chrono::seconds(
+                  filter.oidc().jwks_fetcher().request_duration_sec()),
+              ioc));
     }
   }
 }

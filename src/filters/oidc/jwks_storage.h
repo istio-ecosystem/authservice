@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <iostream>
 #include <memory>
 #include <mutex>
 
@@ -70,6 +71,7 @@ class NonPermanentJwksStorageImpl : public JwksStorage {
     const std::string jwks_uri_;
     common::http::ptr_t http_ptr_;
     boost::asio::io_context& ioc_;
+    std::chrono::seconds duration_;
     boost::asio::steady_timer timer_;
   };
 

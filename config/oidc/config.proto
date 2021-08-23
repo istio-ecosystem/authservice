@@ -75,6 +75,18 @@ message OIDCConfig {
     // Required.
     string callback_uri = 3 [(validate.rules).string.min_len = 1];
 
+    // This message defines a setting to allow asynchronous retrieval and update of the JWK for
+    // JWT validation at regular intervals.
+    message JwksFetcherConfig {
+        // Request URI that has the JWKs.
+        // Required.
+        string jwks_uri = 1;
+        
+        // Request interval to check whether new JWKs are available.
+        // Required.
+        int32 request_duration_sec = 2;
+    }
+
     oneof jwks_config {
         // The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in
         // the OIDC provider's
@@ -82,10 +94,10 @@ message OIDCConfig {
         // Note that this JSON value must be escaped when embedded in a json configmap
         // (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)).
         // Used during token verification.
-        // Required.
         string jwks = 4;
-        
-        string jwks_uri = 17;
+
+        // Configuration to allow JWKs to be retrieved and updated asynchronously at regular intervals.
+        JwksFetcherConfig jwks_fetcher = 17;
     }
 
     // The OIDC client ID assigned to the filter to be used in the
