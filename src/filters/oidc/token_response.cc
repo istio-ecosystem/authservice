@@ -66,8 +66,8 @@ int64_t TokenResponse::GetIDTokenExpiry() const {
 }
 
 TokenResponseParserImpl::TokenResponseParserImpl(
-    std::unique_ptr<JwksStorage> jwks_storage)
-    : jwks_storage_(std::move(jwks_storage)) {}
+    google::jwt_verify::JwksPtr keys)
+    : keys_(std::move(keys)) {}
 
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id, const std::string &nonce,
@@ -238,14 +238,7 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   // value. Verify the token signature & that our client_id is set as an entry
   // in the token's `aud` field.
   std::vector<std::string> audiences = {client_id};
-
-  if (jwks_storage_->jwks() == nullptr) {
-    spdlog::info("{}: no JWKs for token validation.", __func__);
-    return true;
-  }
-
-  auto jwt_status = google::jwt_verify::verifyJwt(
-      id_token, *jwks_storage_->jwks(), audiences);
+  auto jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
     spdlog::info("{}: `id_token` verification failed: {}", __func__,
                  google::jwt_verify::getStatusString(jwt_status));

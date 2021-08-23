@@ -45,6 +45,7 @@ class AsyncServiceImplTest : public ::testing::Test {
 
   std::vector<std::unique_ptr<filters::FilterChain>> chains_;
   google::protobuf::RepeatedPtrField<config::TriggerRule> trigger_rules_config_;
+  boost::asio::io_context ioc_;
 };
 
 using test_types =
@@ -75,8 +76,8 @@ TYPED_TEST(AsyncServiceImplTest,
   this->trigger_rules_config_ = config.trigger_rules();
 
   for (const auto &chain_config : config.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(
-        new filters::FilterChainImpl(chain_config, config.threads()));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(
+        this->ioc_, chain_config, config.threads()));
     this->chains_.push_back(std::move(chain));
   }
 
@@ -106,8 +107,8 @@ TYPED_TEST(AsyncServiceImplTest,
   this->trigger_rules_config_ = config.trigger_rules();
 
   for (const auto &chain_config : config.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(
-        new filters::FilterChainImpl(chain_config, config.threads()));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(
+        this->ioc_, chain_config, config.threads()));
     this->chains_.push_back(std::move(chain));
   }
 
@@ -135,8 +136,8 @@ TYPED_TEST(AsyncServiceImplTest,
   config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
 
   for (const auto &chain_config : config.chains()) {
-    std::unique_ptr<filters::FilterChain> chain(
-        new filters::FilterChainImpl(chain_config, config.threads()));
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(
+        this->ioc_, chain_config, config.threads()));
     this->chains_.push_back(std::move(chain));
   }
 

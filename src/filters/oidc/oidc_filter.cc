@@ -537,11 +537,11 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
   };
 
   spdlog::info("{}: POSTing to refresh access token", __func__);
-  auto retrieved_token_response = http_ptr_->DoRequest(
-      idp_config_.token_uri(), headers,
-      common::http::Http::EncodeFormData(params),
-      idp_config_.trusted_certificate_authority(), beast::http::verb::post,
-      idp_config_.proxy_uri(), ioc, yield);
+  auto retrieved_token_response =
+      http_ptr_->Post(idp_config_.token_uri(), headers,
+                      common::http::Http::EncodeFormData(params),
+                      idp_config_.trusted_certificate_authority(),
+                      idp_config_.proxy_uri(), ioc, yield);
 
   if (retrieved_token_response == nullptr) {
     spdlog::warn(
@@ -633,11 +633,11 @@ google::rpc::Code OidcFilter::RetrieveToken(
       {"grant_type", "authorization_code"},
   };
 
-  auto retrieve_token_response = http_ptr_->DoRequest(
-      idp_config_.token_uri(), headers,
-      common::http::Http::EncodeFormData(params),
-      idp_config_.trusted_certificate_authority(), beast::http::verb::post,
-      idp_config_.proxy_uri(), ioc, yield);
+  auto retrieve_token_response =
+      http_ptr_->Post(idp_config_.token_uri(), headers,
+                      common::http::Http::EncodeFormData(params),
+                      idp_config_.trusted_certificate_authority(),
+                      idp_config_.proxy_uri(), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
                  "IdP connection error");

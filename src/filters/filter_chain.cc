@@ -19,16 +19,30 @@
 namespace authservice {
 namespace filters {
 
-FilterChainImpl::FilterChainImpl(config::FilterChain config,
+FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
+                                 config::FilterChain config,
                                  unsigned int threads)
     : threads_(threads),
       config_(std::move(config)),
-      oidc_session_store_(nullptr) {}
+      oidc_session_store_(nullptr) {
+  for (auto& filter : config_.filters()) {
+    if (filter.oidc().jwks_config_case() == config::oidc::OIDCConfig::kJwks) {
+      jwks_storage_map_.emplace_back(
+          std::make_shared<oidc::PermanentJwksStorageImpl>(
+              filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
+    } else {
+      jwks_storage_map_.emplace_back(
+          std::make_shared<oidc::NonPermanentJwksStorageImpl>(
+              filter.oidc().jwks_uri(),
+              std::chrono::seconds(5) /* TODO(shikugawa): fixme */, ioc));
+    }
+  }
+}
 
-const std::string &FilterChainImpl::Name() const { return config_.name(); }
+const std::string& FilterChainImpl::Name() const { return config_.name(); }
 
 bool FilterChainImpl::Matches(
-    const ::envoy::service::auth::v3::CheckRequest *request) const {
+    const ::envoy::service::auth::v3::CheckRequest* request) const {
   spdlog::trace("{}", __func__);
   if (config_.has_match()) {
     auto matched = request->attributes().request().http().headers().find(
@@ -49,11 +63,12 @@ bool FilterChainImpl::Matches(
   return true;
 }
 
-std::unique_ptr<Filter> FilterChainImpl::New(boost::asio::io_context &ioc) {
+std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
   int oidc_filter_count = 0;
-  for (auto &filter : *config_.mutable_filters()) {
+  for (auto i = 0; i < config_.filters_size(); ++i) {
+    auto& filter = *config_.mutable_filters(i);
     if (filter.has_oidc()) {
       ++oidc_filter_count;
     } else if (filter.has_mock()) {
@@ -67,19 +82,9 @@ std::unique_ptr<Filter> FilterChainImpl::New(boost::asio::io_context &ioc) {
       throw std::runtime_error(
           "only one filter of type \"oidc\" is allowed in a chain");
     }
-
-    std::unique_ptr<oidc::JwksStorage> jwks_storage;
-    if (filter.oidc().jwks_config_case() == config::oidc::OIDCConfig::kJwks) {
-      jwks_storage = std::make_unique<oidc::PermanentJwksStorageImpl>(
-          filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
-    } else {
-      jwks_storage = std::make_unique<oidc::NonPermanentJwksStorageImpl>(
-          filter.oidc().jwks_uri(), ioc);
-    }
-
     auto token_response_parser =
         std::make_shared<oidc::TokenResponseParserImpl>(
-            std::move(jwks_storage));
+            jwks_storage_map_[i]->jwks());
     auto session_string_generator =
         std::make_shared<common::session::SessionStringGenerator>();
 

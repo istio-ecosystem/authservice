@@ -8,6 +8,7 @@
 #include "config/oidc/config.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/filters/filter.h"
+#include "src/filters/oidc/jwks_storage.h"
 #include "src/filters/oidc/session_store.h"
 
 namespace authservice {
@@ -40,7 +41,7 @@ class FilterChain {
    * New creates a new filter instance that can be used to process a request.
    * @return a new filter instance.
    */
-  virtual std::unique_ptr<Filter> New(boost::asio::io_context &ioc) = 0;
+  virtual std::unique_ptr<Filter> New() = 0;
 
   /**
    * Invoked periodically to give the filter chain a chance to clean up expired
@@ -54,16 +55,18 @@ class FilterChainImpl : public FilterChain {
   unsigned int threads_;
   config::FilterChain config_;
   std::shared_ptr<oidc::SessionStore> oidc_session_store_;
+  std::vector<std::shared_ptr<oidc::JwksStorage>> jwks_storage_map_;
 
  public:
-  explicit FilterChainImpl(config::FilterChain config, unsigned int threads);
+  explicit FilterChainImpl(boost::asio::io_context &ioc,
+                           config::FilterChain config, unsigned int threads);
 
   const std::string &Name() const override;
 
   bool Matches(
       const ::envoy::service::auth::v3::CheckRequest *request) const override;
 
-  std::unique_ptr<Filter> New(boost::asio::io_context &ioc) override;
+  std::unique_ptr<Filter> New() override;
 
   virtual void DoPeriodicCleanup() override;
 };

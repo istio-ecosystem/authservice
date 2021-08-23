@@ -1,29 +1,32 @@
 #include "src/filters/oidc/jwks_storage.h"
 
+#include <iostream>
 namespace authservice {
 namespace filters {
 namespace oidc {
 
 NonPermanentJwksStorageImpl::JwksFetcher::JwksFetcher(
     JwksStorage* parent, common::http::ptr_t http_ptr,
-    const std::string& jwks_uri, boost::asio::io_context& io_context)
+    const std::string& jwks_uri, std::chrono::seconds duration,
+    boost::asio::io_context& io_context)
     : parent_(parent),
       jwks_uri_(jwks_uri),
       http_ptr_(http_ptr),
       ioc_(io_context),
-      timer_(ioc_, boost::posix_time::seconds(5)) {}
+      timer_(ioc_, duration) {}
 
 void NonPermanentJwksStorageImpl::JwksFetcher::request(
     const boost::system::error_code&) {
   boost::asio::spawn(ioc_, [this](boost::asio::yield_context yield) {
-    auto resp = http_ptr_->DoRequest(jwks_uri_, {}, "", "",
-                                     beast::http::verb::get, "", ioc_, yield);
+    std::cout << "spawn" << std::endl;
+    auto resp = http_ptr_->Get(jwks_uri_, {}, "", "", "", ioc_, yield);
     const auto& fetched_jwks = resp->body();
     // TODO(shikugawa): Prevent lock with same jwks.
     // TODO(shikugawa): Support PEM.
     parent_->updateJwks(fetched_jwks, google::jwt_verify::Jwks::Type::JWKS);
 
-    timer_.expires_at(timer_.expires_at() + boost::posix_time::seconds(5));
+    timer_.expires_at(std::chrono::steady_clock::now() +
+                      std::chrono::seconds(5));
     timer_.async_wait(
         [this](const boost::system::error_code& ec) { this->request(ec); });
   });

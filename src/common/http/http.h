@@ -4,7 +4,6 @@
 #include <array>
 #include <boost/asio/spawn.hpp>
 #include <boost/beast.hpp>
-#include <boost/beast/ssl.hpp>
 #include <map>
 #include <memory>
 #include <set>
@@ -178,15 +177,29 @@ class Http {
    * @param headers the http headers
    * @param body the http request body
    * @param ca_cert the ca cert to be trusted in the http call
-   * @param method the http method to use
    * @return http response.
    */
-  virtual response_t DoRequest(
+  virtual response_t Post(
       absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
       absl::string_view body, absl::string_view ca_cert,
-      beast::http::verb method, absl::string_view proxy_uri,
-      boost::asio::io_context &ioc, boost::asio::yield_context yield) = 0;
+      absl::string_view proxy_uri, boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const = 0;
+
+  /** @brief Asynchronously send a Get http message with a certificate
+   * authority. To be used inside a Boost co-routine.
+   * @param endpoint the endpoint to call
+   * @param headers the http headers
+   * @param body the http request body
+   * @param ca_cert the ca cert to be trusted in the http call
+   * @return http response.
+   */
+  virtual response_t Get(
+      absl::string_view uri,
+      const std::map<absl::string_view, absl::string_view> &headers,
+      absl::string_view body, absl::string_view ca_cert,
+      absl::string_view proxy_uri, boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const = 0;
 };
 
 /**
@@ -194,24 +207,17 @@ class Http {
  */
 class HttpImpl : public Http {
  public:
-  response_t DoRequest(
-      absl::string_view uri,
-      const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body, absl::string_view ca_cert,
-      beast::http::verb method, absl::string_view proxy_uri,
-      boost::asio::io_context &ioc, boost::asio::yield_context yield) override;
-
- private:
-  response_t Post(int version, Uri uri,
+  response_t Post(absl::string_view uri,
                   const std::map<absl::string_view, absl::string_view> &headers,
-                  absl::string_view body,
-                  beast::ssl_stream<beast::tcp_stream> &stream,
-                  boost::asio::yield_context &yield);
+                  absl::string_view body, absl::string_view ca_cert,
+                  absl::string_view proxy_uri, boost::asio::io_context &ioc,
+                  boost::asio::yield_context yield) const override;
 
-  response_t Get(int version, Uri uri,
+  response_t Get(absl::string_view uri,
                  const std::map<absl::string_view, absl::string_view> &headers,
-                 beast::ssl_stream<beast::tcp_stream> &stream,
-                 boost::asio::yield_context &yield);
+                 absl::string_view body, absl::string_view ca_cert,
+                 absl::string_view proxy_uri, boost::asio::io_context &ioc,
+                 boost::asio::yield_context yield) const override;
 };
 
 }  // namespace http

@@ -65,7 +65,7 @@ template <class RequestType, class ResponseType>
         envoy::service::auth::v3::CheckResponse response_v3;
 
         // Create a new instance of a processor.
-        auto processor = chain->New(ioc);
+        auto processor = chain->New();
         auto status = processor->Process(&request_v3, &response_v3, ioc, yield);
 
         // response v2/v3 conversion layer

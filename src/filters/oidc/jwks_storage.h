@@ -3,7 +3,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <iostream>
 #include <memory>
 #include <mutex>
 
@@ -21,17 +20,7 @@ class JwksStorage {
   virtual void updateJwks(const std::string& new_jwks,
                           google::jwt_verify::Jwks::Type type) = 0;
 
-  virtual const google::jwt_verify::JwksPtr& jwks() const = 0;
-};
-
-class JwksStorageImpl : public JwksStorage {
- public:
-  virtual void updateJwks(const std::string&,
-                          google::jwt_verify::Jwks::Type) override {}
-
-  virtual const google::jwt_verify::JwksPtr& jwks() const override {
-    return jwks_;
-  }
+  virtual google::jwt_verify::JwksPtr jwks() = 0;
 
  protected:
   google::jwt_verify::JwksPtr parseJwks(const std::string& jwks,
@@ -40,33 +29,39 @@ class JwksStorageImpl : public JwksStorage {
     spdlog::debug("status for jwks parsing: {}, {}", __func__,
                   google::jwt_verify::getStatusString(jwks_keys->getStatus()));
 
-    if (jwks_keys->getStatus() == google::jwt_verify::Status::Ok) {
-      return jwks_keys;
+    if (jwks_keys->getStatus() != google::jwt_verify::Status::Ok) {
+      spdlog::warn("{}: failed to parse new JWKs", __func__);
     }
 
-    return nullptr;
+    return jwks_keys;
   }
-
-  google::jwt_verify::JwksPtr jwks_;
 };
 
-class PermanentJwksStorageImpl : public JwksStorageImpl {
+class PermanentJwksStorageImpl : public JwksStorage {
  public:
   explicit PermanentJwksStorageImpl(const std::string& jwks,
-                                    google::jwt_verify::Jwks::Type type) {
-    jwks_ = parseJwks(jwks, type);
-  }
+                                    google::jwt_verify::Jwks::Type type)
+      : jwks_(jwks), type_(type) {}
 
   void updateJwks(const std::string&, google::jwt_verify::Jwks::Type) override {
   }
+
+  virtual google::jwt_verify::JwksPtr jwks() override {
+    return parseJwks(jwks_, type_);
+  }
+
+ private:
+  std::string jwks_;
+  google::jwt_verify::Jwks::Type type_;
 };
 
-class NonPermanentJwksStorageImpl : public JwksStorageImpl {
+class NonPermanentJwksStorageImpl : public JwksStorage {
  public:
   class JwksFetcher {
    public:
     JwksFetcher(JwksStorage* parent, common::http::ptr_t http_ptr,
-                const std::string& jwks_uri, boost::asio::io_context& ioc);
+                const std::string& jwks_uri, std::chrono::seconds duration,
+                boost::asio::io_context& ioc);
 
    private:
     void request(const boost::system::error_code&);
@@ -75,33 +70,34 @@ class NonPermanentJwksStorageImpl : public JwksStorageImpl {
     const std::string jwks_uri_;
     common::http::ptr_t http_ptr_;
     boost::asio::io_context& ioc_;
-    boost::asio::deadline_timer timer_;
+    boost::asio::steady_timer timer_;
   };
 
   explicit NonPermanentJwksStorageImpl(const std::string& jwks_uri,
-                                       boost::asio::io_context& ioc)
-      : jwks_fetcher_(std::make_unique<JwksFetcher>(
-            this, common::http::ptr_t(new common::http::HttpImpl), jwks_uri,
-            ioc)) {}
+                                       std::chrono::seconds duration,
+                                       boost::asio::io_context& ioc) {
+    if (duration != std::chrono::seconds(0)) {
+      jwks_fetcher_ = std::make_unique<JwksFetcher>(
+          this, common::http::ptr_t(new common::http::HttpImpl), jwks_uri,
+          duration, ioc);
+    }
+  }
 
   void updateJwks(const std::string& new_jwks,
                   google::jwt_verify::Jwks::Type type) override {
     std::unique_lock<std::mutex> lck(mux_);
-    auto new_jwks_keys = parseJwks(new_jwks, type);
-
-    if (new_jwks_keys->getStatus() == google::jwt_verify::Status::Ok) {
-      jwks_.reset(new_jwks_keys.get());
-    } else {
-      spdlog::error("failed to parse new JWK");
-    }
+    jwks_ = new_jwks;
+    type_ = type;
   }
 
-  const google::jwt_verify::JwksPtr& jwks() const override {
+  google::jwt_verify::JwksPtr jwks() override {
     std::unique_lock<std::mutex> lck(mux_);
-    return jwks_;
+    return parseJwks(jwks_, type_);
   }
 
  private:
+  std::string jwks_;
+  google::jwt_verify::Jwks::Type type_;
   std::unique_ptr<JwksFetcher> jwks_fetcher_;
   mutable std::mutex mux_;
 };
