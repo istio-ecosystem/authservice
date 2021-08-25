@@ -66,8 +66,8 @@ int64_t TokenResponse::GetIDTokenExpiry() const {
 }
 
 TokenResponseParserImpl::TokenResponseParserImpl(
-    google::jwt_verify::JwksPtr keys)
-    : keys_(std::move(keys)) {}
+    google::jwt_verify::JwksPtr &keys)
+    : keys_(keys) {}
 
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id, const std::string &nonce,

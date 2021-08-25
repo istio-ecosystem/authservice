@@ -126,7 +126,7 @@ xx_library(
     deps = [
         "//src/common/http",
         "@boost//:all",
-        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/synchronization:synchronization",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
 )

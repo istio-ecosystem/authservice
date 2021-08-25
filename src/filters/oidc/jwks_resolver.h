@@ -20,7 +20,7 @@ class JwksResolver {
   virtual void updateJwks(const std::string& new_jwks,
                           google::jwt_verify::Jwks::Type type) = 0;
 
-  virtual google::jwt_verify::JwksPtr jwks() = 0;
+  virtual google::jwt_verify::JwksPtr& jwks() = 0;
 
  protected:
   google::jwt_verify::JwksPtr parseJwks(const std::string& jwks,
@@ -41,17 +41,17 @@ class StaticJwksResolverImpl : public JwksResolver {
  public:
   explicit StaticJwksResolverImpl(const std::string& jwks,
                                   google::jwt_verify::Jwks::Type type)
-      : jwks_(jwks), type_(type) {}
+      : type_(type) {
+    jwks_ = parseJwks(jwks, type_);
+  }
 
   void updateJwks(const std::string&, google::jwt_verify::Jwks::Type) override {
   }
 
-  virtual google::jwt_verify::JwksPtr jwks() override {
-    return parseJwks(jwks_, type_);
-  }
+  virtual google::jwt_verify::JwksPtr& jwks() override { return jwks_; }
 
  private:
-  std::string jwks_;
+  google::jwt_verify::JwksPtr jwks_;
   google::jwt_verify::Jwks::Type type_;
 };
 
@@ -87,17 +87,17 @@ class DynamicJwksResolverImpl : public JwksResolver {
   void updateJwks(const std::string& new_jwks,
                   google::jwt_verify::Jwks::Type type) override {
     absl::MutexLock lck(&mux_);
-    jwks_ = new_jwks;
     type_ = type;
+    jwks_ = parseJwks(new_jwks, type_);
   }
 
-  google::jwt_verify::JwksPtr jwks() override {
+  google::jwt_verify::JwksPtr& jwks() override {
     absl::ReaderMutexLock lck(&mux_);
-    return parseJwks(jwks_, type_);
+    return jwks_;
   }
 
  private:
-  std::string jwks_ ABSL_GUARDED_BY(mux_);
+  google::jwt_verify::JwksPtr jwks_ ABSL_GUARDED_BY(mux_);
   google::jwt_verify::Jwks::Type type_;
   std::unique_ptr<JwksFetcher> jwks_fetcher_;
   absl::Mutex mux_;
