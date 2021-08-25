@@ -35,10 +35,10 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
                   filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
           break;
         case config::oidc::OIDCConfig::kJwksFetcher: {
-          uint32_t periodic_fetch_interval =
-              filter.oidc().jwks_fetcher().periodic_fetch_interval();
-          if (periodic_fetch_interval == 0) {
-            periodic_fetch_interval = 1200;
+          uint32_t periodic_fetch_interval_sec =
+              filter.oidc().jwks_fetcher().periodic_fetch_interval_sec();
+          if (periodic_fetch_interval_sec == 0) {
+            periodic_fetch_interval_sec = 1200;
           }
 
           auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -46,7 +46,7 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
           jwks_resolver_map_.emplace_back(
               std::make_shared<oidc::DynamicJwksResolverImpl>(
                   filter.oidc().jwks_fetcher().jwks_uri(),
-                  std::chrono::seconds(periodic_fetch_interval), http_ptr,
+                  std::chrono::seconds(periodic_fetch_interval_sec), http_ptr,
                   ioc));
         } break;
         default:

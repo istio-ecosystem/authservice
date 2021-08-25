@@ -374,7 +374,7 @@ TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
             "oidc_override": {
               "jwks_fetcher": {
                 "jwks_uri": "jwks_uri",
-                "periodic_fetch_interval": 1
+                "periodic_fetch_interval_sec": 1
               },
               "callback_uri": "https://ingress3/callback",
             }
@@ -449,7 +449,7 @@ TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
               "client_secret": "xxxxx-yyyyy-zzzzz",
               "jwks_fetcher": {
                 "jwks_uri": "jwks_uri",
-                "periodic_fetch_interval": 1
+                "periodic_fetch_interval_sec": 1
               },
               "callback_uri": "https://ingress3/callback",
             }

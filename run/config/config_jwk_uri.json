@@ -17,7 +17,7 @@
               "callback_uri": "https://localhost:9000/oauth/callback",
               "jwks_fetcher": {
                 "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
-                "periodic_fetch_interval": 1
+                "periodic_fetch_interval_sec": 10
               },
               "scopes": [],
               "id_token": {
