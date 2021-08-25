@@ -1,11 +1,11 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_OIDC_JWKS_RESOLVER_H_
 #define AUTHSERVICE_SRC_FILTERS_OIDC_JWKS_RESOLVER_H_
 
-#include <absl/synchronization/mutex.h>
 #include <spdlog/spdlog.h>
 
 #include <memory>
 
+#include "absl/synchronization/mutex.h"
 #include "jwt_verify_lib/jwks.h"
 #include "src/common/http/http.h"
 
