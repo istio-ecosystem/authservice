@@ -1,14 +1,17 @@
-#include "src/filters/oidc/jwks_storage.h"
+#include "src/filters/oidc/jwks_resolver.h"
+
+#include <memory>
 
 #include "gtest/gtest.h"
+#include "test/common/http/mocks.h"
 
 namespace authservice {
 namespace filters {
 namespace oidc {
 
 namespace {
-// A good public key based on above private key
-const char valid_jwt_signing_key_[] = R"(
+// A valid public JWK key for JWT verification.
+const char valid_jwt_public_key_[] = R"(
 {
   "keys": [
     {
@@ -33,7 +36,7 @@ const char valid_jwt_signing_key_[] = R"(
 }
 )";
 
-const char *invalid_jwt_signing_key_ =
+const char *invalid_jwt_public_key_ =
     "MIIBCgKCAQEAnzyis1ZjfNB0bBgKFMSvvkTtwlvBsaJq7S5wA+kzeVOVpVWwkWdV"
     "ha4s38XM/pa/yr47av7+z3VTmvDRyAHcaT92whREFpLv9cj5lTeJSibyr/Mrm/Yt"
     "jCZVWgaOYIhwrXwKLqPr/11inWsAkfIytvHWTxZYEcXLgAXFuUuaS3uF9gEiNQwz"
@@ -41,25 +44,45 @@ const char *invalid_jwt_signing_key_ =
     "FtGJiJvOwRsIfVChDpYStTcHTCMqtvWbV6L11BWkpAGXSW4Hv43qa+GSYOD2QU68"
     "Mb59oSk2OB+BtOLpJofmbGEGgvmwyCI9MwIDAQAB";
 
-TEST(JwksStorageTest, TestPermanentJwksStorage) {
-  PermanentJwksStorageImpl storage(valid_jwt_signing_key_,
-                                   google::jwt_verify::Jwks::JWKS);
+using testing::_;
+using testing::Eq;
+using testing::Invoke;
+
+TEST(JwksResolverTest, TestStaticJwksResolver) {
+  StaticJwksResolverImpl storage(valid_jwt_public_key_,
+                                 google::jwt_verify::Jwks::JWKS);
   EXPECT_EQ(google::jwt_verify::Status::Ok, storage.jwks()->getStatus());
 
-  PermanentJwksStorageImpl storage2(invalid_jwt_signing_key_,
-                                    google::jwt_verify::Jwks::JWKS);
+  StaticJwksResolverImpl storage2(invalid_jwt_public_key_,
+                                  google::jwt_verify::Jwks::JWKS);
   EXPECT_NE(google::jwt_verify::Status::Ok, storage2.jwks()->getStatus());
 }
 
-TEST(JwksStorageTest, TestNonPermanentJwksStorage) {
+TEST(JwksResolverTest, TestDynamicJwksResolver) {
   boost::asio::io_context io_context;
-  NonPermanentJwksStorageImpl storage("istio.io", std::chrono::seconds(0),
-                                      io_context);
-  storage.updateJwks(valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
+  auto mock_http = std::make_shared<common::http::HttpMock>();
+  DynamicJwksResolverImpl storage("istio.io", std::chrono::seconds(1),
+                                  mock_http, io_context);
+  storage.updateJwks(valid_jwt_public_key_, google::jwt_verify::Jwks::JWKS);
   EXPECT_EQ(google::jwt_verify::Status::Ok, storage.jwks()->getStatus());
 
+  EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
+      .Times(5)  // 5 sec to run event loop
+      .WillRepeatedly(
+          Invoke([](absl::string_view,
+                    const std::map<absl::string_view, absl::string_view>,
+                    absl::string_view, absl::string_view, absl::string_view,
+                    boost::asio::io_context &, boost::asio::yield_context) {
+            common::http::response_t response = std::make_unique<
+                beast::http::response<beast::http::string_body>>();
+            response->body() = invalid_jwt_public_key_;
+            return response;
+          }));
+
+  // 5 sec is enough to wait 1 sec interval to wait new JWKs.
+  io_context.run_for(std::chrono::seconds(5));
+
   // update key
-  storage.updateJwks(invalid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
   EXPECT_NE(google::jwt_verify::Status::Ok, storage.jwks()->getStatus());
 }
 

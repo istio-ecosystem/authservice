@@ -76,10 +76,11 @@ cc_test(
 )
 
 cc_test(
-    name = "jwks_storage_test",
-    srcs = ["jwks_storage_test.cc"],
+    name = "jwks_resolver_test",
+    srcs = ["jwks_resolver_test.cc"],
     deps = [
-        "//src/filters/oidc:jwks_storage",
+        "//test/common/http:mocks",
+        "//src/filters/oidc:jwks_resolver",
         "@com_google_googletest//:gtest_main",
     ],
 )

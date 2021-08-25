@@ -26,17 +26,32 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
       config_(std::move(config)),
       oidc_session_store_(nullptr) {
   for (auto& filter : config_.filters()) {
-    if (filter.oidc().jwks_config_case() == config::oidc::OIDCConfig::kJwks) {
-      jwks_storage_map_.emplace_back(
-          std::make_shared<oidc::PermanentJwksStorageImpl>(
-              filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
-    } else {
-      jwks_storage_map_.emplace_back(
-          std::make_shared<oidc::NonPermanentJwksStorageImpl>(
-              filter.oidc().jwks_fetcher().jwks_uri(),
-              std::chrono::seconds(
-                  filter.oidc().jwks_fetcher().request_duration_sec()),
-              ioc));
+    // TODO(shikugawa): We need an abstraction to handle many types of filters.
+    if (filter.type_case() == config::Filter::TypeCase::kOidc) {
+      switch (filter.oidc().jwks_config_case()) {
+        case config::oidc::OIDCConfig::kJwks:
+          jwks_resolver_map_.emplace_back(
+              std::make_shared<oidc::StaticJwksResolverImpl>(
+                  filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
+          break;
+        case config::oidc::OIDCConfig::kJwksFetcher: {
+          uint32_t periodic_fetch_interval =
+              filter.oidc().jwks_fetcher().periodic_fetch_interval();
+          if (periodic_fetch_interval == 0) {
+            periodic_fetch_interval = 1200;
+          }
+
+          auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
+
+          jwks_resolver_map_.emplace_back(
+              std::make_shared<oidc::DynamicJwksResolverImpl>(
+                  filter.oidc().jwks_fetcher().jwks_uri(),
+                  std::chrono::seconds(periodic_fetch_interval), http_ptr,
+                  ioc));
+        } break;
+        default:
+          throw std::runtime_error("invalid JWKs config type");
+      }
     }
   }
 }
@@ -86,7 +101,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     }
     auto token_response_parser =
         std::make_shared<oidc::TokenResponseParserImpl>(
-            jwks_storage_map_[i]->jwks());
+            jwks_resolver_map_[i]->jwks());
     auto session_string_generator =
         std::make_shared<common::session::SessionStringGenerator>();
 
