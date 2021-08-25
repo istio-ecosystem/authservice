@@ -15,7 +15,10 @@
               "client_id": "test-istio",
               "client_secret": "01d4c175-e090-40ce-9182-a585cb19b0f5",
               "callback_uri": "https://localhost:9000/oauth/callback",
-              "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+              "jwks_fetcher": {
+                "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+                "periodic_fetch_interval": 1
+              },
               "scopes": [],
               "id_token": {
                 "preamble": "Bearer",

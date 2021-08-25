@@ -371,6 +371,15 @@ TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
             }
           },
           {
+            "oidc_override": {
+              "jwks_fetcher": {
+                "jwks_uri": "jwks_uri",
+                "periodic_fetch_interval": 1
+              },
+              "callback_uri": "https://ingress3/callback",
+            }
+          },
+          {
             "oidc": {
               "authorization_uri": "https://istio.io/auth/default",
               "token_uri": "https://istio.io/token",
@@ -426,6 +435,23 @@ TEST_F(GetConfigTest, OverrideOIDCConfigSuccess) {
               "client_secret": "xxxxx-yyyyy-zzzzz",
               "jwks": "some-value-2",
               "callback_uri": "https://ingress2/callback",
+            }
+          },
+          {
+            "oidc": {
+              "authorization_uri": "https://istio.io/auth/default",
+              "token_uri": "https://istio.io/token",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz",
+              "jwks_fetcher": {
+                "jwks_uri": "jwks_uri",
+                "periodic_fetch_interval": 1
+              },
+              "callback_uri": "https://ingress3/callback",
             }
           },
           {
