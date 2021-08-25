@@ -7,7 +7,6 @@ xx_library(
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
     deps = [
-        ":jwks_resolver",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -100,6 +99,18 @@ xx_library(
 )
 
 xx_library(
+    name = "jwks_resolver",
+    srcs = ["jwks_resolver.cc"],
+    hdrs = ["jwks_resolver.h"],
+    deps = [
+        "//src/common/http",
+        "@boost//:all",
+        "@com_google_absl//absl/synchronization:synchronization",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
+    ],
+)
+
+xx_library(
     name = "oidc_filter",
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],
@@ -112,21 +123,10 @@ xx_library(
         "//src/filters/oidc:in_memory_session_store",
         "//src/common/utilities:time_service",
         "//src/filters/oidc:token_response",
+        "//src/filters/oidc:jwks_resolver",
         "@boost//:all",
         "@com_github_abseil-cpp//absl/time:time",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
-    ],
-)
-
-xx_library(
-    name = "jwks_resolver",
-    srcs = ["jwks_resolver.cc"],
-    hdrs = ["jwks_resolver.h"],
-    deps = [
-        "//src/common/http",
-        "@boost//:all",
-        "@com_google_absl//absl/synchronization:synchronization",
-        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
 )
