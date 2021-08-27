@@ -240,7 +240,7 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   std::vector<std::string> audiences = {client_id};
 
   if (keys_ == nullptr) {
-    spdlog::info("{}: missing keys", __func__);
+    spdlog::info("{}: missing active JWKs ", __func__);
     return true;
   }
 

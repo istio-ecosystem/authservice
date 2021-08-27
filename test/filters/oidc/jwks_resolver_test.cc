@@ -118,17 +118,41 @@ TEST(JwksResolverTest, TestDynamicJwksResolver) {
   setExpectedRemoteJwks(*mock_http, valid_jwt_public_key_);
   io_context.run_for(std::chrono::seconds(3));
   EXPECT_EQ(google::jwt_verify::Status::Ok, resolver.jwks()->getStatus());
+  EXPECT_EQ(valid_jwt_public_key_, resolver.rawStringJwks());
 
   // Third flight to extract invalid JWKs. And JWKs not updated.
   setExpectedRemoteJwks(*mock_http, invalid_jwt_public_key_);
   io_context.run_for(std::chrono::seconds(3));
   EXPECT_EQ(google::jwt_verify::Status::Ok, resolver.jwks()->getStatus());
+  EXPECT_EQ(valid_jwt_public_key_, resolver.rawStringJwks());
 
   // Forth flight to update valid JWKs. It will update existing valid JWKS.
   setExpectedRemoteJwks(*mock_http, valid_jwt_public_key2_);
   io_context.run_for(std::chrono::seconds(3));
   EXPECT_EQ(google::jwt_verify::Status::Ok, resolver.jwks()->getStatus());
   EXPECT_EQ(valid_jwt_public_key2_, resolver.rawStringJwks());
+}
+
+TEST(JwksResolverTest, TestDynamicJwksResolverWithInvalidHttpStatus) {
+  boost::asio::io_context io_context;
+  auto mock_http = std::make_shared<common::http::HttpMock>();
+  DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(1),
+                                   mock_http, io_context);
+
+  // Never initialized with invalid HTTP status.
+  EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
+      .WillRepeatedly(
+          Invoke([](absl::string_view,
+                    const std::map<absl::string_view, absl::string_view>,
+                    absl::string_view, absl::string_view, absl::string_view,
+                    boost::asio::io_context&, boost::asio::yield_context) {
+            common::http::response_t response = std::make_unique<
+                beast::http::response<beast::http::string_body>>();
+            response->result(503);
+            return response;
+          }));
+  io_context.run_for(std::chrono::seconds(3));
+  EXPECT_EQ(nullptr, resolver.jwks());
 }
 
 }  // namespace
