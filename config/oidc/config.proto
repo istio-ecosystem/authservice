@@ -82,7 +82,8 @@ message OIDCConfig {
         // Required.
         string jwks_uri = 1;
         
-        // Request interval to check whether new JWKs are available. The default value is
+        // Request interval to check whether new JWKs are available. If not specified,
+        // default to 1200 seconds, 20min.
         // Optional.
         uint32 periodic_fetch_interval_sec = 2;
     }

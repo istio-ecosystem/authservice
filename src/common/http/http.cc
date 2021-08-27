@@ -483,7 +483,7 @@ response_t HttpImpl::Post(
       // https://github.com/boostorg/beast/issues/824
       if (ec != beast::errc::not_connected &&
           ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
         return response_t();
       }
     }
@@ -491,7 +491,7 @@ response_t HttpImpl::Post(
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
-    spdlog::info("{}: unexpected exception: {}", __func__, e.what());
+    spdlog::error("{}: unexpected exception: {}", __func__, e.what());
     return response_t();
   }
 }
@@ -608,7 +608,7 @@ response_t HttpImpl::Get(
       // https://github.com/boostorg/beast/issues/824
       if (ec != beast::errc::not_connected &&
           ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
         return response_t();
       }
     }
@@ -616,7 +616,7 @@ response_t HttpImpl::Get(
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
-    spdlog::info("{}: unexpected exception: {}", __func__, e.what());
+    spdlog::error("{}: unexpected exception: {}", __func__, e.what());
     return response_t();
   }
 }

@@ -238,6 +238,12 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   // value. Verify the token signature & that our client_id is set as an entry
   // in the token's `aud` field.
   std::vector<std::string> audiences = {client_id};
+
+  if (keys_ == nullptr) {
+    spdlog::info("{}: missing keys", __func__);
+    return true;
+  }
+
   auto jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
     spdlog::info("{}: `id_token` verification failed: {}", __func__,

@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <iostream>
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
@@ -17,20 +18,20 @@ class JwksResolver {
  public:
   virtual ~JwksResolver() = default;
 
-  virtual void updateJwks(const std::string& new_jwks,
-                          google::jwt_verify::Jwks::Type type) = 0;
-
   virtual google::jwt_verify::JwksPtr& jwks() = 0;
 
+  virtual const std::string& rawStringJwks() const = 0;
+
  protected:
-  google::jwt_verify::JwksPtr parseJwks(const std::string& jwks,
-                                        google::jwt_verify::Jwks::Type type) {
-    auto jwks_keys = google::jwt_verify::Jwks::createFrom(jwks, type);
+  google::jwt_verify::JwksPtr parseJwks(const std::string& jwks) {
+    auto jwks_keys = google::jwt_verify::Jwks::createFrom(
+        jwks, google::jwt_verify::Jwks::JWKS);
     spdlog::debug("status for jwks parsing: {}, {}", __func__,
                   google::jwt_verify::getStatusString(jwks_keys->getStatus()));
 
     if (jwks_keys->getStatus() != google::jwt_verify::Status::Ok) {
-      spdlog::warn("{}: failed to parse new JWKs", __func__);
+      spdlog::warn("{}: failed to parse new JWKs, {}", __func__,
+                   google::jwt_verify::getStatusString(jwks_keys->getStatus()));
     }
 
     return jwks_keys;
@@ -39,38 +40,35 @@ class JwksResolver {
 
 class StaticJwksResolverImpl : public JwksResolver {
  public:
-  explicit StaticJwksResolverImpl(const std::string& jwks,
-                                  google::jwt_verify::Jwks::Type type)
-      : type_(type) {
-    jwks_ = parseJwks(jwks, type_);
-  }
-
-  void updateJwks(const std::string&, google::jwt_verify::Jwks::Type) override {
+  explicit StaticJwksResolverImpl(const std::string& jwks) : raw_jwks_(jwks) {
+    jwks_ = parseJwks(jwks);
   }
 
   virtual google::jwt_verify::JwksPtr& jwks() override { return jwks_; }
 
+  const std::string& rawStringJwks() const override { return raw_jwks_; }
+
  private:
+  std::string raw_jwks_;
   google::jwt_verify::JwksPtr jwks_;
-  google::jwt_verify::Jwks::Type type_;
 };
 
 class DynamicJwksResolverImpl : public JwksResolver {
  public:
   class JwksFetcher {
    public:
-    JwksFetcher(JwksResolver* parent, common::http::ptr_t http_ptr,
+    JwksFetcher(DynamicJwksResolverImpl* parent, common::http::ptr_t http_ptr,
                 const std::string& jwks_uri, std::chrono::seconds duration,
                 boost::asio::io_context& ioc);
 
    private:
     void request(const boost::system::error_code&);
 
-    JwksResolver* parent_;
+    DynamicJwksResolverImpl* parent_;
     const std::string jwks_uri_;
     common::http::ptr_t http_ptr_;
     boost::asio::io_context& ioc_;
-    std::chrono::seconds duration_;
+    std::chrono::seconds periodic_fetch_interval_sec_;
     boost::asio::steady_timer timer_;
   };
 
@@ -84,11 +82,18 @@ class DynamicJwksResolverImpl : public JwksResolver {
     }
   }
 
-  void updateJwks(const std::string& new_jwks,
-                  google::jwt_verify::Jwks::Type type) override {
+  void updateJwks(const std::string& new_jwks) {
     absl::MutexLock lck(&mux_);
-    type_ = type;
-    jwks_ = parseJwks(new_jwks, type_);
+    auto tmp_jwk = parseJwks(new_jwks);
+
+    if (tmp_jwk->getStatus() != google::jwt_verify::Status::Ok) {
+      spdlog::info("{}: failed to update JWKs with status, {}", __func__,
+                   google::jwt_verify::getStatusString(tmp_jwk->getStatus()));
+      return;
+    }
+
+    raw_jwks_ = new_jwks;
+    jwks_ = std::move(tmp_jwk);
   }
 
   google::jwt_verify::JwksPtr& jwks() override {
@@ -96,9 +101,11 @@ class DynamicJwksResolverImpl : public JwksResolver {
     return jwks_;
   }
 
+  const std::string& rawStringJwks() const override { return raw_jwks_; }
+
  private:
+  std::string raw_jwks_ ABSL_GUARDED_BY(mux_);
   google::jwt_verify::JwksPtr jwks_ ABSL_GUARDED_BY(mux_);
-  google::jwt_verify::Jwks::Type type_;
   std::unique_ptr<JwksFetcher> jwks_fetcher_;
   absl::Mutex mux_;
 };

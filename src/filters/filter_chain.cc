@@ -32,7 +32,7 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
         case config::oidc::OIDCConfig::kJwks:
           jwks_resolver_map_.emplace_back(
               std::make_shared<oidc::StaticJwksResolverImpl>(
-                  filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS));
+                  filter.oidc().jwks()));
           break;
         case config::oidc::OIDCConfig::kJwksFetcher: {
           uint32_t periodic_fetch_interval_sec =
