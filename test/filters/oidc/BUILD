@@ -74,3 +74,13 @@ cc_test(
     ],
     linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
+
+cc_test(
+    name = "jwks_resolver_test",
+    srcs = ["jwks_resolver_test.cc"],
+    deps = [
+        "//test/common/http:mocks",
+        "//src/filters/oidc:jwks_resolver",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

@@ -1,7 +1,10 @@
 #include "filter_chain.h"
 
+#include <memory>
+
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "boost/asio/io_context.hpp"
 #include "config/config.pb.h"
 #include "config/oidc/config.pb.h"
 #include "config/oidc/config.pb.validate.h"
@@ -16,16 +19,47 @@
 namespace authservice {
 namespace filters {
 
-FilterChainImpl::FilterChainImpl(config::FilterChain config,
+FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
+                                 config::FilterChain config,
                                  unsigned int threads)
     : threads_(threads),
       config_(std::move(config)),
-      oidc_session_store_(nullptr) {}
+      oidc_session_store_(nullptr) {
+  for (auto& filter : config_.filters()) {
+    // TODO(shikugawa): We need an abstraction to handle many types of filters.
+    if (filter.type_case() == config::Filter::TypeCase::kOidc) {
+      switch (filter.oidc().jwks_config_case()) {
+        case config::oidc::OIDCConfig::kJwks:
+          jwks_resolver_map_.emplace_back(
+              std::make_shared<oidc::StaticJwksResolverImpl>(
+                  filter.oidc().jwks()));
+          break;
+        case config::oidc::OIDCConfig::kJwksFetcher: {
+          uint32_t periodic_fetch_interval_sec =
+              filter.oidc().jwks_fetcher().periodic_fetch_interval_sec();
+          if (periodic_fetch_interval_sec == 0) {
+            periodic_fetch_interval_sec = 1200;
+          }
 
-const std::string &FilterChainImpl::Name() const { return config_.name(); }
+          auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
+
+          jwks_resolver_map_.emplace_back(
+              std::make_shared<oidc::DynamicJwksResolverImpl>(
+                  filter.oidc().jwks_fetcher().jwks_uri(),
+                  std::chrono::seconds(periodic_fetch_interval_sec), http_ptr,
+                  ioc));
+        } break;
+        default:
+          throw std::runtime_error("invalid JWKs config type");
+      }
+    }
+  }
+}
+
+const std::string& FilterChainImpl::Name() const { return config_.name(); }
 
 bool FilterChainImpl::Matches(
-    const ::envoy::service::auth::v3::CheckRequest *request) const {
+    const ::envoy::service::auth::v3::CheckRequest* request) const {
   spdlog::trace("{}", __func__);
   if (config_.has_match()) {
     auto matched = request->attributes().request().http().headers().find(
@@ -50,7 +84,8 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
   int oidc_filter_count = 0;
-  for (auto &filter : *config_.mutable_filters()) {
+  for (auto i = 0; i < config_.filters_size(); ++i) {
+    auto& filter = *config_.mutable_filters(i);
     if (filter.has_oidc()) {
       ++oidc_filter_count;
     } else if (filter.has_mock()) {
@@ -64,13 +99,9 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
       throw std::runtime_error(
           "only one filter of type \"oidc\" is allowed in a chain");
     }
-
-    auto jwks_keys = google::jwt_verify::Jwks::createFrom(
-        filter.oidc().jwks(), google::jwt_verify::Jwks::Type::JWKS);
-    spdlog::debug("status for jwks parsing: {}, {}", __func__,
-                  google::jwt_verify::getStatusString(jwks_keys->getStatus()));
-    auto token_request_parser =
-        std::make_shared<oidc::TokenResponseParserImpl>(std::move(jwks_keys));
+    auto token_response_parser =
+        std::make_shared<oidc::TokenResponseParserImpl>(
+            jwks_resolver_map_[i]->jwks());
     auto session_string_generator =
         std::make_shared<common::session::SessionStringGenerator>();
 
@@ -108,7 +139,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
     }
 
     result->AddFilter(FilterPtr(
-        new oidc::OidcFilter(http, filter.oidc(), token_request_parser,
+        new oidc::OidcFilter(http, filter.oidc(), token_response_parser,
                              session_string_generator, oidc_session_store_)));
   }
   return result;

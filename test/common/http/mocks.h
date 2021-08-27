@@ -16,6 +16,14 @@ class HttpMock : public Http {
                  absl::string_view body, absl::string_view ca_cert,
                  absl::string_view proxy_uri, boost::asio::io_context &ioc,
                  boost::asio::yield_context yield));
+
+  MOCK_CONST_METHOD7(
+      Get,
+      response_t(absl::string_view uri,
+                 const std::map<absl::string_view, absl::string_view> &headers,
+                 absl::string_view body, absl::string_view ca_cert,
+                 absl::string_view proxy_uri, boost::asio::io_context &ioc,
+                 boost::asio::yield_context yield));
 };
 }  // namespace http
 }  // namespace common

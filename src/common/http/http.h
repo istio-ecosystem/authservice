@@ -185,6 +185,21 @@ class Http {
       absl::string_view body, absl::string_view ca_cert,
       absl::string_view proxy_uri, boost::asio::io_context &ioc,
       boost::asio::yield_context yield) const = 0;
+
+  /** @brief Asynchronously send a Get http message with a certificate
+   * authority. To be used inside a Boost co-routine.
+   * @param endpoint the endpoint to call
+   * @param headers the http headers
+   * @param body the http request body
+   * @param ca_cert the ca cert to be trusted in the http call
+   * @return http response.
+   */
+  virtual response_t Get(
+      absl::string_view uri,
+      const std::map<absl::string_view, absl::string_view> &headers,
+      absl::string_view body, absl::string_view ca_cert,
+      absl::string_view proxy_uri, boost::asio::io_context &ioc,
+      boost::asio::yield_context yield) const = 0;
 };
 
 /**
@@ -197,6 +212,12 @@ class HttpImpl : public Http {
                   absl::string_view body, absl::string_view ca_cert,
                   absl::string_view proxy_uri, boost::asio::io_context &ioc,
                   boost::asio::yield_context yield) const override;
+
+  response_t Get(absl::string_view uri,
+                 const std::map<absl::string_view, absl::string_view> &headers,
+                 absl::string_view body, absl::string_view ca_cert,
+                 absl::string_view proxy_uri, boost::asio::io_context &ioc,
+                 boost::asio::yield_context yield) const override;
 };
 
 }  // namespace http

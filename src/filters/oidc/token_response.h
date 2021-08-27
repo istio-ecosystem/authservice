@@ -68,7 +68,7 @@ class TokenResponseParser {
  */
 class TokenResponseParserImpl final : public TokenResponseParser {
  private:
-  google::jwt_verify::JwksPtr keys_;
+  google::jwt_verify::JwksPtr &keys_;
 
   absl::optional<int64_t> ParseAccessTokenExpiry(
       google::protobuf::Map<std::string, google::protobuf::Value> &fields)
@@ -84,7 +84,7 @@ class TokenResponseParserImpl final : public TokenResponseParser {
       google::protobuf::Map<std::string, google::protobuf::Value> fields) const;
 
  public:
-  TokenResponseParserImpl(google::jwt_verify::JwksPtr keys);
+  TokenResponseParserImpl(google::jwt_verify::JwksPtr &keys);
   std::shared_ptr<TokenResponse> Parse(
       const std::string &client_id, const std::string &nonce,
       const std::string &raw_response_string) const override;

@@ -483,7 +483,7 @@ response_t HttpImpl::Post(
       // https://github.com/boostorg/beast/issues/824
       if (ec != beast::errc::not_connected &&
           ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::info("{}: HTTP error encountered: {}", __func__, ec.message());
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
         return response_t();
       }
     }
@@ -491,7 +491,132 @@ response_t HttpImpl::Post(
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
-    spdlog::info("{}: unexpected exception: {}", __func__, e.what());
+    spdlog::error("{}: unexpected exception: {}", __func__, e.what());
+    return response_t();
+  }
+}
+
+response_t HttpImpl::Get(
+    absl::string_view uri,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    absl::string_view body, absl::string_view ca_cert,
+    absl::string_view proxy_uri, boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) const {
+  spdlog::trace("{}", __func__);
+  try {
+    int version = 11;
+
+    ssl::context ctx(ssl::context::tlsv12_client);
+    ctx.set_verify_mode(ssl::verify_peer);
+    ctx.set_default_verify_paths();
+
+    if (!ca_cert.empty()) {
+      spdlog::info("{}: Trusting the provided certificate authority", __func__);
+      beast::error_code ca_ec;
+      ctx.add_certificate_authority(
+          boost::asio::buffer(ca_cert.data(), ca_cert.size()), ca_ec);
+      if (ca_ec) {
+        throw boost::system::system_error{ca_ec};
+      }
+    }
+
+    auto parsed_uri = http::Uri(uri);
+
+    tcp::resolver resolver(ioc);
+    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+    if (!SSL_set_tlsext_host_name(stream.native_handle(),
+                                  parsed_uri.GetHost().c_str())) {
+      throw boost::system::error_code{static_cast<int>(::ERR_get_error()),
+                                      boost::asio::error::get_ssl_category()};
+    }
+
+    if (!proxy_uri.empty()) {
+      auto parsed_proxy_uri = http::Uri(proxy_uri);
+
+      const auto results = resolver.async_resolve(
+          parsed_proxy_uri.GetHost(),
+          std::to_string(parsed_proxy_uri.GetPort()), yield);
+      spdlog::info(
+          "{}: opening connection to proxy {} for request to destination {}:{}",
+          __func__, proxy_uri.data(), parsed_uri.GetHost(),
+          parsed_uri.GetPort());
+      beast::get_lowest_layer(stream).async_connect(results, yield);
+
+      std::string target = absl::StrCat(parsed_uri.GetHost(), ":",
+                                        std::to_string(parsed_uri.GetPort()));
+      beast::http::request<beast::http::string_body> http_connect_req{
+          beast::http::verb::connect, target, version};
+      http_connect_req.set(beast::http::field::host, target);
+
+      // Send the HTTP connect request to the remote host
+      beast::http::async_write(stream.next_layer(), http_connect_req, yield);
+
+      // Read the response from the server
+      boost::beast::flat_buffer http_connect_buffer;
+      beast::http::response<beast::http::empty_body> http_connect_res;
+      beast::http::parser<false, beast::http::empty_body> p(http_connect_res);
+      p.skip(true);  // skip reading the body of the response because there
+                     // won't be a body
+
+      beast::http::async_read(stream.next_layer(), http_connect_buffer, p,
+                              yield);
+      if (http_connect_res.result() != beast::http::status::ok) {
+        throw std::runtime_error(
+            absl::StrCat("http connect failed with status: ",
+                         http_connect_res.result_int()));
+      }
+
+    } else {
+      spdlog::info("{}: opening connection to {}:{}", __func__,
+                   parsed_uri.GetHost(), parsed_uri.GetPort());
+      const auto results = resolver.async_resolve(
+          parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
+      beast::get_lowest_layer(stream).async_connect(results, yield);
+    }
+
+    stream.async_handshake(ssl::stream_base::client, yield);
+    // Set up an HTTP POST request message
+    beast::http::request<beast::http::string_body> req{
+        beast::http::verb::get, parsed_uri.GetPathQueryFragment(), version};
+    req.set(beast::http::field::host, parsed_uri.GetHost());
+    for (auto header : headers) {
+      req.set(boost::beast::string_view(header.first.data()),
+              boost::beast::string_view(header.second.data()));
+    }
+    auto &req_body = req.body();
+    req_body.reserve(body.size());
+    req_body.append(body.begin(), body.end());
+    req.prepare_payload();
+    // Send the HTTP request to the remote host
+    beast::http::async_write(stream, req, yield);
+
+    // Read response
+    beast::flat_buffer buffer;
+    response_t res(new beast::http::response<beast::http::string_body>);
+    beast::http::async_read(stream, buffer, *res, yield);
+
+    // Gracefully close the socket.
+    // Receive an error code instead of throwing an exception if this fails, so
+    // we can ignore some expected not_connected errors.
+    boost::system::error_code ec;
+    stream.async_shutdown(yield[ec]);
+
+    if (ec) {
+      // not_connected happens sometimes so don't bother reporting it.
+      // stream_truncated also happens sometime and we choose to ignore the
+      // stream_truncated error, as recommended by the github thread:
+      // https://github.com/boostorg/beast/issues/824
+      if (ec != beast::errc::not_connected &&
+          ec != boost::asio::ssl::error::stream_truncated) {
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
+        return response_t();
+      }
+    }
+
+    return res;
+    // If we get here then the connection is closed gracefully
+  } catch (std::exception const &e) {
+    spdlog::error("{}: unexpected exception: {}", __func__, e.what());
     return response_t();
   }
 }

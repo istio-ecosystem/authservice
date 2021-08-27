@@ -3,10 +3,12 @@
 
 #include <memory>
 
+#include "boost/asio/io_context.hpp"
 #include "config/config.pb.h"
 #include "config/oidc/config.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/filters/filter.h"
+#include "src/filters/oidc/jwks_resolver.h"
 #include "src/filters/oidc/session_store.h"
 
 namespace authservice {
@@ -53,9 +55,11 @@ class FilterChainImpl : public FilterChain {
   unsigned int threads_;
   config::FilterChain config_;
   std::shared_ptr<oidc::SessionStore> oidc_session_store_;
+  std::vector<std::shared_ptr<oidc::JwksResolver>> jwks_resolver_map_;
 
  public:
-  explicit FilterChainImpl(config::FilterChain config, unsigned int threads);
+  explicit FilterChainImpl(boost::asio::io_context &ioc,
+                           config::FilterChain config, unsigned int threads);
 
   const std::string &Name() const override;
 
