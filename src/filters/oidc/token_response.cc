@@ -81,7 +81,7 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
   const auto status = ::google::protobuf::util::JsonStringToMessage(
       raw_string_piece, &message, options);
   if (!status.ok()) {
-    spdlog::info("{}: JSON parsing error: {}", __func__,
+    spdlog::warn("{}: JSON parsing error: {}", __func__,
                  status.message().data());
     return nullptr;
   }
@@ -137,7 +137,7 @@ TokenResponseParserImpl::ParseRefreshTokenResponse(
   const auto status = ::google::protobuf::util::JsonStringToMessage(
       raw_string_piece, &message, options);
   if (!status.ok()) {
-    spdlog::info("{}: JSON parsing error: {}", __func__,
+    spdlog::warn("{}: JSON parsing error: {}", __func__,
                  status.message().data());
     return nullptr;
   }
@@ -192,14 +192,14 @@ absl::optional<google::jwt_verify::Jwt> TokenResponseParserImpl::ParseIDToken(
   if (id_token_str == fields.end() ||
       id_token_str->second.kind_case() !=
           google::protobuf::Value::kStringValue) {
-    spdlog::info("{}: missing or invalid `id_token` in token response",
+    spdlog::warn("{}: missing or invalid `id_token` in token response",
                  __func__);
     return absl::nullopt;
   }
   auto jwt_status =
       id_token.parseFromString(id_token_str->second.string_value());
   if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::info("{}: failed to parse `id_token` into a JWT: {}", __func__,
+    spdlog::warn("{}: failed to parse `id_token` into a JWT: {}", __func__,
                  google::jwt_verify::getStatusString(jwt_status));
     return absl::nullopt;
   }
@@ -214,7 +214,7 @@ bool TokenResponseParserImpl::IsInvalid(
   if (token_type == fields.end() ||
       !(absl::EqualsIgnoreCase(token_type->second.string_value(),
                                bearer_token_type))) {
-    spdlog::info("{}: missing or incorrect `token_type` in token response",
+    spdlog::warn("{}: missing or incorrect `token_type` in token response",
                  __func__);
     return true;
   }
@@ -223,7 +223,7 @@ bool TokenResponseParserImpl::IsInvalid(
   if (expires_in_iter != fields.end()) {
     auto expires_in = int64_t(expires_in_iter->second.number_value());
     if (expires_in <= 0) {
-      spdlog::info("{}: invalid `expired_in` token response field", __func__);
+      spdlog::warn("{}: invalid `expired_in` token response field", __func__);
       return true;
     }
   }
@@ -240,13 +240,13 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   std::vector<std::string> audiences = {client_id};
 
   if (keys_ == nullptr) {
-    spdlog::info("{}: missing active JWKs ", __func__);
+    spdlog::warn("{}: missing active JWKs ", __func__);
     return true;
   }
 
   auto jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::info("{}: `id_token` verification failed: {}", __func__,
+    spdlog::warn("{}: `id_token` verification failed: {}", __func__,
                  google::jwt_verify::getStatusString(jwt_status));
     return true;
   }
@@ -255,12 +255,12 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   google::jwt_verify::StructUtils getter(id_token.payload_pb_);
   if (getter.GetString(nonce_field, &extracted_nonce) !=
       google::jwt_verify::StructUtils::OK) {
-    spdlog::info("{}: failed to retrieve `nonce` from id_token", __func__);
+    spdlog::warn("{}: failed to retrieve `nonce` from id_token", __func__);
     return true;
   }
 
   if (nonce != extracted_nonce) {
-    spdlog::info("{}: invalid `nonce` field in id_token", __func__);
+    spdlog::warn("{}: invalid `nonce` field in id_token", __func__);
     return true;
   }
 

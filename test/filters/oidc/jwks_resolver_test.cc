@@ -66,10 +66,10 @@ const char invalid_jwt_public_key_[] = R"(
         {
            "kty": "XYZ",
            "crv": "P-256",
-           "x": "unko",
-           "y": "unko",
-           "alg": "unko",
-           "kid": "fuck"
+           "x": "test",
+           "y": "test",
+           "alg": "test",
+           "kid": "test"
         }
      ]
    }
