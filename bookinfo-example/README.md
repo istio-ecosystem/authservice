@@ -61,8 +61,9 @@ URI to be hosted on a protected endpoint.
    Copy the output JWK (with escape) literally to the [templates/config.yaml](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/authservice/templates/config.yaml#L30)
    to replace the JWK content.
 
-   TODO(Shikugawa): this is a limitation. We are currently working on making authservice fetch JWK
-   by itself when a jwk URI is provided. See https://github.com/istio-ecosystem/authservice/issues/34.
+1. If you are using a Google account as your Identity Provider, you need to specify
+the following redirect URL for the client ID you are using. In this example,
+it would be `https://localhost:8443/productpage/oauth/callback`.
 
 1. Install authservice via Helm.
 
@@ -277,3 +278,5 @@ containers:
 Where I can find the authservice images?
 
 We use Github packages to host [authservice images](https://github.com/istio-ecosystem/authservice/pkgs/container/authservice%2Fauthservice).
+
+You can specify any docker image by configuring `--set authservice.image=${YOUR_IMAGE}` as helm option.
