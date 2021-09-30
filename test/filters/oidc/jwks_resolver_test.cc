@@ -1,5 +1,6 @@
 #include "src/filters/oidc/jwks_resolver.h"
 
+#include <chrono>
 #include <memory>
 #include <string_view>
 
@@ -106,7 +107,8 @@ TEST(JwksResolverTest, TestDynamicJwksResolver) {
   boost::asio::io_context io_context;
   auto mock_http = std::make_shared<common::http::HttpMock>();
   DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(1),
-                                   mock_http, io_context);
+                                   std::chrono::seconds(3), mock_http,
+                                   io_context);
 
   // First flight to extract invalid JWKs.
   setExpectedRemoteJwks(*mock_http, invalid_jwt_public_key_);
@@ -137,7 +139,8 @@ TEST(JwksResolverTest, TestDynamicJwksResolverWithInvalidHttpStatus) {
   boost::asio::io_context io_context;
   auto mock_http = std::make_shared<common::http::HttpMock>();
   DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(1),
-                                   mock_http, io_context);
+                                   std::chrono::seconds(3), mock_http,
+                                   io_context);
 
   // Never initialized with invalid HTTP status.
   EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
@@ -153,6 +156,40 @@ TEST(JwksResolverTest, TestDynamicJwksResolverWithInvalidHttpStatus) {
           }));
   io_context.run_for(std::chrono::seconds(3));
   EXPECT_EQ(nullptr, resolver.jwks());
+}
+
+TEST(JwksResolverTest,
+     TestDynamicJwksResolverRequestBy3SecIntervalUntilJwksConfigured) {
+  boost::asio::io_context io_context;
+  auto mock_http = std::make_shared<common::http::HttpMock>();
+
+  // Configured request interval as 10000 sec. This value is enough to guarantee
+  // that second request will not be invoked for 3 sec evloop run.
+  DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(10000),
+                                   std::chrono::seconds(3), mock_http,
+                                   io_context);
+
+  // Initially make mock server always return invalid HTTP response as 503.
+  EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
+      .WillRepeatedly(
+          Invoke([](absl::string_view,
+                    const std::map<absl::string_view, absl::string_view>,
+                    absl::string_view, absl::string_view, absl::string_view,
+                    boost::asio::io_context&, boost::asio::yield_context) {
+            common::http::response_t response = std::make_unique<
+                beast::http::response<beast::http::string_body>>();
+            response->result(503);
+            return response;
+          }));
+
+  io_context.run_for(std::chrono::seconds(4));
+  EXPECT_EQ(nullptr, resolver.jwks());
+
+  // Called successful request after 4 sec.
+  setExpectedRemoteJwks(*mock_http, valid_jwt_public_key_);
+  io_context.run_for(std::chrono::seconds(4));
+  EXPECT_EQ(google::jwt_verify::Status::Ok, resolver.jwks()->getStatus());
+  EXPECT_EQ(valid_jwt_public_key_, resolver.rawStringJwks());
 }
 
 }  // namespace

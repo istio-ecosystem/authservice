@@ -88,6 +88,10 @@ The configuration of an OpenID Connect filter that can be used to retrieve ident
 | JwksFetcherConfig | This message defines a setting to allow asynchronous retrieval and update of the JWK for JWT validation at regular intervals. | message |
 | jwks_uri | Request URI that has the JWKs. Required. | string |
 | periodic_fetch_interval_sec | Request interval to check whether new JWKs are available. If not specified, default to 1200 seconds, 20min. Optional. | uint32 |
+<<<<<<< HEAD
+| initial_fetch_delay_sec | The delay seconds to fetch JWKs from system startup, If not specified, default to 3 seconds. Optional. | uint32 |
+=======
+>>>>>>> 0ae3aa4... add docs for dynamic JWKs resolver (#162)
 | jwks_config |  | oneof |
 | jwks | The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in the OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). Note that this JSON value must be escaped when embedded in a json configmap (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)). Used during token verification. | string |
 | jwks_fetcher | Configuration to allow JWKs to be retrieved and updated asynchronously at regular intervals. | JwksFetcherConfig |

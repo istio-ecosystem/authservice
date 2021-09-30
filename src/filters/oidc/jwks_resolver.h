@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
@@ -58,6 +59,7 @@ class DynamicJwksResolverImpl : public JwksResolver {
    public:
     JwksFetcher(DynamicJwksResolverImpl* parent, common::http::ptr_t http_ptr,
                 const std::string& jwks_uri, std::chrono::seconds duration,
+                std::chrono::seconds initial_fetch_delay_sec,
                 boost::asio::io_context& ioc);
 
    private:
@@ -68,16 +70,18 @@ class DynamicJwksResolverImpl : public JwksResolver {
     common::http::ptr_t http_ptr_;
     boost::asio::io_context& ioc_;
     std::chrono::seconds periodic_fetch_interval_sec_;
+    std::chrono::seconds initial_fetch_delay_sec_;
     boost::asio::steady_timer timer_;
   };
 
   explicit DynamicJwksResolverImpl(const std::string& jwks_uri,
                                    std::chrono::seconds duration,
+                                   std::chrono::seconds initial_fetch_delay_sec,
                                    common::http::ptr_t http_ptr,
                                    boost::asio::io_context& ioc) {
     if (duration != std::chrono::seconds(0)) {
-      jwks_fetcher_ = std::make_unique<JwksFetcher>(this, http_ptr, jwks_uri,
-                                                    duration, ioc);
+      jwks_fetcher_ = std::make_unique<JwksFetcher>(
+          this, http_ptr, jwks_uri, duration, initial_fetch_delay_sec, ioc);
     }
   }
 
