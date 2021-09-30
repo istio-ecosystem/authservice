@@ -10,6 +10,7 @@ cc_library(
     ],
     deps = [
         "//config:config_cc",
+        "//rpc:healthcheck_cc_grpc",
         "//src/config",
         "//src/filters:filter_chain",
         "//src/common/http",

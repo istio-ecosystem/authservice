@@ -153,5 +153,14 @@ void FilterChainImpl::DoPeriodicCleanup() {
   }
 }
 
+bool FilterChainImpl::allJwksActiveInFilters() const {
+  for (auto&& jwk_resolver : jwks_resolver_map_) {
+    if (jwk_resolver->jwks() == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace filters
 }  // namespace authservice

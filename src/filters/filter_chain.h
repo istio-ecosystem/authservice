@@ -48,6 +48,11 @@ class FilterChain {
    * sessions and any other resources.
    */
   virtual void DoPeriodicCleanup() = 0;
+
+  /**
+   * Return true if JWKs on each filters are active.
+   */
+  virtual bool allJwksActiveInFilters() const = 0;
 };
 
 class FilterChainImpl : public FilterChain {
@@ -69,6 +74,8 @@ class FilterChainImpl : public FilterChain {
   std::unique_ptr<Filter> New() override;
 
   virtual void DoPeriodicCleanup() override;
+
+  bool allJwksActiveInFilters() const override;
 };
 
 }  // namespace filters

@@ -1,5 +1,6 @@
-// This code is derived from gRPC official docs.
+// This code is derived from gRPC official docs for the compatibility of grpc_health_probe.
 // https://github.com/grpc/grpc/blob/master/doc/health-checking.md
+// https://github.com/grpc-ecosystem/grpc-health-probe
 
 syntax = "proto3";
 
