@@ -43,7 +43,7 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
           }
 
           uint32_t initial_fetch_delay_sec =
-              filter.oidc().jwks_fetcher().initial_delay_fetch_sec();
+              filter.oidc().jwks_fetcher().initial_fetch_delay_sec();
           if (initial_fetch_delay_sec == 0) {
             initial_fetch_delay_sec = 3;
           }
