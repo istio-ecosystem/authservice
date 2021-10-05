@@ -10,8 +10,6 @@ namespace oidc {
 
 class SessionStore;
 
-typedef std::shared_ptr<SessionStore> SessionStorePtr;
-
 class SessionStore {
  public:
   virtual void SetTokenResponse(
@@ -39,6 +37,8 @@ class SessionError : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;
 };
+
+using SessionStorePtr = std::shared_ptr<SessionStore>;
 
 }  // namespace oidc
 }  // namespace filters

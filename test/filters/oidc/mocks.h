@@ -1,6 +1,8 @@
 #ifndef AUTHSERVICE_TEST_FILTERS_OIDC_MOCKS_H_
 #define AUTHSERVICE_TEST_FILTERS_OIDC_MOCKS_H_
 
+#include <gmock/gmock-function-mocker.h>
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
@@ -12,6 +14,8 @@
 namespace authservice {
 namespace filters {
 namespace oidc {
+
+using testing::ReturnRef;
 
 class SessionStoreMock final : public SessionStore {
  public:
@@ -80,6 +84,16 @@ class RedisWrapperMock : public RedisWrapper {
 
   MOCK_METHOD2(expireat, bool(const absl::string_view, long long));
 };
+
+// class MockJwksResolver : public JwksResolver {
+//  public:
+//   MockJwksResolver(google::jwt_verify::JwksPtr &jwks_status) {
+//     ON_CALL(*this, jwks()).WillByDefault(ReturnRef(jwks_status));
+//   }
+
+//   MOCK_METHOD(google::jwt_verify::JwksPtr &, jwks, ());
+//   MOCK_METHOD(const std::string &, rawStringJwks, (), (const));
+// };
 
 }  // namespace oidc
 }  // namespace filters

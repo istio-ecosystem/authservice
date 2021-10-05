@@ -4,6 +4,7 @@
 #include "config/oidc/config.pb.h"
 #include "gtest/gtest.h"
 #include "src/filters/pipe.h"
+#include "test/filters/oidc/mocks.h"
 
 namespace authservice {
 namespace filters {
@@ -99,6 +100,11 @@ TEST(FilterChainTest, MockFilter) {
   FilterChainImpl chain(io_context, *configuration, 1);
   auto instance = chain.New();
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+}
+
+TEST(FilterChainTest, CheckJwks) {
+  // google::jwt_verify::JwksPtr jwks = nullptr;
+  // MockJwksResolver resolver(jwks);
 }
 
 }  // namespace filters

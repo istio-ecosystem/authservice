@@ -3,6 +3,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
+#include <memory>
 
 #include "absl/strings/string_view.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"

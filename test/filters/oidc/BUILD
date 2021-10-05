@@ -10,6 +10,7 @@ cc_library(
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
     ],
+    visibility = ["//visibility:public"],
 )
 
 cc_test(
