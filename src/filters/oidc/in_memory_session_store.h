@@ -4,6 +4,7 @@
 #include "src/common/utilities/synchronized.h"
 #include "src/common/utilities/time_service.h"
 #include "src/filters/oidc/session_store.h"
+#include "src/filters/oidc/session_store_factory.h"
 
 namespace authservice {
 namespace filters {
@@ -50,6 +51,20 @@ class InMemorySessionStore : public SessionStore {
   virtual void RemoveSession(absl::string_view session_id) override;
 
   virtual void RemoveAllExpired() override;
+};
+
+class InMemorySessionStoreFactory : public SessionStoreFactory {
+ public:
+  InMemorySessionStoreFactory(uint32_t absolute_session_timeout,
+                              uint32_t idle_session_timeout)
+      : absolute_session_timeout_(absolute_session_timeout),
+        idle_session_timeout_(idle_session_timeout) {}
+
+  SessionStorePtr create() override;
+
+ private:
+  uint32_t absolute_session_timeout_ = 0;
+  uint32_t idle_session_timeout_ = 0;
 };
 
 }  // namespace oidc

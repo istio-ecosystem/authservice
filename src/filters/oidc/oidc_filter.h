@@ -9,6 +9,8 @@
 #include "src/common/session/session_string_generator.h"
 #include "src/common/utilities/random.h"
 #include "src/filters/filter.h"
+#include "src/filters/filter_factory.h"
+#include "src/filters/oidc/jwks_resolver.h"
 #include "src/filters/oidc/session_store.h"
 #include "src/filters/oidc/token_response.h"
 
@@ -227,6 +229,23 @@ class OidcFilter final : public filters::Filter {
 
   /** @brief Get sessionID cookie name */
   std::string GetSessionIdCookieName() const;
+};
+
+class FilterFactory : public filters::FilterFactory {
+ public:
+  FilterFactory(const config::oidc::OIDCConfig &config,
+                oidc::SessionStorePtr session_store,
+                oidc::JwksResolverCachePtr resolver_cache)
+      : config_(config),
+        session_store_(session_store),
+        resolver_cache_(resolver_cache) {}
+
+  filters::FilterPtr create() override;
+
+ private:
+  const config::oidc::OIDCConfig config_;
+  oidc::SessionStorePtr session_store_;
+  oidc::JwksResolverCachePtr resolver_cache_;
 };
 
 }  // namespace oidc

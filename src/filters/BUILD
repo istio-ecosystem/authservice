@@ -25,6 +25,14 @@ xx_library(
 )
 
 xx_library(
+    name = "filter_factory",
+    hdrs = ["filter_factory.h"],
+    deps = [
+        ":pipe",
+    ]
+)
+
+xx_library(
     name = "filter_chain",
     srcs = [
         "filter_chain.cc",
@@ -33,6 +41,7 @@ xx_library(
         "filter_chain.h",
     ],
     deps = [
+        ":filter_factory",
         "//config:config_cc",
         "//src/config",
         "//src/filters:filter",

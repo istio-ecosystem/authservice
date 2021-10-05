@@ -182,6 +182,12 @@ void InMemorySessionStore::Set(absl::string_view session_id,
   }
 }
 
+SessionStorePtr InMemorySessionStoreFactory::create() {
+  return std::make_shared<oidc::InMemorySessionStore>(
+      std::make_shared<common::utilities::TimeService>(),
+      absolute_session_timeout_, idle_session_timeout_);
+}
+
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice

@@ -226,6 +226,20 @@ void RedisSessionStore::RefreshExpiration(
 
 void RedisSessionStore::RemoveAllExpired() {}
 
+SessionStorePtr RedisSessionStoreFactory::create() {
+  auto redis_sever_uri = config_.server_uri();
+  spdlog::trace("{}: redis configuration found. attempting to connect to: {}",
+                __func__, redis_sever_uri);
+  auto redis_wrapper =
+      std::make_shared<oidc::RedisWrapper>(redis_sever_uri, threads_);
+  auto redis_retry_wrapper =
+      std::make_shared<oidc::RedisRetryWrapper>(redis_wrapper);
+
+  return std::make_shared<oidc::RedisSessionStore>(
+      std::make_shared<common::utilities::TimeService>(),
+      absolute_session_timeout_, idle_session_timeout_, redis_retry_wrapper);
+}
+
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice

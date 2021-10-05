@@ -1,5 +1,7 @@
 #include "mock_filter.h"
 
+#include <memory>
+
 #include "spdlog/spdlog.h"
 
 namespace authservice {
@@ -20,6 +22,10 @@ enum google::rpc::Code MockFilter::Process(
 }
 
 absl::string_view MockFilter::Name() const { return "mock"; }
+
+filters::FilterPtr FilterFactory::create() {
+  return std::make_unique<MockFilter>(config_);
+}
 
 }  // namespace mock
 }  // namespace filters
