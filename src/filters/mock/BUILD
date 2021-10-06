@@ -9,6 +9,7 @@ xx_library(
     deps = [
         "//config/mock:config_cc",
         "//src/filters:filter",
+        "//src/filters:filter_factory",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
     ],

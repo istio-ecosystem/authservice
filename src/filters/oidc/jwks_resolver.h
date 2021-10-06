@@ -6,13 +6,17 @@
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
+#include "boost/asio/io_context.hpp"
+#include "config/oidc/config.pb.h"
 #include "jwt_verify_lib/jwks.h"
 #include "src/common/http/http.h"
 
 namespace authservice {
 namespace filters {
 namespace oidc {
-
+namespace {
+constexpr uint32_t kJwksPeriodicFetchIntervalSec = 1200;
+}
 class JwksResolver {
  public:
   virtual ~JwksResolver() = default;
@@ -36,6 +40,8 @@ class JwksResolver {
     return jwks_keys;
   }
 };
+
+using JwksResolverPtr = std::shared_ptr<JwksResolver>;
 
 class StaticJwksResolverImpl : public JwksResolver {
  public:
@@ -108,6 +114,43 @@ class DynamicJwksResolverImpl : public JwksResolver {
   std::unique_ptr<JwksFetcher> jwks_fetcher_;
   absl::Mutex mux_;
 };
+
+class JwksResolverCache {
+ public:
+  JwksResolverCache(const config::oidc::OIDCConfig& config,
+                    boost::asio::io_context& ioc)
+      : config_(config) {
+    switch (config_.jwks_config_case()) {
+      case config::oidc::OIDCConfig::kJwks:
+        resolver_ =
+            std::make_shared<oidc::StaticJwksResolverImpl>(config_.jwks());
+        break;
+      case config::oidc::OIDCConfig::kJwksFetcher: {
+        uint32_t periodic_fetch_interval_sec =
+            config_.jwks_fetcher().periodic_fetch_interval_sec();
+        if (periodic_fetch_interval_sec == 0) {
+          periodic_fetch_interval_sec = kJwksPeriodicFetchIntervalSec;
+        }
+
+        auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
+        resolver_ = std::make_shared<oidc::DynamicJwksResolverImpl>(
+            config_.jwks_fetcher().jwks_uri(),
+            std::chrono::seconds(periodic_fetch_interval_sec), http_ptr, ioc);
+        break;
+      }
+      default:
+        throw std::runtime_error("invalid JWKs config type");
+    }
+  }
+
+  JwksResolverPtr getResolver() { return resolver_; }
+
+ private:
+  JwksResolverPtr resolver_;
+  const config::oidc::OIDCConfig config_;
+};
+
+using JwksResolverCachePtr = std::shared_ptr<JwksResolverCache>;
 
 }  // namespace oidc
 }  // namespace filters

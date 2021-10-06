@@ -4,6 +4,7 @@
 #include "config/mock/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/filters/filter.h"
+#include "src/filters/filter_factory.h"
 
 namespace authservice {
 namespace filters {
@@ -23,6 +24,17 @@ class MockFilter final : public filters::Filter {
 
   absl::string_view Name() const override;
 };
+
+class FilterFactory : public filters::FilterFactory {
+ public:
+  FilterFactory(const config::mock::MockConfig &config) : config_(config) {}
+
+  filters::FilterPtr create() override;
+
+ private:
+  const config::mock::MockConfig config_;
+};
+
 }  // namespace mock
 }  // namespace filters
 }  // namespace authservice

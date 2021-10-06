@@ -2,10 +2,13 @@
 
 #include <algorithm>
 #include <boost/beast.hpp>
+#include <memory>
 #include <sstream>
 
 #include "absl/strings/str_join.h"
+#include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
+#include "jwks_resolver.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
@@ -689,6 +692,17 @@ google::rpc::Code OidcFilter::RetrieveToken(
 }
 
 absl::string_view OidcFilter::Name() const { return filter_name_; }
+
+FilterPtr FilterFactory::create() {
+  auto token_response_parser = std::make_shared<oidc::TokenResponseParserImpl>(
+      resolver_cache_->getResolver()->jwks());
+  auto session_string_generator =
+      std::make_shared<common::session::SessionStringGenerator>();
+  auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
+
+  return std::make_unique<OidcFilter>(http_ptr, config_, token_response_parser,
+                                      session_string_generator, session_store_);
+}
 
 }  // namespace oidc
 }  // namespace filters

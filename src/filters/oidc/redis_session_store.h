@@ -1,10 +1,14 @@
 #ifndef AUTHSERVICE_REDIS_SESSION_STORE_H
 #define AUTHSERVICE_REDIS_SESSION_STORE_H
 
+#include <cstdint>
+
+#include "config/oidc/config.pb.h"
 #include "src/common/utilities/synchronized.h"
 #include "src/common/utilities/time_service.h"
 #include "src/filters/oidc/redis_retry_wrapper.h"
 #include "src/filters/oidc/session_store.h"
+#include "src/filters/oidc/session_store_factory.h"
 
 namespace authservice {
 namespace filters {
@@ -51,6 +55,25 @@ class RedisSessionStore : public SessionStore {
 
   virtual void RefreshExpiration(absl::string_view session_id,
                                  absl::optional<std::string> time_added_opt);
+};
+
+class RedisSessionStoreFactory : public SessionStoreFactory {
+ public:
+  RedisSessionStoreFactory(const config::oidc::RedisConfig& config,
+                           uint32_t absolute_session_timeout,
+                           uint32_t idle_session_timeout, uint32_t threads)
+      : threads_(threads),
+        absolute_session_timeout_(absolute_session_timeout),
+        idle_session_timeout_(idle_session_timeout),
+        config_(config) {}
+
+  SessionStorePtr create() override;
+
+ private:
+  const uint32_t threads_ = 1;
+  const uint32_t absolute_session_timeout_ = 0;
+  const uint32_t idle_session_timeout_ = 0;
+  const config::oidc::RedisConfig config_;
 };
 
 }  // namespace oidc

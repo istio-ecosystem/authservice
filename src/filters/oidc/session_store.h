@@ -8,10 +8,6 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
-class SessionStore;
-
-typedef std::shared_ptr<SessionStore> SessionStorePtr;
-
 class SessionStore {
  public:
   virtual void SetTokenResponse(
@@ -34,6 +30,8 @@ class SessionStore {
 
   virtual void RemoveAllExpired() = 0;
 };
+
+using SessionStorePtr = std::shared_ptr<SessionStore>;
 
 class SessionError : public std::runtime_error {
  public:
