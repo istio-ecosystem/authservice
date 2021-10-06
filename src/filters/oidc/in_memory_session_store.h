@@ -63,8 +63,8 @@ class InMemorySessionStoreFactory : public SessionStoreFactory {
   SessionStorePtr create() override;
 
  private:
-  uint32_t absolute_session_timeout_ = 0;
-  uint32_t idle_session_timeout_ = 0;
+  const uint32_t absolute_session_timeout_ = 0;
+  const uint32_t idle_session_timeout_ = 0;
 };
 
 }  // namespace oidc

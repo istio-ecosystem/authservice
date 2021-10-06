@@ -77,10 +77,10 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
   // Create filter chain factory
   for (const auto& filter : config_.filters()) {
     if (filter.has_mock()) {
-      filter_factory_chain_.emplace_back(
+      filter_factories_.emplace_back(
           std::make_unique<mock::FilterFactory>(filter.mock()));
     } else if (filter.has_oidc()) {
-      filter_factory_chain_.emplace_back(std::make_unique<oidc::FilterFactory>(
+      filter_factories_.emplace_back(std::make_unique<oidc::FilterFactory>(
           filter.oidc(), oidc_session_store_, jwks_resolver_cache_));
     } else {
       throw std::runtime_error("invalid filter type");
@@ -116,7 +116,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
 
-  for (auto&& filter_factory : filter_factory_chain_) {
+  for (auto&& filter_factory : filter_factories_) {
     result->AddFilter(filter_factory->create());
   }
 

@@ -14,7 +14,9 @@
 namespace authservice {
 namespace filters {
 namespace oidc {
-
+namespace {
+constexpr uint32_t kJwksPeriodicFetchIntervalSec = 1200;
+}
 class JwksResolver {
  public:
   virtual ~JwksResolver() = default;
@@ -115,7 +117,7 @@ class DynamicJwksResolverImpl : public JwksResolver {
 
 class JwksResolverCache {
  public:
-  JwksResolverCache(const authservice::config::oidc::OIDCConfig& config,
+  JwksResolverCache(const config::oidc::OIDCConfig& config,
                     boost::asio::io_context& ioc)
       : config_(config) {
     switch (config_.jwks_config_case()) {
@@ -127,7 +129,7 @@ class JwksResolverCache {
         uint32_t periodic_fetch_interval_sec =
             config_.jwks_fetcher().periodic_fetch_interval_sec();
         if (periodic_fetch_interval_sec == 0) {
-          periodic_fetch_interval_sec = 1200;
+          periodic_fetch_interval_sec = kJwksPeriodicFetchIntervalSec;
         }
 
         auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -145,7 +147,7 @@ class JwksResolverCache {
 
  private:
   JwksResolverPtr resolver_;
-  const authservice::config::oidc::OIDCConfig& config_;
+  const config::oidc::OIDCConfig config_;
 };
 
 using JwksResolverCachePtr = std::shared_ptr<JwksResolverCache>;

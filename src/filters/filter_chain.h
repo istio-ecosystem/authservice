@@ -58,7 +58,7 @@ class FilterChainImpl : public FilterChain {
   config::FilterChain config_;
   oidc::SessionStorePtr oidc_session_store_;
   oidc::JwksResolverCachePtr jwks_resolver_cache_;
-  std::vector<FilterFactoryPtr> filter_factory_chain_;
+  std::vector<FilterFactoryPtr> filter_factories_;
 
  public:
   explicit FilterChainImpl(boost::asio::io_context &ioc,
