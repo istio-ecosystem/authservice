@@ -31,7 +31,8 @@ void ConfigValidator::ValidateAll(const Config& config) {
       if (filter.has_mock()) {
         continue;
       } else if (filter.has_oidc()) {
-        ConfigValidator::ValidateOIDCConfig(filter.oidc(), config.not_strict_https());
+        ConfigValidator::ValidateOIDCConfig(filter.oidc(),
+                                            config.not_strict_https());
         continue;
       }
       // not reached
@@ -39,8 +40,8 @@ void ConfigValidator::ValidateAll(const Config& config) {
   }
 }
 
-void ConfigValidator::ValidateOIDCConfig(
-    const config::oidc::OIDCConfig& config, bool not_strict_https) {
+void ConfigValidator::ValidateOIDCConfig(const config::oidc::OIDCConfig& config,
+                                         bool not_strict_https) {
   const auto required_scheme = not_strict_https ? "" : "https";
   ValidateUri(config.authorization_uri(), "authorization_uri", required_scheme);
   ValidateUri(config.callback_uri(), "callback_uri", required_scheme);
