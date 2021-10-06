@@ -1,6 +1,5 @@
 #include "filter_chain.h"
 
-#include <cstdint>
 #include <memory>
 
 #include "absl/strings/match.h"
@@ -42,18 +41,12 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
             periodic_fetch_interval_sec = 1200;
           }
 
-          uint32_t initial_fetch_delay_sec =
-              filter.oidc().jwks_fetcher().initial_fetch_delay_sec();
-          if (initial_fetch_delay_sec == 0) {
-            initial_fetch_delay_sec = 3;
-          }
           auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
           jwks_resolver_map_.emplace_back(
               std::make_shared<oidc::DynamicJwksResolverImpl>(
                   filter.oidc().jwks_fetcher().jwks_uri(),
-                  std::chrono::seconds(periodic_fetch_interval_sec),
-                  std::chrono::seconds(initial_fetch_delay_sec), http_ptr,
+                  std::chrono::seconds(periodic_fetch_interval_sec), http_ptr,
                   ioc));
         } break;
         default:

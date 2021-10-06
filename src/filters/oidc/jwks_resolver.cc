@@ -6,23 +6,25 @@ namespace authservice {
 namespace filters {
 namespace oidc {
 
+namespace {
+constexpr uint32_t kJwksInitialFetchDelaySec = 3;
+}
+
 DynamicJwksResolverImpl::JwksFetcher::JwksFetcher(
     DynamicJwksResolverImpl* parent, common::http::ptr_t http_ptr,
     const std::string& jwks_uri,
     std::chrono::seconds periodic_fetch_interval_sec,
-    std::chrono::seconds initial_fetch_delay_sec,
     boost::asio::io_context& io_context)
     : parent_(parent),
       jwks_uri_(jwks_uri),
       http_ptr_(http_ptr),
       ioc_(io_context),
       periodic_fetch_interval_sec_(periodic_fetch_interval_sec),
-      initial_fetch_delay_sec_(initial_fetch_delay_sec),
       timer_(ioc_, periodic_fetch_interval_sec_) {
   // Extract initial JWKs.
   // After timer callback sucessful, next timer invocation will be scheduled.
   timer_.expires_at(std::chrono::steady_clock::now() +
-                    initial_fetch_delay_sec_);
+                    std::chrono::seconds(kJwksInitialFetchDelaySec));
   timer_.async_wait(
       [this](const boost::system::error_code& ec) { this->request(ec); });
 }
@@ -56,7 +58,7 @@ void DynamicJwksResolverImpl::JwksFetcher::request(
       // so if the first fetch fails, the JWKs will be empty for 20 minutes.
       // To prevent this problem, the timer should be rescheduled depending on
       // initial_fetch_delay_sec.
-      next_schedule_interval = initial_fetch_delay_sec_;
+      next_schedule_interval = std::chrono::seconds(kJwksInitialFetchDelaySec);
     }
 
     timer_.expires_at(std::chrono::steady_clock::now() +

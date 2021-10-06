@@ -86,10 +86,6 @@ message OIDCConfig {
         // default to 1200 seconds, 20min.
         // Optional.
         uint32 periodic_fetch_interval_sec = 2;
-        
-        // The delay seconds to fetch JWKs from system startup, If not specified, default to 3 seconds.
-        // Optional.
-        uint32 initial_fetch_delay_sec = 3;
     }
 
     oneof jwks_config {

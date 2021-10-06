@@ -107,8 +107,7 @@ TEST(JwksResolverTest, TestDynamicJwksResolver) {
   boost::asio::io_context io_context;
   auto mock_http = std::make_shared<common::http::HttpMock>();
   DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(1),
-                                   std::chrono::seconds(3), mock_http,
-                                   io_context);
+                                   mock_http, io_context);
 
   // First flight to extract invalid JWKs.
   setExpectedRemoteJwks(*mock_http, invalid_jwt_public_key_);
@@ -139,8 +138,7 @@ TEST(JwksResolverTest, TestDynamicJwksResolverWithInvalidHttpStatus) {
   boost::asio::io_context io_context;
   auto mock_http = std::make_shared<common::http::HttpMock>();
   DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(1),
-                                   std::chrono::seconds(3), mock_http,
-                                   io_context);
+                                   mock_http, io_context);
 
   // Never initialized with invalid HTTP status.
   EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
@@ -166,8 +164,7 @@ TEST(JwksResolverTest,
   // Configured request interval as 10000 sec. This value is enough to guarantee
   // that second request will not be invoked for 3 sec evloop run.
   DynamicJwksResolverImpl resolver("istio.io", std::chrono::seconds(10000),
-                                   std::chrono::seconds(3), mock_http,
-                                   io_context);
+                                   mock_http, io_context);
 
   // Initially make mock server always return invalid HTTP response as 503.
   EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
