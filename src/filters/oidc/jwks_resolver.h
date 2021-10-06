@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <memory>
 
 #include "absl/synchronization/mutex.h"
