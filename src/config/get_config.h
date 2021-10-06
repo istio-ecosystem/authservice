@@ -15,7 +15,7 @@ class ConfigValidator {
   static void ValidateAll(const Config& config);
 
  private:
-  static void ValidateOIDCConfig(const config::oidc::OIDCConfig& config);
+  static void ValidateOIDCConfig(const config::oidc::OIDCConfig& config, bool not_strict_https);
   static void ValidateUri(absl::string_view uri, absl::string_view uri_type,
                           absl::string_view required_scheme);
 };

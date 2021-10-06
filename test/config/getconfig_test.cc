@@ -561,5 +561,41 @@ TEST_F(GetConfigTest, OverrideOIDCConfigFailedWithMissingRequiredField) {
   EXPECT_THROW(GetConfig(tmp_filename), std::runtime_error);
 }
 
+TEST_F(GetConfigTest, AllowNonHttps) {
+  const std::string target_config = R"(
+  {
+    "listen_address": "127.0.0.1",
+    "listen_port": "10003",
+    "log_level": "trace",
+    "threads": 8,
+    "not_strict_https": true,
+    "chains": [
+      {
+        "name": "test-chain",
+        "filters": [
+          {
+            "oidc": {
+              "authorization_uri": "http://istio.io/auth/default",
+              "token_uri": "http://istio.io/token",
+              "callback_uri": "http://ingress3/callback",
+              "jwks": "default_jwk",
+              "id_token": {
+                "preamble": "Bearer",
+                "header": "Authorization"
+              },
+              "client_id": "test-istio",
+              "client_secret": "xxxxx-yyyyy-zzzzz"
+            }
+          }
+        ]
+      }
+    ]
+  }
+  )";
+
+  write_test_file(target_config);
+  EXPECT_NO_THROW(GetConfig(tmp_filename));
+}
+
 }  // namespace config
 }  // namespace authservice

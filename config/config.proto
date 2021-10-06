@@ -121,6 +121,12 @@ message Config {
     // when it defined as `oidc_override`.
     // Optional.
     oidc.OIDCConfig default_oidc_config = 10;
+
+    // This option is False by default. When set to True, it allows non-HTTPS schemes
+    // in the configured URI (e.g. callback URI or Authorization URI). It is not
+    // recommended to set this option to False and use it in production, but it can be useful for quick debugging.
+    // Optional.
+    bool not_strict_https = 11;
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if

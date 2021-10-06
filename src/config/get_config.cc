@@ -31,7 +31,7 @@ void ConfigValidator::ValidateAll(const Config& config) {
       if (filter.has_mock()) {
         continue;
       } else if (filter.has_oidc()) {
-        ConfigValidator::ValidateOIDCConfig(filter.oidc());
+        ConfigValidator::ValidateOIDCConfig(filter.oidc(), config.not_strict_https());
         continue;
       }
       // not reached
@@ -40,10 +40,11 @@ void ConfigValidator::ValidateAll(const Config& config) {
 }
 
 void ConfigValidator::ValidateOIDCConfig(
-    const config::oidc::OIDCConfig& config) {
-  ValidateUri(config.authorization_uri(), "authorization_uri", "https");
-  ValidateUri(config.callback_uri(), "callback_uri", "https");
-  ValidateUri(config.token_uri(), "token_uri", "https");
+    const config::oidc::OIDCConfig& config, bool not_strict_https) {
+  const auto required_scheme = not_strict_https ? "" : "https";
+  ValidateUri(config.authorization_uri(), "authorization_uri", required_scheme);
+  ValidateUri(config.callback_uri(), "callback_uri", required_scheme);
+  ValidateUri(config.token_uri(), "token_uri", required_scheme);
 
   const auto proxy_uri = config.proxy_uri();
   if (!proxy_uri.empty()) {
@@ -71,7 +72,7 @@ void ConfigValidator::ValidateUri(absl::string_view uri,
         fmt::format("invalid {}: query params and fragments not allowed: {}",
                     uri_type, uri));
   }
-  if (parsed_uri->GetScheme() != required_scheme) {
+  if (!required_scheme.empty() && parsed_uri->GetScheme() != required_scheme) {
     throw std::runtime_error(
         fmt::format("invalid {}: uri must be {} scheme: {}", uri_type,
                     required_scheme, uri));
