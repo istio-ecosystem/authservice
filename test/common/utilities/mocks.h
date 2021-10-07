@@ -9,11 +9,8 @@ namespace common {
 namespace utilities {
 
 class TimeServiceMock : public TimeService {
-public:
-  MOCK_METHOD0(
-      GetCurrentTimeInSecondsSinceEpoch,
-      int64_t()
-  );
+ public:
+  MOCK_METHOD0(GetCurrentTimeInSecondsSinceEpoch, int64_t());
 };
 
 }  // namespace utilities

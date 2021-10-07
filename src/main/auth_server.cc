@@ -2,7 +2,7 @@
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
 #include "absl/strings/str_cat.h"
-#include "envoy/service/auth/v2/external_auth.pb.validate.h"
+#include "envoy/service/auth/v3/external_auth.pb.validate.h"
 #include "spdlog/sinks/stdout_sinks.h"
 #include "spdlog/spdlog.h"
 #include "src/config/get_config.h"
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
 
   try {
     auto config = GetConfig(absl::GetFlag(FLAGS_filter_config));
-    console->set_level(GetConfiguredLogLevel(*config));
+    console->set_level(authservice::config::GetConfiguredLogLevel(*config));
     RunServer(*config);
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());

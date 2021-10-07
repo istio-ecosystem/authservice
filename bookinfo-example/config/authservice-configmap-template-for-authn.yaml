@@ -24,12 +24,12 @@ data:
           {
             "oidc":
               {
-                "authorization_uri": "https://demo.example.change.me/oauth/authorize/change/me",
-                "token_uri": "https://demo.example.change.me/oauth/token/change/me",
-                "callback_uri": "https://INGRESS_HOST_CHANGE_ME/productpage/oauth/callback",
-                "jwks": "{\"keys\":[{\"kty\":\"RSA\",\"e\":\"AQAB\",\"use\":\"sig\",\"kid\":\"sha2-2017-01-20-key\",\"alg\":\"RS256\",\"value\":\"-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyH6kYCP29faDAUPKtei3\nV/Zh8eCHyHRDHrD0iosvgHuaakK1AFHjD19ojuPiTQm8r8nEeQtHb6mDi1LvZ03e\nEWxpvWwFfFVtCyBqWr5wn6IkY+ZFXfERLn2NCn6sMVxcFV12sUtuqD+jrW8MnTG7\nhofQqxmVVKKsZiXCvUSzfiKxDgoiRuD3MJSoZ0nQTHVmYxlFHuhTEETuTqSPmOXd\n/xJBVRi5WYCjt1aKRRZEz04zVEBVhVkr2H84qcVJHcfXFu4JM6dg0nmTjgd5cZUN\ncwA1KhK2/Qru9N0xlk9FGD2cvrVCCPWFPvZ1W7U7PBWOSBBH6GergA+dk2vQr7Ho\nlQIDAQAB\n-----END PUBLIC KEY-----\",\"n\":\"AMh-pGAj9vX2gwFDyrXot1f2YfHgh8h0Qx6w9IqLL4B7mmpCtQBR4w9faI7j4k0JvK_JxHkLR2-pg4tS72dN3hFsab1sBXxVbQsgalq-cJ-iJGPmRV3xES59jQp-rDFcXBVddrFLbqg_o61vDJ0xu4aH0KsZlVSirGYlwr1Es34isQ4KIkbg9zCUqGdJ0Ex1ZmMZRR7oUxBE7k6kj5jl3f8SQVUYuVmAo7dWikUWRM9OM1RAVYVZK9h_OKnFSR3H1xbuCTOnYNJ5k44HeXGVDXMANSoStv0K7vTdMZZPRRg9nL61Qgj1hT72dVu1OzwVjkgQR-hnq4APnZNr0K-x6JU\"}]}",
-                "client_id": "xxxxxx-xxxx-xxxx-xxxx-xxxxxxxxx_CHANGE_ME",
-                "client_secret": "xxxxx-xxxx-xxx-xxx-xxx_CHANGE_ME",
+                "authorization_uri": "https://accounts.google.com/o/oauth2/v2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "callback_uri": "https://localhost:8443/productpage/oauth/callback",
+                "jwks": "{   \"keys\": [     {       \"use\": \"sig\",       \"alg\": \"RS256\",       \"n\": \"7qnlkR2Ysvik__jqELu5__2Ib4_Pix6NEmEYKY80NyIGBhUQ0QDtijFypOk3cN3aRgb1f3741vQu7PQGMr79J8jM4-sA1A6UQNmfjl-thB5JpdfQrS1n3EpsrPMUvf5w-uBMQnxmiM3hrHgjA107-UxLF_xBG8Vp_EXmZI7y6IfUwTHrNotSpLLBSNH77C8ncFcm9ADsdl-Bav2CjOaef6CpGISCscx2T4LZS6DIafU1M_xYcx3aLET9TojymjZJi2hfZDyF9x_qssrlnxqfgrI71warY8HiXsiZzOTNB6s81Fu9AaxV7YckfLHyvXwOX8lQN53c2IiAuk-T7nf69w\",       \"e\": \"AQAB\",       \"kty\": \"RSA\",       \"kid\": \"0fcc014f22934e47480daf107a340c22bd262b6c\"     },     {       \"alg\": \"RS256\",       \"e\": \"AQAB\",       \"kid\": \"462949174f1eedf4f9f9434877be483b324140f5\",       \"kty\": \"RSA\",       \"n\": \"2BHFUUq8NqZ3pxxi_RJcSIMG5nJoZQ8Nbvf-lW5o7hJ9CmLA4SeUmDL2IVK6CSuskTPj_ohAp_gtOg3PCJvn33grPoJQu38MoMB8kDqA4U-u3A86GGEjWtk6LPo7dEkojZNQkzhZCnEMTuRMtBZXsLWNGJpY3UADA3rxnHnBP1wrSt27iXIE0C6-1N5z00R13r3L0aWC0MuAUgjI2H4dGMr8B3niJ-NjOVPCwG7xSWsCwsSitAuhPGHaDtenB23ZsFJjbuTuiguoSJ9A1qo9kzBOg32xda4derbWasu7Tk8p53PFxXDJGR_h7dM-nsJHl7lAUDqL8zOrf9XXlPTjwQ\",       \"use\": \"sig\"     }   ] }",
+                "client_id": "YOUR_OIDC_CLIENT_ID",
+                "client_secret": "YOUR_OIDC_CLIENT_SECRET",
                 "scopes": [],
                 "cookie_name_prefix": "productpage",
                 "id_token": {
@@ -38,7 +38,7 @@ data:
                 },
                 "logout": {
                   "path": "/authservice_logout",
-                  "redirect_uri": "https://<demo.example.change.me>/some/logout/path"
+                  "redirect_uri": "https://localhost:8443/some/logout/path"
                 }
               }
             }

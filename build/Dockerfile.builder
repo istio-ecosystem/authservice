@@ -2,6 +2,7 @@
 FROM debian:buster as bazel-builder
 COPY build/install-bazel.sh /build/
 RUN chmod +x /build/install-bazel.sh && /build/install-bazel.sh
+RUN apt-get update && apt-get -y install make cmake ninja-build build-essential
 
 # Copy in only the necessary files for building.
 FROM bazel-builder as auth-builder

@@ -1,4 +1,5 @@
 #include "src/filters/pipe.h"
+
 #include "gtest/gtest.h"
 
 namespace authservice {

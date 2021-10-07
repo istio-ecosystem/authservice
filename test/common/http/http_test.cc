@@ -1,4 +1,5 @@
 #include "src/common/http/http.h"
+
 #include "gtest/gtest.h"
 #include "src/common/http/headers.h"
 #include "test/shared/assertions.h"
@@ -122,7 +123,8 @@ TEST(Http, DecodeCookies) {
   result = Http::DecodeCookies(cookies3);
   ASSERT_FALSE(result.has_value());
 
-  auto cookies4 = "first=1; second=value=with=equals; third=\"another=one=with-quotes\"";
+  auto cookies4 =
+      "first=1; second=value=with=equals; third=\"another=one=with-quotes\"";
   result = Http::DecodeCookies(cookies4);
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ(result->size(), 3);
@@ -258,15 +260,37 @@ TEST(Http, ParseUri) {
   ASSERT_EQ(result.GetQuery(), "query");
   ASSERT_EQ(result.GetFragment(), "frag/?ment");
 
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("noscheme"); }, "uri must be http or https scheme: noscheme");
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("ftp://host"); }, "uri must be http or https scheme: ftp://host");
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://"); }, "no host in uri: https://"); // no host
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("http://"); }, "no host in uri: http://"); // no host
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://:80/path"); }, "no host in uri: https://:80/path"); // no host
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:/path"); }, "port not valid in uri: https://host:/path"); // colon, but no port
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:a8/path"); }, "port not valid in uri: https://host:a8/path"); // port not an int
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:65536/path"); }, "port value must be between 0 and 65535: https://host:65536/path"); // port int too large
-  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://host:-1/path"); }, "port value must be between 0 and 65535: https://host:-1/path"); // port int too small
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("noscheme"); },
+                                  "uri must be http or https scheme: noscheme");
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("ftp://host"); },
+      "uri must be http or https scheme: ftp://host");
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("https://"); },
+                                  "no host in uri: https://");  // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR([]() -> void { Uri("http://"); },
+                                  "no host in uri: http://");  // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("https://:80/path"); },
+      "no host in uri: https://:80/path");  // no host
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("https://host:/path"); },
+      "port not valid in uri: https://host:/path");  // colon, but no port
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("https://host:a8/path"); },
+      "port not valid in uri: https://host:a8/path");  // port not an int
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("https://host:65536/path"); },
+      "port value must be between 0 and 65535: "
+      "https://host:65536/path");  // port
+                                   // int
+                                   // too
+                                   // large
+  ASSERT_THROWS_STD_RUNTIME_ERROR(
+      []() -> void { Uri("https://host:-1/path"); },
+      "port value must be between 0 and 65535: https://host:-1/path");  // port
+                                                                        // int
+                                                                        // too
+                                                                        // small
 }
 
 TEST(Http, ParsePathQueryFragment) {
@@ -296,17 +320,20 @@ TEST(Http, ParsePathQueryFragment) {
   ASSERT_EQ("", result5.Query());
   ASSERT_EQ("", result5.Fragment());
 
-  auto result6 = PathQueryFragment("/path#fragment?still_fragment/still_fragment");
+  auto result6 =
+      PathQueryFragment("/path#fragment?still_fragment/still_fragment");
   ASSERT_EQ("/path", result6.Path());
   ASSERT_EQ("", result6.Query());
   ASSERT_EQ("fragment?still_fragment/still_fragment", result6.Fragment());
 
-  auto result7 = PathQueryFragment("/path?query/still_query#fragment/still_fragment?still_fragment");
+  auto result7 = PathQueryFragment(
+      "/path?query/still_query#fragment/still_fragment?still_fragment");
   ASSERT_EQ("/path", result7.Path());
   ASSERT_EQ("query/still_query", result7.Query());
   ASSERT_EQ("fragment/still_fragment?still_fragment", result7.Fragment());
 
-  auto result8 = PathQueryFragment("/path#fragment/still_fragment?still_fragment");
+  auto result8 =
+      PathQueryFragment("/path#fragment/still_fragment?still_fragment");
   ASSERT_EQ("/path", result8.Path());
   ASSERT_EQ("", result8.Query());
   ASSERT_EQ("fragment/still_fragment?still_fragment", result8.Fragment());

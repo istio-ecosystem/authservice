@@ -10,7 +10,7 @@ xx_library(
         "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_google_googleapis//google/rpc:code_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_grpc",
     ],
 )
 
@@ -25,6 +25,14 @@ xx_library(
 )
 
 xx_library(
+    name = "filter_factory",
+    hdrs = ["filter_factory.h"],
+    deps = [
+        ":pipe",
+    ]
+)
+
+xx_library(
     name = "filter_chain",
     srcs = [
         "filter_chain.cc",
@@ -33,15 +41,18 @@ xx_library(
         "filter_chain.h",
     ],
     deps = [
+        ":filter_factory",
         "//config:config_cc",
+        "//src/config",
         "//src/filters:filter",
         "//src/filters:pipe",
         "//src/filters/oidc:oidc_filter",
+        "//src/filters/mock:mock_filter",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "//src/filters/oidc:redis_wrapper",
         "//src/filters/oidc:redis_session_store",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
-        "@envoy_api//envoy/service/auth/v2:external_auth_cc_grpc",
+        "@envoy_api//envoy/service/auth/v3:pkg_cc_grpc",
     ],
 )

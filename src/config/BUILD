@@ -13,5 +13,6 @@ xx_library(
         "//src/common/http:http",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
+        "@envoy//source/common/http:header_map_lib",
     ],
 )

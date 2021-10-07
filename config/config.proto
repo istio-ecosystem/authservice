@@ -3,6 +3,7 @@ syntax = "proto3";
 package authservice.config;
 
 import "config/oidc/config.proto";
+import "config/mock/config.proto";
 import "validate/validate.proto";
 
 // Specifies how a request can be matched to a filter chain.
@@ -31,13 +32,22 @@ message Match {
 // A filter configuration.
 message Filter {
 
-    // The type of filter. Currently, the only valid type is `oidc`.
-    // Required.
+    // The type of filter. Currently, the only valid types are `oidc`
+    // and `mock`. Required.
     oneof type {
         option (validate.required) = true;
 
         // An OpenID Connect filter configuration.
         oidc.OIDCConfig oidc = 1;
+
+        // This value will be used when `default_oidc_config` exists.
+        // It will override values of them. If that doesn't exist,
+        // this configuration will be rejected.
+        oidc.OIDCConfig oidc_override = 2;
+
+        // Mock filter configuration for testing and letting
+        // AuthService run even if no OIDC providers are configured.
+        mock.MockConfig mock = 3;
     }
 }
 
@@ -106,6 +116,11 @@ message Config {
     // intercept requests made to those paths to perform the appropriate login/logout behavior.
     // Optional. Leave this empty to always trigger authentication for all paths.
     repeated TriggerRule trigger_rules = 9;
+
+    // Global configuration of OIDC. This value will be applied to all filter definition
+    // when it defined as `oidc_override`.
+    // Optional.
+    oidc.OIDCConfig default_oidc_config = 10;
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if

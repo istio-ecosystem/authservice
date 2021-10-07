@@ -1,0 +1,36 @@
+name: authservice CI workflow
+
+on:
+  pull_request:
+    branches: 
+      - master
+  push:
+    branches:
+      - master
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup clang-format
+      run: |
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        tar -xvf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        sudo mv ./clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format /usr/local/bin
+        rm -rf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/
+        git clone https://github.com/Sarcasm/run-clang-format.git
+    - name: Run clang-format
+      run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Bazel
+      run: sudo build/install-bazel.sh
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get -y install make cmake ninja-build build-essential
+    - name: make test
+      run: |
+       sudo chmod -R a+rxw /home
+       make test

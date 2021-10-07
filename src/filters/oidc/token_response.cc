@@ -1,4 +1,5 @@
 #include "token_response.h"
+
 #include "absl/strings/match.h"
 #include "absl/time/clock.h"
 #include "google/protobuf/struct.pb.h"
@@ -65,29 +66,31 @@ int64_t TokenResponse::GetIDTokenExpiry() const {
 }
 
 TokenResponseParserImpl::TokenResponseParserImpl(
-    google::jwt_verify::JwksPtr keys)
-    : keys_(std::move(keys)) {}
+    google::jwt_verify::JwksPtr &keys)
+    : keys_(keys) {}
 
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
-    const std::string &client_id,
-    const std::string &nonce,
-    const std::string &raw_response_string
-) const {
+    const std::string &client_id, const std::string &nonce,
+    const std::string &raw_response_string) const {
   ::google::protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = true;
   options.case_insensitive_enum_parsing = false;
   ::google::protobuf::Struct message;
   ::google::protobuf::StringPiece raw_string_piece(raw_response_string.data());
 
-  const auto status = ::google::protobuf::util::JsonStringToMessage(raw_string_piece, &message, options);
+  const auto status = ::google::protobuf::util::JsonStringToMessage(
+      raw_string_piece, &message, options);
   if (!status.ok()) {
-    spdlog::info("{}: JSON parsing error: {}", __func__, status.message().data());
+    spdlog::warn("{}: JSON parsing error: {}", __func__,
+                 status.message().data());
     return nullptr;
   }
 
-  google::protobuf::Map<std::string, google::protobuf::Value> fields = message.fields();
+  google::protobuf::Map<std::string, google::protobuf::Value> fields =
+      message.fields();
 
-  absl::optional<google::jwt_verify::Jwt> optional_id_token = ParseIDToken(fields);
+  absl::optional<google::jwt_verify::Jwt> optional_id_token =
+      ParseIDToken(fields);
   if (!optional_id_token.has_value()) {
     return nullptr;
   }
@@ -121,23 +124,26 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
   return result;
 }
 
-std::shared_ptr<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenResponse(
+std::shared_ptr<TokenResponse>
+TokenResponseParserImpl::ParseRefreshTokenResponse(
     const TokenResponse &existing_token_response,
-    const std::string &raw_response_string
-) const {
+    const std::string &raw_response_string) const {
   ::google::protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = true;
   options.case_insensitive_enum_parsing = false;
   ::google::protobuf::Struct message;
   ::google::protobuf::StringPiece raw_string_piece(raw_response_string.data());
 
-  const auto status = ::google::protobuf::util::JsonStringToMessage(raw_string_piece, &message, options);
+  const auto status = ::google::protobuf::util::JsonStringToMessage(
+      raw_string_piece, &message, options);
   if (!status.ok()) {
-    spdlog::info("{}: JSON parsing error: {}", __func__, status.message().data());
+    spdlog::warn("{}: JSON parsing error: {}", __func__,
+                 status.message().data());
     return nullptr;
   }
 
-  google::protobuf::Map<std::string, google::protobuf::Value> fields = message.fields();
+  google::protobuf::Map<std::string, google::protobuf::Value> fields =
+      message.fields();
 
   std::shared_ptr<TokenResponse> result;
   const google::jwt_verify::Jwt &id_token = existing_token_response.IDToken();
@@ -164,7 +170,8 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenRespons
     result->SetRefreshToken(existing_token_response.RefreshToken().value());
   }
 
-  const absl::optional<int64_t> &access_token_expiry = ParseAccessTokenExpiry(fields);
+  const absl::optional<int64_t> &access_token_expiry =
+      ParseAccessTokenExpiry(fields);
   if (access_token_expiry.has_value()) {
     spdlog::info("{}: Updating access token expiration.", __func__);
     result->SetAccessTokenExpiry(access_token_expiry.value());
@@ -178,33 +185,37 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::ParseRefreshTokenRespons
 }
 
 absl::optional<google::jwt_verify::Jwt> TokenResponseParserImpl::ParseIDToken(
-    google::protobuf::Map<std::string, google::protobuf::Value> fields
-) const {
+    google::protobuf::Map<std::string, google::protobuf::Value> fields) const {
   google::jwt_verify::Jwt id_token;
   // There must be an id_token
   auto id_token_str = fields.find(id_token_field);
   if (id_token_str == fields.end() ||
-      id_token_str->second.kind_case() != google::protobuf::Value::kStringValue) {
-    spdlog::info("{}: missing or invalid `id_token` in token response", __func__);
+      id_token_str->second.kind_case() !=
+          google::protobuf::Value::kStringValue) {
+    spdlog::warn("{}: missing or invalid `id_token` in token response",
+                 __func__);
     return absl::nullopt;
   }
-  auto jwt_status = id_token.parseFromString(id_token_str->second.string_value());
+  auto jwt_status =
+      id_token.parseFromString(id_token_str->second.string_value());
   if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::info("{}: failed to parse `id_token` into a JWT: {}", __func__,
+    spdlog::warn("{}: failed to parse `id_token` into a JWT: {}", __func__,
                  google::jwt_verify::getStatusString(jwt_status));
     return absl::nullopt;
   }
   return absl::optional<google::jwt_verify::Jwt>(id_token);
 }
 
-bool TokenResponseParserImpl::IsInvalid(google::protobuf::Map<std::string, google::protobuf::Value> &fields) const {
-
+bool TokenResponseParserImpl::IsInvalid(
+    google::protobuf::Map<std::string, google::protobuf::Value> &fields) const {
   // https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse
   // token_type must be Bearer
   auto token_type = fields.find(token_type_field);
   if (token_type == fields.end() ||
-      !(absl::EqualsIgnoreCase(token_type->second.string_value(), bearer_token_type))) {
-    spdlog::info("{}: missing or incorrect `token_type` in token response", __func__);
+      !(absl::EqualsIgnoreCase(token_type->second.string_value(),
+                               bearer_token_type))) {
+    spdlog::warn("{}: missing or incorrect `token_type` in token response",
+                 __func__);
     return true;
   }
 
@@ -212,7 +223,7 @@ bool TokenResponseParserImpl::IsInvalid(google::protobuf::Map<std::string, googl
   if (expires_in_iter != fields.end()) {
     auto expires_in = int64_t(expires_in_iter->second.number_value());
     if (expires_in <= 0) {
-      spdlog::info("{}: invalid `expired_in` token response field", __func__);
+      spdlog::warn("{}: invalid `expired_in` token response field", __func__);
       return true;
     }
   }
@@ -221,28 +232,35 @@ bool TokenResponseParserImpl::IsInvalid(google::protobuf::Map<std::string, googl
 }
 
 bool TokenResponseParserImpl::IsIDTokenInvalid(
-    const std::string &client_id,
-    const std::string &nonce,
-    google::jwt_verify::Jwt &id_token
-) const {
-  // Verify the token contains a `nonce` claim and that it matches our expected value.
-  // Verify the token signature & that our client_id is set as an entry in the token's `aud` field.
+    const std::string &client_id, const std::string &nonce,
+    google::jwt_verify::Jwt &id_token) const {
+  // Verify the token contains a `nonce` claim and that it matches our expected
+  // value. Verify the token signature & that our client_id is set as an entry
+  // in the token's `aud` field.
   std::vector<std::string> audiences = {client_id};
+
+  if (keys_ == nullptr) {
+    spdlog::warn("{}: missing active JWKs ", __func__);
+    return true;
+  }
+
   auto jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
   if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::info("{}: `id_token` verification failed: {}", __func__, google::jwt_verify::getStatusString(jwt_status));
+    spdlog::warn("{}: `id_token` verification failed: {}", __func__,
+                 google::jwt_verify::getStatusString(jwt_status));
     return true;
   }
 
   std::string extracted_nonce;
   google::jwt_verify::StructUtils getter(id_token.payload_pb_);
-  if (getter.GetString(nonce_field, &extracted_nonce) != google::jwt_verify::StructUtils::OK) {
-    spdlog::info("{}: failed to retrieve `nonce` from id_token", __func__);
+  if (getter.GetString(nonce_field, &extracted_nonce) !=
+      google::jwt_verify::StructUtils::OK) {
+    spdlog::warn("{}: failed to retrieve `nonce` from id_token", __func__);
     return true;
   }
 
   if (nonce != extracted_nonce) {
-    spdlog::info("{}: invalid `nonce` field in id_token", __func__);
+    spdlog::warn("{}: invalid `nonce` field in id_token", __func__);
     return true;
   }
 
@@ -250,13 +268,13 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
 }
 
 absl::optional<int64_t> TokenResponseParserImpl::ParseAccessTokenExpiry(
-    google::protobuf::Map<std::string, google::protobuf::Value> &fields
-) const {
+    google::protobuf::Map<std::string, google::protobuf::Value> &fields) const {
   // expires_in field takes precedence over JWT timeout.
   auto expires_in_iter = fields.find(expires_in_field);
   if (expires_in_iter != fields.end()) {
     auto expires_in = int64_t(expires_in_iter->second.number_value());
-    // Knock 5 seconds off the expiry time to take into account the time it may have taken to retrieve the token.
+    // Knock 5 seconds off the expiry time to take into account the time it may
+    // have taken to retrieve the token.
     return absl::ToUnixSeconds(absl::Now()) + expires_in - 5;
   }
   return absl::nullopt;

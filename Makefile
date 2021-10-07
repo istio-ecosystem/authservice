@@ -3,7 +3,8 @@
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
 TARGET:=//src/main:auth_server
-BAZEL_FLAGS:=--incompatible_depset_is_not_iterable=false --verbose_failures
+BAZEL_FLAGS:= --verbose_failures
+IMAGE?=authservice:$(USER)
 
 all: build test docs
 
@@ -14,10 +15,11 @@ docs:
 
 compose:
 	openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
+	chmod a+rw run/envoy/tls.crt run/envoy/tls.pem
 	docker-compose up --build
 
 docker: build
-	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build -f build/Dockerfile.runner -t authservice:$(USER) .
+	rm -rf build_release && mkdir -p build_release && cp -r bazel-bin/ build_release && docker build . -f build/Dockerfile.runner -t $(IMAGE)
 
 docker-from-scratch:
 	docker build -f build/Dockerfile.builder -t authservice:$(USER) .
@@ -49,7 +51,7 @@ coverage:
 	bazel coverage $(BAZEL_FLAGS) --instrumentation_filter=//src/ //...
 
 format:
-	clang-format -i -style=Google -sort-includes $(SRCS) $(HDRS)
+	clang-format -i $(SRCS) $(HDRS)
 
 clean:
 	bazel clean --expunge --async
