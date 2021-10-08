@@ -86,10 +86,8 @@ void ProcessingState::Proceed() {
 void CompleteState::Proceed() {
   spdlog::trace("Processing completion and deleting state");
 
-  if (!processor_v2_) delete processor_v2_;
-
-  if (!processor_v3_) delete processor_v3_;
-
+  delete processor_v2_;
+  delete processor_v3_;
   delete this;
 }
 
