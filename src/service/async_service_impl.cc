@@ -221,6 +221,11 @@ void AsyncAuthServiceImpl::Run() {
   // Reset the work item for the IO service will terminate once it finishes any
   // outstanding jobs
   work.reset();
+
+  // This is used to prevent schedule next periodic cleanup task.
+  // This is because we will suffer from non-termination of I/O thread
+  // completion with non-empty internal scheduling queue.
+  io_context_->stop();
   threadpool.join_all();
 }
 
