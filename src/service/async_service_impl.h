@@ -187,6 +187,7 @@ class CompleteState : public ServiceState {
   ProcessingStateV2 *processor_v2_;
   ProcessingState *processor_v3_;
 };
+
 class ActiveHealthcheckState : public ServiceState {
  public:
   explicit ActiveHealthcheckState(

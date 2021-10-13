@@ -102,7 +102,7 @@ void ActiveHealthcheckState::Proceed() {
       grpc::health::v1::HealthCheckResponse::SERVING;
 
   for (auto &&chain : chains_) {
-    if (!chain->allJwksActiveInFilters()) {
+    if (!chain->jwksActive()) {
       status = grpc::health::v1::HealthCheckResponse::NOT_SERVING;
     }
   }

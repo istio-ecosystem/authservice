@@ -71,16 +71,16 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
     }
 
     jwks_resolver_cache_ =
-        std::make_unique<oidc::JwksResolverCache>(oidc_filter->oidc(), ioc);
+        std::make_unique<oidc::JwksResolverCacheImpl>(oidc_filter->oidc(), ioc);
   }
 
   // Create filter chain factory
   for (const auto& filter : config_.filters()) {
     if (filter.has_mock()) {
-      filter_factory_chain_.emplace_back(
+      filter_factories_.emplace_back(
           std::make_unique<mock::FilterFactory>(filter.mock()));
     } else if (filter.has_oidc()) {
-      filter_factory_chain_.emplace_back(std::make_unique<oidc::FilterFactory>(
+      filter_factories_.emplace_back(std::make_unique<oidc::FilterFactory>(
           filter.oidc(), oidc_session_store_, jwks_resolver_cache_));
     } else {
       throw std::runtime_error("invalid filter type");
@@ -116,7 +116,7 @@ std::unique_ptr<Filter> FilterChainImpl::New() {
   spdlog::trace("{}", __func__);
   std::unique_ptr<Pipe> result(new Pipe);
 
-  for (auto&& filter_factory : filter_factory_chain_) {
+  for (auto&& filter_factory : filter_factories_) {
     result->AddFilter(filter_factory->create());
   }
 
@@ -131,13 +131,14 @@ void FilterChainImpl::DoPeriodicCleanup() {
   }
 }
 
-bool FilterChainImpl::allJwksActiveInFilters() const {
-  // for (auto&& jwk_resolver : jwks_resolver_map_) {
-  //   if (jwk_resolver->jwks() == nullptr) {
-  //     return false;
-  //   }
-  // }
-  return true;
+bool FilterChainImpl::jwksActive() const {
+  const auto resolver = jwks_resolver_cache_->getResolver();
+  return resolver != nullptr && resolver->jwks() != nullptr;
+}
+
+void FilterChainImpl::setJwksResolverCache(
+    oidc::JwksResolverCachePtr jwks_resolver_cache) {
+  jwks_resolver_cache_ = jwks_resolver_cache;
 }
 
 }  // namespace filters

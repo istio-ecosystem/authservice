@@ -13,7 +13,7 @@ class FilterFactory {
   virtual ~FilterFactory() = default;
 
   /**
-   * Create auth filter in filter chain.
+   * Creates an authentication filter.
    */
   virtual FilterPtr create() = 0;
 };

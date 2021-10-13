@@ -54,7 +54,14 @@ class FilterChain {
   /**
    * Return true if JWKs on each filters are active.
    */
-  virtual bool allJwksActiveInFilters() const = 0;
+  virtual bool jwksActive() const = 0;
+
+  /**
+   * Replace existing jwks resolver cache.
+   * This will be utilized in unit test for dependency injection.
+   */
+  virtual void setJwksResolverCache(
+      oidc::JwksResolverCachePtr jwks_resolver_cache) = 0;
 };
 
 class FilterChainImpl : public FilterChain {
@@ -63,7 +70,7 @@ class FilterChainImpl : public FilterChain {
   config::FilterChain config_;
   oidc::SessionStorePtr oidc_session_store_;
   oidc::JwksResolverCachePtr jwks_resolver_cache_;
-  std::vector<FilterFactoryPtr> filter_factory_chain_;
+  std::vector<FilterFactoryPtr> filter_factories_;
 
  public:
   explicit FilterChainImpl(boost::asio::io_context &ioc,
@@ -78,7 +85,10 @@ class FilterChainImpl : public FilterChain {
 
   virtual void DoPeriodicCleanup() override;
 
-  bool allJwksActiveInFilters() const override;
+  bool jwksActive() const override;
+
+  void setJwksResolverCache(
+      oidc::JwksResolverCachePtr jwks_resolver_cache) override;
 };
 
 }  // namespace filters

@@ -3,7 +3,9 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
 #include <memory>
+#include <stdexcept>
 
 #include "absl/synchronization/mutex.h"
 #include "boost/asio/io_context.hpp"
@@ -14,7 +16,9 @@
 namespace authservice {
 namespace filters {
 namespace oidc {
-
+namespace {
+constexpr uint32_t kJwksPeriodicFetchIntervalSec = 1200;
+}
 class JwksResolver {
  public:
   virtual ~JwksResolver() = default;
@@ -45,6 +49,10 @@ class StaticJwksResolverImpl : public JwksResolver {
  public:
   explicit StaticJwksResolverImpl(const std::string& jwks) : raw_jwks_(jwks) {
     jwks_ = parseJwks(jwks);
+
+    if (jwks_->getStatus() != google::jwt_verify::Status::Ok) {
+      throw std::runtime_error("failed to parse jwks");
+    }
   }
 
   virtual google::jwt_verify::JwksPtr& jwks() override { return jwks_; }
@@ -115,8 +123,15 @@ class DynamicJwksResolverImpl : public JwksResolver {
 
 class JwksResolverCache {
  public:
-  JwksResolverCache(const authservice::config::oidc::OIDCConfig& config,
-                    boost::asio::io_context& ioc)
+  virtual ~JwksResolverCache() = default;
+
+  virtual JwksResolverPtr getResolver() = 0;
+};
+
+class JwksResolverCacheImpl : public JwksResolverCache {
+ public:
+  JwksResolverCacheImpl(const config::oidc::OIDCConfig& config,
+                        boost::asio::io_context& ioc)
       : config_(config) {
     switch (config_.jwks_config_case()) {
       case config::oidc::OIDCConfig::kJwks:
@@ -127,7 +142,7 @@ class JwksResolverCache {
         uint32_t periodic_fetch_interval_sec =
             config_.jwks_fetcher().periodic_fetch_interval_sec();
         if (periodic_fetch_interval_sec == 0) {
-          periodic_fetch_interval_sec = 1200;
+          periodic_fetch_interval_sec = kJwksPeriodicFetchIntervalSec;
         }
 
         auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -145,7 +160,7 @@ class JwksResolverCache {
 
  private:
   JwksResolverPtr resolver_;
-  const authservice::config::oidc::OIDCConfig& config_;
+  const config::oidc::OIDCConfig config_;
 };
 
 using JwksResolverCachePtr = std::shared_ptr<JwksResolverCache>;
