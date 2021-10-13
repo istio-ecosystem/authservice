@@ -9,21 +9,19 @@ namespace common {
 namespace http {
 class HttpMock : public Http {
  public:
-  MOCK_CONST_METHOD7(
-      Post,
-      response_t(absl::string_view uri,
-                 const std::map<absl::string_view, absl::string_view> &headers,
-                 absl::string_view body, absl::string_view ca_cert,
-                 absl::string_view proxy_uri, boost::asio::io_context &ioc,
-                 boost::asio::yield_context yield));
+  MOCK_METHOD(response_t, Post,
+              (absl::string_view,
+               (const std::map<absl::string_view, absl::string_view> &),
+               absl::string_view, absl::string_view, absl::string_view,
+               boost::asio::io_context &, boost::asio::yield_context),
+              (const));
 
-  MOCK_CONST_METHOD7(
-      Get,
-      response_t(absl::string_view uri,
-                 const std::map<absl::string_view, absl::string_view> &headers,
-                 absl::string_view body, absl::string_view ca_cert,
-                 absl::string_view proxy_uri, boost::asio::io_context &ioc,
-                 boost::asio::yield_context yield));
+  MOCK_METHOD(response_t, Get,
+              (absl::string_view,
+               (const std::map<absl::string_view, absl::string_view> &),
+               absl::string_view, absl::string_view, absl::string_view,
+               boost::asio::io_context &, boost::asio::yield_context),
+              (const));
 };
 }  // namespace http
 }  // namespace common
