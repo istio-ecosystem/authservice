@@ -80,15 +80,15 @@ TEST(FilterChainTest, MatchesEquality) {
   ASSERT_TRUE(chain2.Matches(&request2));
 }
 
-TEST(FilterChainTest, New) {
+TEST(FilterChainTest, NewFailWithInvalidJwks) {
   auto configuration =
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
 
-  FilterChainImpl chain(io_context, *configuration, 1);
-  auto instance = chain.New();
-  ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+  FilterChainImpl *chain;
+  EXPECT_THROW(chain = new FilterChainImpl(io_context, *configuration, 1),
+               std::runtime_error);
 }
 
 TEST(FilterChainTest, MockFilter) {
