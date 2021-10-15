@@ -92,9 +92,10 @@ TEST(FilterChainTest, New) {
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
-  FilterChainImpl *chain;
-  EXPECT_THROW(chain = new FilterChainImpl(io_context, *configuration, 1),
-               std::runtime_error);
+
+  FilterChainImpl chain(io_context, *configuration, 1);
+  auto instance = chain.New();
+  ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 
 TEST(FilterChainTest, MockFilter) {

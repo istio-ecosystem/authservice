@@ -49,10 +49,6 @@ class StaticJwksResolverImpl : public JwksResolver {
  public:
   explicit StaticJwksResolverImpl(const std::string& jwks) : raw_jwks_(jwks) {
     jwks_ = parseJwks(jwks);
-
-    if (jwks_->getStatus() != google::jwt_verify::Status::Ok) {
-      throw std::runtime_error("failed to parse jwks");
-    }
   }
 
   virtual google::jwt_verify::JwksPtr& jwks() override { return jwks_; }

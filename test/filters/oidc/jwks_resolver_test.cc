@@ -84,9 +84,9 @@ using testing::Invoke;
 TEST(JwksResolverTest, TestStaticJwksResolver) {
   StaticJwksResolverImpl resolver(valid_jwt_public_key_);
   EXPECT_EQ(google::jwt_verify::Status::Ok, resolver.jwks()->getStatus());
-  EXPECT_THROW(
-      [] { StaticJwksResolverImpl resolver2(invalid_jwt_public_key_); }(),
-      std::runtime_error);
+
+  StaticJwksResolverImpl resolver2(invalid_jwt_public_key_);
+  EXPECT_NE(google::jwt_verify::Status::Ok, resolver2.jwks()->getStatus());
 }
 
 void setExpectedRemoteJwks(common::http::HttpMock& mock_http,

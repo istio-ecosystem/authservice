@@ -3,7 +3,6 @@
 
 #include <ctime>
 
-#include "boost/asio/io_context.hpp"
 #include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/common/http/http.h"
@@ -26,7 +25,6 @@ namespace oidc {
  * using the Authorization Code flow. See
  * https://openid.net/specs/openid-connect-core-1_0.html.
  */
-
 class OidcFilter final : public filters::Filter {
  private:
   common::http::ptr_t http_ptr_;
