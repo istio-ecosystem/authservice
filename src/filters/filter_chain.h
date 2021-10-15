@@ -50,6 +50,18 @@ class FilterChain {
    * sessions and any other resources.
    */
   virtual void DoPeriodicCleanup() = 0;
+
+  /**
+   * Return true if JWKs on each filters are active.
+   */
+  virtual bool jwksActive() const = 0;
+
+  /**
+   * Replace existing jwks resolver cache.
+   * This will be utilized in unit test for dependency injection.
+   */
+  virtual void setJwksResolverCache(
+      oidc::JwksResolverCachePtr jwks_resolver_cache) = 0;
 };
 
 class FilterChainImpl : public FilterChain {
@@ -72,6 +84,11 @@ class FilterChainImpl : public FilterChain {
   std::unique_ptr<Filter> New() override;
 
   virtual void DoPeriodicCleanup() override;
+
+  bool jwksActive() const override;
+
+  void setJwksResolverCache(
+      oidc::JwksResolverCachePtr jwks_resolver_cache) override;
 };
 
 }  // namespace filters

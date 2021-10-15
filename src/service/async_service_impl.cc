@@ -7,6 +7,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include "rpc/healthcheck.pb.h"
 #include "src/common/http/http.h"
 #include "src/config/get_config.h"
 
@@ -93,6 +94,29 @@ void CompleteState::Proceed() {
   delete this;
 }
 
+void ActiveHealthcheckState::Proceed() {
+  new ActiveHealthcheckState(cq_, chains_, service_);
+
+  grpc::health::v1::HealthCheckResponse response;
+  grpc::health::v1::HealthCheckResponse::ServingStatus status =
+      grpc::health::v1::HealthCheckResponse::SERVING;
+
+  for (auto &&chain : chains_) {
+    if (!chain->jwksActive()) {
+      status = grpc::health::v1::HealthCheckResponse::NOT_SERVING;
+    }
+  }
+
+  response.set_status(status);
+  this->responder_.Finish(response, grpc::Status::OK,
+                          new HealthcheckResponseCompletionState(this));
+}
+
+void HealthcheckResponseCompletionState::Proceed() {
+  delete active_health_state_;
+  delete this;
+}
+
 ProcessingStateFactory::ProcessingStateFactory(
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
@@ -130,6 +154,7 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
                            grpc::InsecureServerCredentials());
   builder.RegisterService(&service_);
   builder.RegisterService(&service_v2_);
+  builder.RegisterService(&health_service_);
   cq_ = builder.AddCompletionQueue();
   server_ = builder.BuildAndStart();
 
@@ -180,6 +205,7 @@ void AsyncAuthServiceImpl::Run() {
     // deleted in the destructor of CompleteState
     state_factory_->create(service_);
     state_factory_->createV2(service_v2_);
+    new ActiveHealthcheckState(*cq_, chains_, health_service_);
 
     void *tag;
     bool ok;
@@ -192,7 +218,6 @@ void AsyncAuthServiceImpl::Run() {
       if (!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
       }
-
       static_cast<ServiceState *>(tag)->Proceed();
     }
   } catch (const std::exception &e) {

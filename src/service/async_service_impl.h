@@ -11,6 +11,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
+#include "rpc/healthcheck.grpc.pb.h"
+#include "rpc/healthcheck.pb.h"
 #include "src/common/http/http.h"
 #include "src/common/utilities/trigger_rules.h"
 #include "src/filters/filter_chain.h"
@@ -213,6 +215,40 @@ class ProcessingStateFactory {
   friend class ProcessingState;
 };
 
+class ActiveHealthcheckState : public ServiceState {
+ public:
+  explicit ActiveHealthcheckState(
+      grpc::ServerCompletionQueue &cq,
+      const std::vector<std::unique_ptr<filters::FilterChain>> &chains,
+      grpc::health::v1::Health::AsyncService &service)
+      : service_(service), responder_(&ctx_), cq_(cq), chains_(chains) {
+    service_.RequestCheck(&ctx_, &request_, &responder_, &cq_, &cq_, this);
+  }
+
+  void Proceed() override;
+
+ private:
+  grpc::ServerContext ctx_;
+  grpc::health::v1::Health::AsyncService &service_;
+  grpc::health::v1::HealthCheckRequest request_;
+  grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>
+      responder_;
+  grpc::ServerCompletionQueue &cq_;
+  const std::vector<std::unique_ptr<filters::FilterChain>> &chains_;
+};
+
+class HealthcheckResponseCompletionState : public ServiceState {
+ public:
+  explicit HealthcheckResponseCompletionState(
+      ActiveHealthcheckState *active_health_state)
+      : active_health_state_(active_health_state) {}
+
+  void Proceed() override;
+
+ private:
+  ActiveHealthcheckState *active_health_state_;
+};
+
 class AsyncAuthServiceImpl {
  public:
   explicit AsyncAuthServiceImpl(const config::Config &config);
@@ -227,6 +263,7 @@ class AsyncAuthServiceImpl {
 
   envoy::service::auth::v2::Authorization::AsyncService service_v2_;
   envoy::service::auth::v3::Authorization::AsyncService service_;
+  grpc::health::v1::Health::AsyncService health_service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;
   std::unique_ptr<grpc::Server> server_;
 
