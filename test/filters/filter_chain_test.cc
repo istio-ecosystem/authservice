@@ -80,7 +80,7 @@ TEST(FilterChainTest, MatchesEquality) {
   ASSERT_TRUE(chain2.Matches(&request2));
 }
 
-TEST(FilterChainTest, New) {
+TEST(FilterChainTest, NewFailWithInvalidJwks) {
   auto configuration =
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
