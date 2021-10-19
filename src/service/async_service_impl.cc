@@ -221,6 +221,15 @@ void AsyncAuthServiceImpl::Run() {
   // Reset the work item for the IO service will terminate once it finishes any
   // outstanding jobs
   work.reset();
+
+  // The `SchedulePeriodicCleanupTask` is scheduled with `timer_`, which is
+  // bound with the io_context_. Calling `stop()` explicitly ensures that the
+  // periodic task won't be further scheduled onto `io_context` internal
+  // scheduling queue. Therefore the thread running periodic task can be
+  // terminated and joined here. This is because we will suffer from
+  // non-termination of I/O thread completion with non-empty internal scheduling
+  // queue.
+  io_context_->stop();
   threadpool.join_all();
 }
 
