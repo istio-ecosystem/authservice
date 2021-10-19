@@ -41,17 +41,17 @@ class HealthcheckHttpConnection {
   void onReadDone() {
     response_.version(request_.version());
 
-    if (request_.method() != http::verb::get) {
-      startWrite();
-      return;
-    }
-
     http::status status = http::status::ok;
 
-    for (auto &&chain : chains_) {
-      if (!chain->jwksActive()) {
-        status = http::status::not_found;
-        break;
+    if (request_.method() != http::verb::get ||
+        request_.target() != "/healthz") {
+      status = http::status::bad_request;
+    } else {
+      for (auto &&chain : chains_) {
+        if (!chain->jwksActive()) {
+          status = http::status::not_found;
+          break;
+        }
       }
     }
 
