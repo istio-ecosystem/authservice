@@ -121,6 +121,10 @@ message Config {
     // when it defined as `oidc_override`.
     // Optional.
     oidc.OIDCConfig default_oidc_config = 10;
+
+    // The TCP port for the Authservice to listen for incorming REST request for healthcheck.
+    // Required.
+    int32 healthz_listen_port = 11 [(validate.rules).int32.lt = 65536];
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if

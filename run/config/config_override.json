@@ -1,6 +1,7 @@
 {
   "listen_address": "0.0.0.0",
   "listen_port": "10004",
+  "healthz_listen_port": "9999",
   "log_level": "trace",
   "threads": 8,
   "default_oidc_config": {
