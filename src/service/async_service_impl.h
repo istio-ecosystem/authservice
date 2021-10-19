@@ -5,7 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
+#include <memory>
 
+#include "boost/system/error_code.hpp"
 #include "common/config/version_converter.h"
 #include "config/config.pb.h"
 #include "envoy/common/exception.h"
@@ -131,7 +134,7 @@ class ServiceState {
  public:
   virtual ~ServiceState() = default;
 
-  virtual void Proceed() = 0;
+  virtual void Proceed(bool is_drain) = 0;
 };
 
 class ProcessingStateFactory;
@@ -142,7 +145,7 @@ class ProcessingStateV2 : public ServiceState {
       ProcessingStateFactory &parent,
       envoy::service::auth::v2::Authorization::AsyncService &service);
 
-  void Proceed() override;
+  void Proceed(bool is_drain) override;
 
  private:
   ProcessingStateFactory &parent_;
@@ -160,7 +163,7 @@ class ProcessingState : public ServiceState {
       ProcessingStateFactory &parent,
       envoy::service::auth::v3::Authorization::AsyncService &service);
 
-  void Proceed() override;
+  void Proceed(bool is_drain) override;
 
  private:
   ProcessingStateFactory &parent_;
@@ -179,7 +182,7 @@ class CompleteState : public ServiceState {
   explicit CompleteState(ProcessingState *processor)
       : processor_v3_(processor) {}
 
-  void Proceed() override;
+  void Proceed(bool is_drain) override;
 
  private:
   ProcessingStateV2 *processor_v2_;
@@ -214,8 +217,15 @@ class ProcessingStateFactory {
 };
 
 class AsyncAuthServiceImpl {
+ private:
+  static AsyncAuthServiceImpl *instance;
+  AsyncAuthServiceImpl(const config::Config &config);
+
  public:
-  explicit AsyncAuthServiceImpl(const config::Config &config);
+  static AsyncAuthServiceImpl *get(const config::Config &config);
+  static AsyncAuthServiceImpl *get();
+
+  ~AsyncAuthServiceImpl() { shutdown(); }
 
   void Run();
 
@@ -238,8 +248,11 @@ class AsyncAuthServiceImpl {
       timer_handler_function_;
 
   std::unique_ptr<ProcessingStateFactory> state_factory_;
+  std::shared_ptr<boost::asio::io_context::work> work_;
+  boost::thread_group thread_pool_;
 
   void SchedulePeriodicCleanupTask();
+  void shutdown();
 };
 
 }  // namespace service

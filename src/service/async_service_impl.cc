@@ -3,10 +3,12 @@
 #include <grpcpp/server_builder.h>
 
 #include <boost/asio.hpp>
-#include <boost/thread/thread.hpp>
+#include <csignal>
 #include <memory>
-#include <stdexcept>
 
+#include "boost/asio/signal_set.hpp"
+#include "boost/system/error_code.hpp"
+#include "boost/thread/pthread/thread_data.hpp"
 #include "src/common/http/http.h"
 #include "src/config/get_config.h"
 
@@ -23,11 +25,13 @@ ProcessingStateV2::ProcessingStateV2(
                         &parent_.cq_, this);
 }
 
-void ProcessingStateV2::Proceed() {
-  // Spawn a new instance to serve new clients while we process this one
-  // This will later be pulled off the queue for processing and ultimately
-  // deleted in the destructor of CompleteState
-  parent_.createV2(service_);
+void ProcessingStateV2::Proceed(bool is_drain) {
+  if (!is_drain) {
+    // Spawn a new instance to serve new clients while we process this one
+    // This will later be pulled off the queue for processing and ultimately
+    // deleted in the destructor of CompleteState
+    parent_.createV2(service_);
+  }
 
   spdlog::trace("Launching V2 request processor worker");
 
@@ -56,11 +60,13 @@ ProcessingState::ProcessingState(
                         &parent_.cq_, this);
 }
 
-void ProcessingState::Proceed() {
-  // Spawn a new instance to serve new clients while we process this one
-  // This will later be pulled off the queue for processing and ultimately
-  // deleted in the destructor of CompleteState
-  parent_.create(service_);
+void ProcessingState::Proceed(bool is_drain) {
+  if (!is_drain) {
+    // Spawn a new instance to serve new clients while we process this one
+    // This will later be pulled off the queue for processing and ultimately
+    // deleted in the destructor of CompleteState
+    parent_.create(service_);
+  }
 
   spdlog::trace("Launching request processor worker");
 
@@ -83,7 +89,7 @@ void ProcessingState::Proceed() {
       });
 }
 
-void CompleteState::Proceed() {
+void CompleteState::Proceed(bool) {
   spdlog::trace("Processing completion and deleting state");
 
   if (!processor_v2_) delete processor_v2_;
@@ -140,16 +146,15 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
 void AsyncAuthServiceImpl::Run() {
   // Add a work object to the IO service so it will not shut down when it has
   // nothing left to do
-  auto work = std::make_shared<boost::asio::io_context::work>(*io_context_);
+  work_ = std::make_shared<boost::asio::io_context::work>(*io_context_);
 
   SchedulePeriodicCleanupTask();
 
   // Spin up our worker threads
   // Config validation should have already ensured that the number of threads is
   // > 0
-  boost::thread_group threadpool;
   for (unsigned int i = 0; i < config_.threads(); ++i) {
-    threadpool.create_thread([this]() {
+    thread_pool_.create_thread([this]() {
       while (true) {
         try {
           // The asio library provides a guarantee that callback handlers will
@@ -184,6 +189,7 @@ void AsyncAuthServiceImpl::Run() {
     void *tag;
     bool ok;
     while (cq_->Next(&tag, &ok)) {
+      bool is_drain = false;
       // Block waiting to read the next event from the completion queue. The
       // event is uniquely identified by its tag, which in this case is the
       // memory address of a CallData instance.
@@ -191,42 +197,14 @@ void AsyncAuthServiceImpl::Run() {
       // tells us whether there is any kind of event or cq_ is shutting down.
       if (!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
+        is_drain = true;
       }
 
-      static_cast<ServiceState *>(tag)->Proceed();
+      static_cast<ServiceState *>(tag)->Proceed(is_drain);
     }
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
   }
-
-  spdlog::info("Server shutting down");
-
-  // Start shutting down gRPC
-  server_->Shutdown();
-  cq_->Shutdown();
-
-  // The destructor of the completion queue will abort if there are any
-  // outstanding events, so we must drain the queue before we allow that to
-  // happen
-  try {
-    void *tag;
-    bool ok;
-    while (cq_->Next(&tag, &ok)) {
-      delete static_cast<ServiceState *>(tag);
-    }
-  } catch (const std::exception &e) {
-    spdlog::error("{}: Unexpected error: {}", __func__, e.what());
-  }
-
-  // Reset the work item for the IO service will terminate once it finishes any
-  // outstanding jobs
-  work.reset();
-
-  // This is used to prevent schedule next periodic cleanup task.
-  // This is because we will suffer from non-termination of I/O thread
-  // completion with non-empty internal scheduling queue.
-  io_context_->stop();
-  threadpool.join_all();
 }
 
 void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
@@ -248,6 +226,60 @@ void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
   // Schedule the first invocation of the handler on the timer
   timer_.async_wait(timer_handler_function_);
 }
+
+void AsyncAuthServiceImpl::shutdown() {
+  spdlog::info("Server shutting down");
+
+  // Start shutting down gRPC
+  if (server_ != nullptr) {
+    server_->Shutdown();
+  }
+
+  if (cq_ != nullptr) {
+    cq_->Shutdown();
+
+    // The destructor of the completion queue will abort if there are any
+    // outstanding events, so we must drain the queue before we allow that to
+    // happen
+    try {
+      void *tag;
+      bool ok;
+      while (cq_->Next(&tag, &ok)) {
+        delete static_cast<ServiceState *>(tag);
+      }
+    } catch (const std::exception &e) {
+      spdlog::error("{}: Unexpected error: {}", __func__, e.what());
+    }
+  }
+
+  if (work_ != nullptr) {
+    // Reset the work item for the IO service will terminate once it finishes
+    // any outstanding jobs
+    work_.reset();
+  }
+
+  if (io_context_ != nullptr) {
+    // The `SchedulePeriodicCleanupTask` is scheduled with `timer_`,
+    // which is bound with the io_context_.
+    // Calling `stop()` explicitly ensures that the periodic task
+    // won't be further scheduled onto `io_context` internal scheduling queue.
+    // Therefore the thread running periodic task can be terminated and joined
+    // here.
+    io_context_->stop();
+  }
+  thread_pool_.join_all();
+}
+
+AsyncAuthServiceImpl *AsyncAuthServiceImpl::instance = 0;
+
+AsyncAuthServiceImpl *AsyncAuthServiceImpl::get(const config::Config &config) {
+  if (instance == 0) {
+    instance = new AsyncAuthServiceImpl(config);
+  }
+  return instance;
+}
+
+AsyncAuthServiceImpl *AsyncAuthServiceImpl::get() { return instance; }
 
 }  // namespace service
 }  // namespace authservice

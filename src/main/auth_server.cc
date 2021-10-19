@@ -14,9 +14,13 @@ using namespace authservice::service;
 namespace authservice {
 namespace service {
 
+void signalHandler(int signal) {
+  delete AsyncAuthServiceImpl::get();
+  exit(signal);
+}
+
 void RunServer(const config::Config &config) {
-  AsyncAuthServiceImpl service(config);
-  service.Run();
+  AsyncAuthServiceImpl::get(config)->Run();
 }
 
 }  // namespace service
@@ -35,6 +39,7 @@ int main(int argc, char **argv) {
   try {
     auto config = GetConfig(absl::GetFlag(FLAGS_filter_config));
     console->set_level(authservice::config::GetConfiguredLogLevel(*config));
+    signal(SIGINT, signalHandler);
     RunServer(*config);
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
