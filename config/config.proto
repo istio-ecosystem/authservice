@@ -126,13 +126,7 @@ message Config {
     // Healthcheck is used to check not only for checking that server is up and running
     // but valid JWKs for token validation are extracted and available for request validation.
     // This feature is intended to be used from [readiness probe](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
-    // on Kubernetes. For example,
-    //
-    // readinessProbe:
-    //    httpGet:
-    //    path: /healthz
-    //    port: 8080
-    //
+    // on Kubernetes.
     // Required.
     int32 healthz_listen_port = 11 [(validate.rules).int32.lt = 65536];
 }
