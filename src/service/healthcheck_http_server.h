@@ -89,7 +89,10 @@ class HealthcheckAsyncServer {
           ioc_.run();
         }) {}
 
-  ~HealthcheckAsyncServer() { ioc_.stop(); }
+  ~HealthcheckAsyncServer() {
+    ioc_.stop();
+    th_.join();
+  }
 
  private:
   void startAccept() {
