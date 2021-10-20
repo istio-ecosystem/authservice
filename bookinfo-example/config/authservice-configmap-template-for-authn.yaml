@@ -15,7 +15,6 @@ data:
     {
       "listen_address": "127.0.0.1",
       "listen_port": "10003",
-      "healthz_listen_port": "10004",
       "log_level": "trace",
       "threads": 8,
       "chains": [
