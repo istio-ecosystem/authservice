@@ -170,8 +170,9 @@ class Http {
    * Virtual destructor
    */
   virtual ~Http() = default;
-  
-  // TODO(shikugawa): add transport socket abstraction to enable raw or tls socket switching easiliy.
+
+  // TODO(shikugawa): add transport socket abstraction to enable raw or tls
+  // socket switching easiliy.
   /** @brief Asynchronously send a Post http message with a certificate
    * authority. To be used inside a Boost co-routine.
    * @param endpoint the endpoint to call
