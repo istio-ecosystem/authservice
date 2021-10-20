@@ -15,6 +15,10 @@
 namespace authservice {
 namespace service {
 
+namespace {
+constexpr uint16_t kHealthCheckServerPort = 10004;
+}
+
 ProcessingStateV2::ProcessingStateV2(
     ProcessingStateFactory &parent,
     envoy::service::auth::v2::Authorization::AsyncService &service)
@@ -175,9 +179,9 @@ void AsyncAuthServiceImpl::Run() {
   }
 
   spdlog::info("{}: Healthcheck Server listening on {}:{}", __func__,
-               config_.listen_address(), config_.healthz_listen_port());
+               config_.listen_address(), kHealthCheckServerPort);
   health_server_ = std::make_unique<HealthcheckAsyncServer>(
-      chains_, config_.listen_address(), config_.healthz_listen_port());
+      chains_, config_.listen_address(), kHealthCheckServerPort);
 
   spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
