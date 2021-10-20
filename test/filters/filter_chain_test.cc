@@ -5,6 +5,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "src/filters/pipe.h"
+#include "test/filters/oidc/mocks.h"
 
 namespace authservice {
 namespace filters {
@@ -105,28 +106,15 @@ TEST(FilterChainTest, MockFilter) {
   ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
 }
 
-class MockJwksResolver final : public authservice::filters::oidc::JwksResolver {
- public:
-  MOCK_METHOD((google::jwt_verify::JwksPtr &), jwks, ());
-  MOCK_METHOD((const std::string &), rawStringJwks, (), (const));
-};
-
-class MockJwksResolverCache
-    : public authservice::filters::oidc::JwksResolverCache {
- public:
-  MOCK_METHOD((std::shared_ptr<authservice::filters::oidc::JwksResolver>),
-              getResolver, ());
-};
-
 TEST(FilterChainTest, CheckJwks) {
   auto configuration = std::make_unique<config::FilterChain>();
   FilterChainImpl chain(io_context, *configuration, 1);
 
-  auto mock_resolver = std::make_shared<MockJwksResolver>();
+  auto mock_resolver = std::make_shared<oidc::MockJwksResolver>();
   google::jwt_verify::JwksPtr dangling_jwks;
   EXPECT_CALL(*mock_resolver, jwks()).WillOnce(ReturnRef(dangling_jwks));
 
-  auto resolver_cache = std::make_unique<MockJwksResolverCache>();
+  auto resolver_cache = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache, getResolver()).WillOnce(Return(mock_resolver));
 
   chain.setJwksResolverCache(std::move(resolver_cache));
@@ -158,10 +146,10 @@ TEST(FilterChainTest, CheckJwks) {
 )";
   auto jwks2 = google::jwt_verify::Jwks::createFrom(
       valid_jwks, google::jwt_verify::Jwks::JWKS);
-  auto mock_resolver2 = std::make_shared<MockJwksResolver>();
+  auto mock_resolver2 = std::make_shared<oidc::MockJwksResolver>();
   EXPECT_CALL(*mock_resolver2, jwks()).WillOnce(ReturnRef(jwks2));
 
-  auto resolver_cache2 = std::make_unique<MockJwksResolverCache>();
+  auto resolver_cache2 = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache2, getResolver()).WillOnce(Return(mock_resolver2));
 
   chain.setJwksResolverCache(std::move(resolver_cache2));

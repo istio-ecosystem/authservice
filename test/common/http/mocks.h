@@ -22,6 +22,13 @@ class HttpMock : public Http {
                absl::string_view, absl::string_view, absl::string_view,
                boost::asio::io_context &, boost::asio::yield_context),
               (const));
+
+  MOCK_METHOD(response_t, SimpleGet,
+              (absl::string_view,
+               (const std::map<absl::string_view, absl::string_view> &),
+               absl::string_view, boost::asio::io_context &,
+               boost::asio::yield_context),
+              (const));
 };
 }  // namespace http
 }  // namespace common

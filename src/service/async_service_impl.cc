@@ -176,8 +176,8 @@ void AsyncAuthServiceImpl::Run() {
 
   spdlog::info("{}: Healthcheck Server listening on {}:{}", __func__,
                config_.listen_address(), config_.healthz_listen_port());
-  HealthcheckAsyncServer health_server_(chains_, config_.listen_address(),
-                                        config_.healthz_listen_port());
+  health_server_ = std::make_unique<HealthcheckAsyncServer>(
+      chains_, config_.listen_address(), config_.healthz_listen_port());
 
   spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
@@ -210,6 +210,9 @@ void AsyncAuthServiceImpl::Run() {
   // Start shutting down gRPC
   server_->Shutdown();
   cq_->Shutdown();
+
+  // Start shutting down health server
+  health_server_.reset();
 
   // The destructor of the completion queue will abort if there are any
   // outstanding events, so we must drain the queue before we allow that to

@@ -5,6 +5,9 @@ cc_library(
     hdrs = [
         "healthcheck_http_server.h"
     ],
+    srcs = [
+        "healthcheck_http_server.cc",
+    ],
     deps = [
         "//src/filters:filter_chain",
         "@boost//:all"
