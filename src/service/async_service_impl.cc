@@ -25,13 +25,11 @@ ProcessingStateV2::ProcessingStateV2(
                         &parent_.cq_, this);
 }
 
-void ProcessingStateV2::Proceed(bool is_drain) {
-  if (!is_drain) {
-    // Spawn a new instance to serve new clients while we process this one
-    // This will later be pulled off the queue for processing and ultimately
-    // deleted in the destructor of CompleteState
-    parent_.createV2(service_);
-  }
+void ProcessingStateV2::Proceed() {
+  // Spawn a new instance to serve new clients while we process this one
+  // This will later be pulled off the queue for processing and ultimately
+  // deleted in the destructor of CompleteState
+  parent_.createV2(service_);
 
   spdlog::trace("Launching V2 request processor worker");
 
@@ -60,13 +58,11 @@ ProcessingState::ProcessingState(
                         &parent_.cq_, this);
 }
 
-void ProcessingState::Proceed(bool is_drain) {
-  if (!is_drain) {
-    // Spawn a new instance to serve new clients while we process this one
-    // This will later be pulled off the queue for processing and ultimately
-    // deleted in the destructor of CompleteState
-    parent_.create(service_);
-  }
+void ProcessingState::Proceed() {
+  // Spawn a new instance to serve new clients while we process this one
+  // This will later be pulled off the queue for processing and ultimately
+  // deleted in the destructor of CompleteState
+  parent_.create(service_);
 
   spdlog::trace("Launching request processor worker");
 
@@ -89,13 +85,11 @@ void ProcessingState::Proceed(bool is_drain) {
       });
 }
 
-void CompleteState::Proceed(bool) {
+void CompleteState::Proceed() {
   spdlog::trace("Processing completion and deleting state");
 
-  if (!processor_v2_) delete processor_v2_;
-
-  if (!processor_v3_) delete processor_v3_;
-
+  delete processor_v2_;
+  delete processor_v3_;
   delete this;
 }
 
@@ -189,7 +183,6 @@ void AsyncAuthServiceImpl::Run() {
     void *tag;
     bool ok;
     while (cq_->Next(&tag, &ok)) {
-      bool is_drain = false;
       // Block waiting to read the next event from the completion queue. The
       // event is uniquely identified by its tag, which in this case is the
       // memory address of a CallData instance.
@@ -197,10 +190,9 @@ void AsyncAuthServiceImpl::Run() {
       // tells us whether there is any kind of event or cq_ is shutting down.
       if (!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
-        is_drain = true;
       }
 
-      static_cast<ServiceState *>(tag)->Proceed(is_drain);
+      static_cast<ServiceState *>(tag)->Proceed();
     }
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
@@ -227,7 +219,7 @@ void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
   timer_.async_wait(timer_handler_function_);
 }
 
-void AsyncAuthServiceImpl::shutdown() {
+void AsyncAuthServiceImpl::Shutdown() {
   spdlog::info("Server shutting down");
 
   // Start shutting down gRPC
@@ -269,17 +261,6 @@ void AsyncAuthServiceImpl::shutdown() {
   }
   thread_pool_.join_all();
 }
-
-AsyncAuthServiceImpl *AsyncAuthServiceImpl::instance = 0;
-
-AsyncAuthServiceImpl *AsyncAuthServiceImpl::get(const config::Config &config) {
-  if (instance == 0) {
-    instance = new AsyncAuthServiceImpl(config);
-  }
-  return instance;
-}
-
-AsyncAuthServiceImpl *AsyncAuthServiceImpl::get() { return instance; }
 
 }  // namespace service
 }  // namespace authservice

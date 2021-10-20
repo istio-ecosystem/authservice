@@ -134,7 +134,7 @@ class ServiceState {
  public:
   virtual ~ServiceState() = default;
 
-  virtual void Proceed(bool is_drain) = 0;
+  virtual void Proceed() = 0;
 };
 
 class ProcessingStateFactory;
@@ -145,7 +145,7 @@ class ProcessingStateV2 : public ServiceState {
       ProcessingStateFactory &parent,
       envoy::service::auth::v2::Authorization::AsyncService &service);
 
-  void Proceed(bool is_drain) override;
+  void Proceed() override;
 
  private:
   ProcessingStateFactory &parent_;
@@ -163,7 +163,7 @@ class ProcessingState : public ServiceState {
       ProcessingStateFactory &parent,
       envoy::service::auth::v3::Authorization::AsyncService &service);
 
-  void Proceed(bool is_drain) override;
+  void Proceed() override;
 
  private:
   ProcessingStateFactory &parent_;
@@ -178,11 +178,11 @@ class ProcessingState : public ServiceState {
 class CompleteState : public ServiceState {
  public:
   explicit CompleteState(ProcessingStateV2 *processor)
-      : processor_v2_(processor) {}
+      : processor_v2_(processor), processor_v3_(nullptr) {}
   explicit CompleteState(ProcessingState *processor)
-      : processor_v3_(processor) {}
+      : processor_v2_(nullptr), processor_v3_(processor) {}
 
-  void Proceed(bool is_drain) override;
+  void Proceed() override;
 
  private:
   ProcessingStateV2 *processor_v2_;
@@ -217,15 +217,9 @@ class ProcessingStateFactory {
 };
 
 class AsyncAuthServiceImpl {
- private:
-  static AsyncAuthServiceImpl *instance;
-  AsyncAuthServiceImpl(const config::Config &config);
-
  public:
-  static AsyncAuthServiceImpl *get(const config::Config &config);
-  static AsyncAuthServiceImpl *get();
-
-  ~AsyncAuthServiceImpl() { shutdown(); }
+  AsyncAuthServiceImpl(const config::Config &config);
+  ~AsyncAuthServiceImpl() { Shutdown(); }
 
   void Run();
 
@@ -252,7 +246,7 @@ class AsyncAuthServiceImpl {
   boost::thread_group thread_pool_;
 
   void SchedulePeriodicCleanupTask();
-  void shutdown();
+  void Shutdown();
 };
 
 }  // namespace service

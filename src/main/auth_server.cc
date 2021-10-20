@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
 #include "absl/flags/usage.h"
@@ -13,14 +15,18 @@ using namespace authservice::service;
 
 namespace authservice {
 namespace service {
+namespace {
+static std::unique_ptr<AsyncAuthServiceImpl> server_;
+}
 
 void signalHandler(int signal) {
-  delete AsyncAuthServiceImpl::get();
+  server_.reset();
   exit(signal);
 }
 
 void RunServer(const config::Config &config) {
-  AsyncAuthServiceImpl::get(config)->Run();
+  server_ = std::make_unique<AsyncAuthServiceImpl>(config);
+  server_->Run();
 }
 
 }  // namespace service
