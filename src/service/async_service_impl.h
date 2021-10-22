@@ -25,6 +25,7 @@ template <class RequestType, class ResponseType>
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
+    bool default_skip_auth,
     boost::asio::io_context &ioc, boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
@@ -43,6 +44,7 @@ template <class RequestType, class ResponseType>
     auto request_path = common::http::PathQueryFragment(
                             request_v3.attributes().request().http().path())
                             .Path();
+    const auto default_behavior = default_skip_auth ? grpc::Status::OK : grpc::Status::CANCELLED;
 
     if (!common::utilities::trigger_rules::TriggerRuleMatchesPath(
             request_path, trigger_rules_config)) {
@@ -52,7 +54,7 @@ template <class RequestType, class ResponseType>
           __func__, request_v3.attributes().request().http().scheme(),
           request_v3.attributes().request().http().host(),
           request_v3.attributes().request().http().path());
-      return ::grpc::Status::OK;
+      return default_behavior;
     }
 
     // Find a configured processing chain.
@@ -119,7 +121,7 @@ template <class RequestType, class ResponseType>
                   __func__, request.attributes().request().http().scheme(),
                   request.attributes().request().http().host(),
                   request.attributes().request().http().path());
-    return ::grpc::Status::OK;
+    return default_behavior;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());
   } catch (...) {
@@ -193,6 +195,7 @@ class ProcessingStateFactory {
       std::vector<std::unique_ptr<filters::FilterChain>> &chains,
       const google::protobuf::RepeatedPtrField<config::TriggerRule>
           &trigger_rules_config,
+      bool default_skip_auth,
       grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context);
 
   ProcessingStateV2 *createV2(
@@ -209,6 +212,7 @@ class ProcessingStateFactory {
   std::vector<std::unique_ptr<filters::FilterChain>> &chains_;
   const google::protobuf::RepeatedPtrField<config::TriggerRule>
       &trigger_rules_config_;
+  bool default_skip_auth_{false};
 
   friend class ProcessingStateV2;
   friend class ProcessingState;

@@ -32,7 +32,7 @@ class AsyncServiceImplTest : public ::testing::Test {
     // Spawn a co-routine to run the filter.
     boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
       status = authservice::service::Check(*request, *response, chains_,
-                                           trigger_rules_config_, ioc, yield);
+                                           trigger_rules_config_, default_skip_auth_, ioc, yield);
     });
 
     // Run the I/O context to completion, on the current thread.
@@ -43,6 +43,7 @@ class AsyncServiceImplTest : public ::testing::Test {
     return status;
   }
 
+  bool default_skip_auth_{true};
   std::vector<std::unique_ptr<filters::FilterChain>> chains_;
   google::protobuf::RepeatedPtrField<config::TriggerRule> trigger_rules_config_;
   boost::asio::io_context ioc_;
@@ -158,6 +159,35 @@ TYPED_TEST(AsyncServiceImplTest,
     }
   }
   EXPECT_TRUE(hasLocation);
+}
+
+
+TYPED_TEST(AsyncServiceImplTest, CheckRejectNoMatchedFilterChainWithDefaultDeny) {
+  typename TypeParam::first_type request;
+  typename TypeParam::second_type response;
+  this->default_skip_auth_ = false;
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(
+      "https");
+  request.mutable_attributes()->mutable_request()->mutable_http()->set_path(
+      "/status/foo?some-query");  // this is a matching path for trigger_rules
+  auto request_headers = request.mutable_attributes()
+                             ->mutable_request()
+                             ->mutable_http()
+                             ->mutable_headers();
+  request_headers->insert({"x-tenant-identifier", "tenant2"});
+
+  config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
+
+  for (const auto &chain_config : config.chains()) {
+    std::unique_ptr<filters::FilterChain> chain(new filters::FilterChainImpl(
+        this->ioc_, chain_config, config.threads()));
+    this->chains_.push_back(std::move(chain));
+  }
+
+  auto status = this->check(&request, &response);
+
+  // Can't find matched filter chain.
+  EXPECT_FALSE(status.ok());
 }
 
 }  // namespace service
