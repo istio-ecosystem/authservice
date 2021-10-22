@@ -85,15 +85,15 @@ TEST(FilterChainTest, MatchesEquality) {
   ASSERT_TRUE(chain2.Matches(&request2));
 }
 
-TEST(FilterChainTest, New) {
+TEST(FilterChainTest, NewFailWithInvalidJwks) {
   auto configuration =
       std::unique_ptr<config::FilterChain>(new config::FilterChain);
   auto filter_config = configuration->mutable_filters()->Add();
   filter_config->mutable_oidc()->set_jwks("some-value");
 
-  FilterChainImpl chain(io_context, *configuration, 1);
-  auto instance = chain.New();
-  ASSERT_TRUE(dynamic_cast<Pipe *>(instance.get()) != nullptr);
+  FilterChainImpl *chain;
+  EXPECT_THROW(chain = new FilterChainImpl(io_context, *configuration, 1),
+               std::runtime_error);
 }
 
 TEST(FilterChainTest, MockFilter) {
@@ -117,7 +117,11 @@ TEST(FilterChainTest, CheckJwks) {
   auto resolver_cache = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache, getResolver()).WillOnce(Return(mock_resolver));
 
-  chain.setJwksResolverCache(std::move(resolver_cache));
+// <<<<<<< healthcheck3
+//   chain.setJwksResolverCache(std::move(resolver_cache));
+// =======
+  chain.setJwksResolverCacheForTest(std::move(resolver_cache));
+// >>>>>>> master
   EXPECT_FALSE(chain.jwksActive());
 
   std::string valid_jwks = R"(
@@ -152,7 +156,11 @@ TEST(FilterChainTest, CheckJwks) {
   auto resolver_cache2 = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache2, getResolver()).WillOnce(Return(mock_resolver2));
 
-  chain.setJwksResolverCache(std::move(resolver_cache2));
+// <<<<<<< healthcheck3
+//   chain.setJwksResolverCache(std::move(resolver_cache2));
+// =======
+  chain.setJwksResolverCacheForTest(std::move(resolver_cache2));
+// >>>>>>> master
   EXPECT_TRUE(chain.jwksActive());
 }
 

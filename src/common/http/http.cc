@@ -642,7 +642,11 @@ response_t HttpImpl::SimpleGet(
         parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
     beast::get_lowest_layer(stream).async_connect(results, yield);
 
-    // Set up an HTTP POST request message
+// <<<<<<< healthcheck3
+//     // Set up an HTTP POST request message
+// =======
+//     // Set up an HTTP simple get request message
+// >>>>>>> master
     beast::http::request<beast::http::string_body> req{
         beast::http::verb::get, parsed_uri.GetPathQueryFragment(), version};
     req.set(beast::http::field::host, parsed_uri.GetHost());
@@ -661,6 +665,7 @@ response_t HttpImpl::SimpleGet(
     beast::flat_buffer buffer;
     response_t res(new beast::http::response<beast::http::string_body>);
     beast::http::async_read(stream, buffer, *res, yield);
+// <<<<<<< healthcheck3
 
     // Gracefully close the socket.
     // Receive an error code instead of throwing an exception if this fails, so
@@ -679,6 +684,8 @@ response_t HttpImpl::SimpleGet(
       }
     }
 
+// =======
+// >>>>>>> master
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {

@@ -136,7 +136,11 @@ bool FilterChainImpl::jwksActive() const {
   return resolver != nullptr && resolver->jwks() != nullptr;
 }
 
-void FilterChainImpl::setJwksResolverCache(
+// <<<<<<< healthcheck3
+// void FilterChainImpl::setJwksResolverCache(
+// =======
+void FilterChainImpl::setJwksResolverCacheForTest(
+// >>>>>>> master
     oidc::JwksResolverCachePtr jwks_resolver_cache) {
   jwks_resolver_cache_ = jwks_resolver_cache;
 }

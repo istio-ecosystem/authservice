@@ -176,9 +176,9 @@ class ProcessingState : public ServiceState {
 class CompleteState : public ServiceState {
  public:
   explicit CompleteState(ProcessingStateV2 *processor)
-      : processor_v2_(processor) {}
+      : processor_v2_(processor), processor_v3_(nullptr) {}
   explicit CompleteState(ProcessingState *processor)
-      : processor_v3_(processor) {}
+      : processor_v2_(nullptr), processor_v3_(processor) {}
 
   void Proceed() override;
 

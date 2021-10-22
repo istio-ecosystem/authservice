@@ -60,7 +60,11 @@ class FilterChain {
    * Replace existing jwks resolver cache.
    * This will be utilized in unit test for dependency injection.
    */
-  virtual void setJwksResolverCache(
+// <<<<<<< healthcheck3
+//   virtual void setJwksResolverCache(
+// =======
+  virtual void setJwksResolverCacheForTest(
+// >>>>>>> master
       oidc::JwksResolverCachePtr jwks_resolver_cache) = 0;
 };
 
@@ -87,7 +91,11 @@ class FilterChainImpl : public FilterChain {
 
   bool jwksActive() const override;
 
-  void setJwksResolverCache(
+// <<<<<<< healthcheck3
+//   void setJwksResolverCache(
+// =======
+  void setJwksResolverCacheForTest(
+// >>>>>>> master
       oidc::JwksResolverCachePtr jwks_resolver_cache) override;
 };
 

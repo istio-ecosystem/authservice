@@ -29,7 +29,7 @@ spec:
         volumeMounts:
           - name: authservice-config # mount the volume containing the authservice ConfigMap
             mountPath: /etc/authservice
-        livenessProbe:
+        readinessProbe:
           path: /healthz
           port: 10004
 ---
