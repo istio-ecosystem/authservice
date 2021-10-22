@@ -44,8 +44,6 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  // It may cause flaky test allcating 33333.
-  // TODO(shikugawa): fix to set port 0
   HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -109,8 +107,6 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  // It may cause flaky test allcating 33334.
-  // TODO(shikugawa): fix to set port 0
   HealthcheckAsyncServer server(chains, "0.0.0.0", 33334);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
