@@ -7,11 +7,17 @@
 #include <memory>
 #include <stdexcept>
 
+#include "boost/asio/io_context.hpp"
+#include "boost/thread/detail/thread.hpp"
 #include "src/common/http/http.h"
 #include "src/config/get_config.h"
 
 namespace authservice {
 namespace service {
+
+namespace {
+constexpr uint16_t kHealthCheckServerPort = 10004;
+}
 
 ProcessingStateV2::ProcessingStateV2(
     ProcessingStateFactory &parent,
@@ -170,6 +176,11 @@ void AsyncAuthServiceImpl::Run() {
     });
   }
 
+  spdlog::info("{}: Healthcheck Server listening on {}:{}", __func__,
+               config_.listen_address(), kHealthCheckServerPort);
+  health_server_ = std::make_unique<HealthcheckAsyncServer>(
+      chains_, config_.listen_address(), kHealthCheckServerPort);
+
   spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
   try {
@@ -190,7 +201,6 @@ void AsyncAuthServiceImpl::Run() {
       if (!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
       }
-
       static_cast<ServiceState *>(tag)->Proceed();
     }
   } catch (const std::exception &e) {
@@ -202,6 +212,9 @@ void AsyncAuthServiceImpl::Run() {
   // Start shutting down gRPC
   server_->Shutdown();
   cq_->Shutdown();
+
+  // Start shutting down health server
+  health_server_.reset();
 
   // The destructor of the completion queue will abort if there are any
   // outstanding events, so we must drain the queue before we allow that to

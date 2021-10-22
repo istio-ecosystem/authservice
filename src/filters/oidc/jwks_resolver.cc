@@ -48,8 +48,6 @@ void DynamicJwksResolverImpl::JwksFetcher::request(
       }
     }
 
-    // TODO(shikugawa): add healthcheck endpoint for gRPC that works as JWKs are
-    // not empty.
     if (parent_->jwks() == nullptr) {
       // On Kubernetes, depending on the timing of the Pod startup,
       // the first egress HTTP/HTTPS request may fail. This problem

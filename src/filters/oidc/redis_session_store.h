@@ -1,8 +1,6 @@
 #ifndef AUTHSERVICE_REDIS_SESSION_STORE_H
 #define AUTHSERVICE_REDIS_SESSION_STORE_H
 
-#include <cstdint>
-
 #include "config/oidc/config.pb.h"
 #include "src/common/utilities/synchronized.h"
 #include "src/common/utilities/time_service.h"

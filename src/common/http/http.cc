@@ -12,6 +12,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "boost/beast/core/tcp_stream.hpp"
 #include "spdlog/spdlog.h"
 
 namespace beast = boost::beast;    // from <boost/beast.hpp>
@@ -565,7 +566,6 @@ response_t HttpImpl::Get(
             absl::StrCat("http connect failed with status: ",
                          http_connect_res.result_int()));
       }
-
     } else {
       spdlog::info("{}: opening connection to {}:{}", __func__,
                    parsed_uri.GetHost(), parsed_uri.GetPort());
@@ -575,6 +575,7 @@ response_t HttpImpl::Get(
     }
 
     stream.async_handshake(ssl::stream_base::client, yield);
+
     // Set up an HTTP POST request message
     beast::http::request<beast::http::string_body> req{
         beast::http::verb::get, parsed_uri.GetPathQueryFragment(), version};
@@ -613,6 +614,53 @@ response_t HttpImpl::Get(
       }
     }
 
+    return res;
+    // If we get here then the connection is closed gracefully
+  } catch (std::exception const &e) {
+    spdlog::error("{}: unexpected exception: {}", __func__, e.what());
+    return response_t();
+  }
+}
+
+response_t HttpImpl::SimpleGet(
+    absl::string_view uri,
+    const std::map<absl::string_view, absl::string_view> &headers,
+    absl::string_view body, boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) const {
+  spdlog::trace("{}", __func__);
+  try {
+    int version = 11;
+
+    auto parsed_uri = http::Uri(uri);
+
+    tcp::resolver resolver(ioc);
+    beast::tcp_stream stream(ioc);
+
+    spdlog::info("{}: opening connection to {}:{}", __func__,
+                 parsed_uri.GetHost(), parsed_uri.GetPort());
+    const auto results = resolver.async_resolve(
+        parsed_uri.GetHost(), std::to_string(parsed_uri.GetPort()), yield);
+    beast::get_lowest_layer(stream).async_connect(results, yield);
+
+    // Set up an HTTP simple get request message
+    beast::http::request<beast::http::string_body> req{
+        beast::http::verb::get, parsed_uri.GetPathQueryFragment(), version};
+    req.set(beast::http::field::host, parsed_uri.GetHost());
+    for (auto header : headers) {
+      req.set(boost::beast::string_view(header.first.data()),
+              boost::beast::string_view(header.second.data()));
+    }
+    auto &req_body = req.body();
+    req_body.reserve(body.size());
+    req_body.append(body.begin(), body.end());
+    req.prepare_payload();
+    // Send the HTTP request to the remote host
+    beast::http::async_write(stream, req, yield);
+
+    // Read response
+    beast::flat_buffer buffer;
+    response_t res(new beast::http::response<beast::http::string_body>);
+    beast::http::async_read(stream, buffer, *res, yield);
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
