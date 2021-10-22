@@ -58,7 +58,7 @@ class HealthcheckAsyncServer {
       std::string address, uint16_t port);
 
   ~HealthcheckAsyncServer();
-
+  int getPort() const { return acceptor_.local_endpoint().port(); }
   void removeConnection(HealthcheckHttpConnection* conn);
 
  private:
