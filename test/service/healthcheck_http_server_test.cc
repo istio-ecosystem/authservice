@@ -19,7 +19,7 @@ using testing::_;
 using testing::Return;
 using testing::ReturnRef;
 
-TEST(TestHealthCheckHttpServer, BasicFlowWithDanglingJwks) {
+TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   boost::asio::io_context io_context;
 
   auto configuration = std::make_unique<config::FilterChain>();
@@ -38,12 +38,13 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithDanglingJwks) {
       .Times(2)
       .WillRepeatedly(Return(mock_resolver));
 
-  chain->setJwksResolverCache(std::move(resolver_cache));
+  chain->setJwksResolverCacheForTest(std::move(resolver_cache));
   EXPECT_FALSE(chain->jwksActive());
 
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
+  // It may cause flaky test allcating 33333.
   HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -101,12 +102,13 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
       .Times(2)
       .WillRepeatedly(Return(mock_resolver));
 
-  chain->setJwksResolverCache(std::move(resolver_cache));
+  chain->setJwksResolverCacheForTest(std::move(resolver_cache));
   EXPECT_TRUE(chain->jwksActive());
 
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
+  // It may cause flaky test allcating 33333.
   HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);

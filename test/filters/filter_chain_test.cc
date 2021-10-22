@@ -117,7 +117,7 @@ TEST(FilterChainTest, CheckJwks) {
   auto resolver_cache = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache, getResolver()).WillOnce(Return(mock_resolver));
 
-  chain.setJwksResolverCache(std::move(resolver_cache));
+  chain.setJwksResolverCacheForTest(std::move(resolver_cache));
   EXPECT_FALSE(chain.jwksActive());
 
   std::string valid_jwks = R"(
@@ -152,7 +152,7 @@ TEST(FilterChainTest, CheckJwks) {
   auto resolver_cache2 = std::make_unique<oidc::MockJwksResolverCache>();
   EXPECT_CALL(*resolver_cache2, getResolver()).WillOnce(Return(mock_resolver2));
 
-  chain.setJwksResolverCache(std::move(resolver_cache2));
+  chain.setJwksResolverCacheForTest(std::move(resolver_cache2));
   EXPECT_TRUE(chain.jwksActive());
 }
 
