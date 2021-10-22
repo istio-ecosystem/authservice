@@ -44,7 +44,6 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  // It may cause flaky test allcating 33333.
   HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
@@ -108,13 +107,12 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  // It may cause flaky test allcating 33333.
-  HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
+  HealthcheckAsyncServer server(chains, "0.0.0.0", 33334);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
   boost::asio::spawn(io_context, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet("http://0.0.0.0:33333/healthz", {}, "",
+    auto res = http_ptr->SimpleGet("http://0.0.0.0:33334/healthz", {}, "",
                                    io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::ok);
   });
