@@ -140,7 +140,7 @@ bool FilterChainImpl::jwksActive() const {
 // void FilterChainImpl::setJwksResolverCache(
 // =======
 void FilterChainImpl::setJwksResolverCacheForTest(
-// >>>>>>> master
+    // >>>>>>> master
     oidc::JwksResolverCachePtr jwks_resolver_cache) {
   jwks_resolver_cache_ = jwks_resolver_cache;
 }

@@ -32,11 +32,12 @@ void HealthcheckHttpConnection::onReadDone() {
   } else {
     for (auto&& chain : chains_) {
       if (!chain->jwksActive()) {
-// <<<<<<< healthcheck3
+        // <<<<<<< healthcheck3
         spdlog::warn("{}: chain:{} is inactive yet", __func__, chain->Name());
-// =======
-//         spdlog::warn("{}: chain:{} JWKS is not ready", __func__, chain->Name());
-// >>>>>>> master
+        // =======
+        //         spdlog::warn("{}: chain:{} JWKS is not ready", __func__,
+        //         chain->Name());
+        // >>>>>>> master
         status = http::status::not_found;
         break;
       }
