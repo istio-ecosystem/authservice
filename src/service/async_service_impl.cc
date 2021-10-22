@@ -42,10 +42,9 @@ void ProcessingStateV2::Proceed() {
         spdlog::trace("Processing V2 request");
 
         envoy::service::auth::v2::CheckResponse response;
-        authservice::service::Check(request_, response, parent_.chains_,
-                                    parent_.trigger_rules_config_,
-                                    parent_.default_skip_auth_,
-                                    parent_.io_context_, yield);
+        authservice::service::Check(
+            request_, response, parent_.chains_, parent_.trigger_rules_config_,
+            parent_.default_skip_auth_, parent_.io_context_, yield);
 
         this->responder_.Finish(response, grpc::Status::OK,
                                 new CompleteState(this));
@@ -79,10 +78,9 @@ void ProcessingState::Proceed() {
         spdlog::trace("Processing request");
 
         envoy::service::auth::v3::CheckResponse response;
-        authservice::service::Check(request_, response, parent_.chains_,
-                                    parent_.trigger_rules_config_,
-                                    parent_.default_skip_auth_,
-                                    parent_.io_context_, yield);
+        authservice::service::Check(
+            request_, response, parent_.chains_, parent_.trigger_rules_config_,
+            parent_.default_skip_auth_, parent_.io_context_, yield);
 
         this->responder_.Finish(response, grpc::Status::OK,
                                 new CompleteState(this));
@@ -103,12 +101,13 @@ ProcessingStateFactory::ProcessingStateFactory(
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
-    bool default_skip_auth,
-    grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context)
+    bool default_skip_auth, grpc::ServerCompletionQueue &cq,
+    boost::asio::io_context &io_context)
     : cq_(cq),
       io_context_(io_context),
       chains_(chains),
-      trigger_rules_config_(trigger_rules_config), default_skip_auth_(default_skip_auth) {}
+      trigger_rules_config_(trigger_rules_config),
+      default_skip_auth_(default_skip_auth) {}
 
 ProcessingStateV2 *ProcessingStateFactory::createV2(
     envoy::service::auth::v2::Authorization::AsyncService &service) {
@@ -141,7 +140,8 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
   server_ = builder.BuildAndStart();
 
   state_factory_ = std::make_unique<ProcessingStateFactory>(
-      chains_, config_.trigger_rules(), config_.default_skip_auth(), *cq_, *io_context_);
+      chains_, config_.trigger_rules(), config_.default_skip_auth(), *cq_,
+      *io_context_);
 }
 
 void AsyncAuthServiceImpl::Run() {

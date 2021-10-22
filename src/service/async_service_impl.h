@@ -25,8 +25,8 @@ template <class RequestType, class ResponseType>
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
-    bool default_skip_auth,
-    boost::asio::io_context &ioc, boost::asio::yield_context yield) {
+    bool default_skip_auth, boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
   envoy::service::auth::v3::CheckRequest request_v3;
@@ -44,7 +44,6 @@ template <class RequestType, class ResponseType>
     auto request_path = common::http::PathQueryFragment(
                             request_v3.attributes().request().http().path())
                             .Path();
-    const auto default_behavior = default_skip_auth ? grpc::Status::OK : grpc::Status::CANCELLED;
 
     if (!common::utilities::trigger_rules::TriggerRuleMatchesPath(
             request_path, trigger_rules_config)) {
@@ -54,8 +53,11 @@ template <class RequestType, class ResponseType>
           __func__, request_v3.attributes().request().http().scheme(),
           request_v3.attributes().request().http().host(),
           request_v3.attributes().request().http().path());
-      return default_behavior;
+      return ::grpc::Status::OK;
     }
+
+    const auto default_behavior =
+        default_skip_auth ? grpc::Status::OK : grpc::Status::CANCELLED;
 
     // Find a configured processing chain.
     for (auto &chain : chains) {
@@ -195,8 +197,8 @@ class ProcessingStateFactory {
       std::vector<std::unique_ptr<filters::FilterChain>> &chains,
       const google::protobuf::RepeatedPtrField<config::TriggerRule>
           &trigger_rules_config,
-      bool default_skip_auth,
-      grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context);
+      bool default_skip_auth, grpc::ServerCompletionQueue &cq,
+      boost::asio::io_context &io_context);
 
   ProcessingStateV2 *createV2(
       envoy::service::auth::v2::Authorization::AsyncService &service);

@@ -32,7 +32,8 @@ class AsyncServiceImplTest : public ::testing::Test {
     // Spawn a co-routine to run the filter.
     boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
       status = authservice::service::Check(*request, *response, chains_,
-                                           trigger_rules_config_, default_skip_auth_, ioc, yield);
+                                           trigger_rules_config_,
+                                           default_skip_auth_, ioc, yield);
     });
 
     // Run the I/O context to completion, on the current thread.
@@ -161,8 +162,8 @@ TYPED_TEST(AsyncServiceImplTest,
   EXPECT_TRUE(hasLocation);
 }
 
-
-TYPED_TEST(AsyncServiceImplTest, CheckRejectNoMatchedFilterChainWithDefaultDeny) {
+TYPED_TEST(AsyncServiceImplTest,
+           CheckRejectNoMatchedFilterChainWithDefaultDeny) {
   typename TypeParam::first_type request;
   typename TypeParam::second_type response;
   this->default_skip_auth_ = false;
