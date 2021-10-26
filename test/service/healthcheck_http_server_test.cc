@@ -77,6 +77,7 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   ]
 }
 )";
+
     auto jwks = google::jwt_verify::Jwks::createFrom(
         valid_jwks, google::jwt_verify::Jwks::JWKS);
     EXPECT_CALL(*mock_resolver, jwks()).WillOnce(ReturnRef(jwks));
