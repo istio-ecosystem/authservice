@@ -244,7 +244,7 @@ class AsyncAuthServiceImpl {
       timer_handler_function_;
 
   std::unique_ptr<ProcessingStateFactory> state_factory_;
-  std::shared_ptr<boost::asio::io_context::work> work_;
+  std::unique_ptr<boost::asio::io_context::work> work_;
   boost::thread_group thread_pool_;
 
   void SchedulePeriodicCleanupTask();
