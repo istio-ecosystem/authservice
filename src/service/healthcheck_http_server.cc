@@ -63,6 +63,7 @@ HealthcheckAsyncServer::~HealthcheckAsyncServer() {
   for (auto&& conn : active_connections_) {
     delete conn;
   }
+  active_connections_.clear();
   acceptor_.close();
   ioc_.stop();
   th_.join();

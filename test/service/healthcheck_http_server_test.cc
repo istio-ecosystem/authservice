@@ -53,11 +53,12 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
         io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::not_found);
 
-    // If we separate this unit verifying valid JWKs on another test, the CI
-    // workflow will fail even if that succeed on local env. I'm not sure why
-    // this problem had been caused. But I found that this problem had been
-    // eliminated only to merge tests. (I expect the cause of this problem is
-    // relating with binding socket multiple times on the same test process.)
+    // NOTE(shikugawa): If we separate this unit verifying valid JWKs on another
+    // test, the CI workflow will fail even if that succeed on local env. we are
+    // not sure why this problem had been caused. But we found that this problem
+    // had been eliminated only to merge tests. (we expect the cause of this
+    // problem is relating with binding socket multiple times on the same test
+    // process.)
     std::string valid_jwks = R"(
 {
   "keys": [
