@@ -63,7 +63,7 @@ HealthcheckAsyncServer::~HealthcheckAsyncServer() {
   for (auto&& conn : active_connections_) {
     delete conn;
   }
-  sock_.close();
+  acceptor_.close();
   ioc_.stop();
   th_.join();
 }

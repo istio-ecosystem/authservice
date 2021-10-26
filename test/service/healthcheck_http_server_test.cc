@@ -1,6 +1,8 @@
 #include "src/service/healthcheck_http_server.h"
 
+#include <chrono>
 #include <memory>
+#include <thread>
 
 #include "boost/asio/io_context.hpp"
 #include "boost/asio/ip/tcp.hpp"
@@ -21,16 +23,14 @@ using testing::ReturnRef;
 
 TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   boost::asio::io_context io_context;
-
   auto configuration = std::make_unique<config::FilterChain>();
   auto chain =
       std::make_unique<filters::FilterChainImpl>(io_context, *configuration, 1);
 
   auto mock_resolver = std::make_shared<filters::oidc::MockJwksResolver>();
   google::jwt_verify::JwksPtr dangling_jwks;
-  EXPECT_CALL(*mock_resolver, jwks())
-      .Times(2)
-      .WillRepeatedly(ReturnRef(dangling_jwks));
+
+  EXPECT_CALL(*mock_resolver, jwks()).WillOnce(ReturnRef(dangling_jwks));
 
   auto resolver_cache =
       std::make_unique<filters::oidc::MockJwksResolverCache>();
@@ -39,34 +39,26 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
       .WillRepeatedly(Return(mock_resolver));
 
   chain->setJwksResolverCacheForTest(std::move(resolver_cache));
-  EXPECT_FALSE(chain->jwksActive());
 
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
+  HealthcheckAsyncServer server(chains, "0.0.0.0", 0);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
   boost::asio::spawn(io_context, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet("http://0.0.0.0:33333/healthz", {}, "",
-                                   io_context, yield);
+    auto res = http_ptr->SimpleGet(
+        fmt::format("http://0.0.0.0:{}/healthz", server.getPort()), {}, "",
+        io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::not_found);
-  });
 
-  io_context.run();
-}
-
-TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
-  boost::asio::io_context io_context;
-
-  auto configuration = std::make_unique<config::FilterChain>();
-  auto chain =
-      std::make_unique<filters::FilterChainImpl>(io_context, *configuration, 1);
-
-  auto mock_resolver = std::make_shared<filters::oidc::MockJwksResolver>();
-
-  std::string valid_jwks = R"(
+    // If we separate this unit verifying valid JWKs on another test, the CI
+    // workflow will fail even if that succeed on local env. I'm not sure why
+    // this problem had been caused. But I found that this problem had been
+    // eliminated only to merge tests. (I expect the cause of this problem is
+    // relating with binding socket multiple times on the same test process.)
+    std::string valid_jwks = R"(
 {
   "keys": [
     {
@@ -90,31 +82,14 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
   ]
 }
 )";
-  auto jwks = google::jwt_verify::Jwks::createFrom(
-      valid_jwks, google::jwt_verify::Jwks::JWKS);
+    auto jwks = google::jwt_verify::Jwks::createFrom(
+        valid_jwks, google::jwt_verify::Jwks::JWKS);
+    EXPECT_CALL(*mock_resolver, jwks()).WillOnce(ReturnRef(jwks));
 
-  EXPECT_CALL(*mock_resolver, jwks()).Times(2).WillRepeatedly(ReturnRef(jwks));
-
-  auto resolver_cache =
-      std::make_unique<filters::oidc::MockJwksResolverCache>();
-  EXPECT_CALL(*resolver_cache, getResolver())
-      .Times(2)
-      .WillRepeatedly(Return(mock_resolver));
-
-  chain->setJwksResolverCacheForTest(std::move(resolver_cache));
-  EXPECT_TRUE(chain->jwksActive());
-
-  std::vector<std::unique_ptr<filters::FilterChain>> chains;
-  chains.push_back(std::move(chain));
-
-  HealthcheckAsyncServer server(chains, "0.0.0.0", 33334);
-
-  auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
-
-  boost::asio::spawn(io_context, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet("http://0.0.0.0:33334/healthz", {}, "",
-                                   io_context, yield);
-    EXPECT_EQ(res->result(), boost::beast::http::status::ok);
+    auto res2 = http_ptr->SimpleGet(
+        fmt::format("http://0.0.0.0:{}/healthz", server.getPort()), {}, "",
+        io_context, yield);
+    EXPECT_EQ(res2->result(), boost::beast::http::status::ok);
   });
 
   io_context.run();
