@@ -49,8 +49,9 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
   boost::asio::spawn(io_context, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet("http://0.0.0.0:33333/healthz", {}, "",
-                                   io_context, yield);
+    auto res = http_ptr->SimpleGet(
+        fmt::format("http://0.0.0.0:{}/healthz", server.getPort()), {}, "",
+        io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::not_found);
   });
 
@@ -112,8 +113,9 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
   boost::asio::spawn(io_context, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet("http://0.0.0.0:33334/healthz", {}, "",
-                                   io_context, yield);
+    auto res = http_ptr->SimpleGet(
+        fmt::format("http://0.0.0.0:{}/healthz", server.getPort()), {}, "",
+        io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::ok);
   });
 

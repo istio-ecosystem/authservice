@@ -59,6 +59,7 @@ class HealthcheckAsyncServer {
 
   ~HealthcheckAsyncServer();
 
+  int getPort() const { return acceptor_.local_endpoint().port(); }
   void removeConnection(HealthcheckHttpConnection* conn);
 
  private:
