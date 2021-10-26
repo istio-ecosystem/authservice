@@ -17,6 +17,7 @@
 #include "src/common/http/http.h"
 #include "src/common/utilities/trigger_rules.h"
 #include "src/filters/filter_chain.h"
+#include "src/service/healthcheck_http_server.h"
 
 namespace authservice {
 namespace service {
@@ -233,6 +234,7 @@ class AsyncAuthServiceImpl {
   envoy::service::auth::v3::Authorization::AsyncService service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;
   std::unique_ptr<grpc::Server> server_;
+  std::unique_ptr<HealthcheckAsyncServer> health_server_;
 
   std::shared_ptr<boost::asio::io_context> io_context_;
 

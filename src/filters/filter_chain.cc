@@ -71,7 +71,7 @@ FilterChainImpl::FilterChainImpl(boost::asio::io_context& ioc,
     }
 
     jwks_resolver_cache_ =
-        std::make_unique<oidc::JwksResolverCache>(oidc_filter->oidc(), ioc);
+        std::make_unique<oidc::JwksResolverCacheImpl>(oidc_filter->oidc(), ioc);
   }
 
   // Create filter chain factory
@@ -129,6 +129,16 @@ void FilterChainImpl::DoPeriodicCleanup() {
                  Name());
     oidc_session_store_->RemoveAllExpired();
   }
+}
+
+bool FilterChainImpl::jwksActive() const {
+  const auto resolver = jwks_resolver_cache_->getResolver();
+  return resolver != nullptr && resolver->jwks() != nullptr;
+}
+
+void FilterChainImpl::setJwksResolverCacheForTest(
+    oidc::JwksResolverCachePtr jwks_resolver_cache) {
+  jwks_resolver_cache_ = jwks_resolver_cache;
 }
 
 }  // namespace filters

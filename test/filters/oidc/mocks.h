@@ -5,6 +5,7 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "src/filters/oidc/authorization_state.h"
+#include "src/filters/oidc/jwks_resolver.h"
 #include "src/filters/oidc/redis_wrapper.h"
 #include "src/filters/oidc/session_store.h"
 #include "src/filters/oidc/token_response.h"
@@ -76,6 +77,18 @@ class RedisWrapperMock : public RedisWrapper {
               (const absl::string_view, std::vector<std::string> &));
 
   MOCK_METHOD(bool, expireat, (const absl::string_view, long long));
+};
+
+class MockJwksResolver final : public JwksResolver {
+ public:
+  MOCK_METHOD((google::jwt_verify::JwksPtr &), jwks, ());
+  MOCK_METHOD((const std::string &), rawStringJwks, (), (const));
+};
+
+class MockJwksResolverCache : public JwksResolverCache {
+ public:
+  MOCK_METHOD((std::shared_ptr<authservice::filters::oidc::JwksResolver>),
+              getResolver, ());
 };
 
 }  // namespace oidc

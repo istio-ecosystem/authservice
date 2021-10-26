@@ -1,6 +1,20 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "healthcheck_http_server_lib",
+    hdrs = [
+        "healthcheck_http_server.h"
+    ],
+    srcs = [
+        "healthcheck_http_server.cc",
+    ],
+    deps = [
+        "//src/filters:filter_chain",
+        "@boost//:all"
+    ]
+)
+
+cc_library(
     name = "serviceimpl",
     srcs = [
         "async_service_impl.cc",
@@ -9,6 +23,7 @@ cc_library(
         "async_service_impl.h",
     ],
     deps = [
+        ":healthcheck_http_server_lib",
         "//config:config_cc",
         "//src/config",
         "//src/filters:filter_chain",
