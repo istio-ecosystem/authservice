@@ -44,7 +44,7 @@ void HealthcheckHttpConnection::onReadDone() {
 }
 
 void HealthcheckHttpConnection::onWriteDone() {
-  sock_.shutdown(tcp::socket::shutdown_send, ec_);
+  sock_.close();
   parent_.removeConnection(this);
 }
 
