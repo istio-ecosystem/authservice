@@ -129,6 +129,7 @@ xx_library(
     deps = [
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_abseil-cpp//absl/container:flat_hash_map",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
         "@com_google_protobuf//:protobuf",
