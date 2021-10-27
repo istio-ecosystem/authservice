@@ -12,14 +12,24 @@ HealthcheckHttpConnection::HealthcheckHttpConnection(
 }
 
 void HealthcheckHttpConnection::startRead() {
-  http::async_read(sock_, read_buffer_, request_,
-                   [this](auto, auto) { onReadDone(); });
+  http::async_read(sock_, read_buffer_, request_, [this](auto ec, auto) {
+    if (!ec) {
+      onReadDone();
+    } else {
+      sock_.close();
+      parent_.removeConnection(this);
+    }
+  });
 }
 
 void HealthcheckHttpConnection::startWrite() {
   http::async_write(sock_, response_, [this](auto ec, auto) {
-    ec_ = ec;
-    onWriteDone();
+    if (!ec) {
+      onWriteDone();
+    } else {
+      sock_.close();
+      parent_.removeConnection(this);
+    }
   });
 }
 
