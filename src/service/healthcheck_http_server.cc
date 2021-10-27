@@ -66,7 +66,15 @@ HealthcheckAsyncServer::HealthcheckAsyncServer(
       sock_(ioc_),
       th_([this] {
         startAccept();
-        ioc_.run();
+
+        while (true) {
+          try {
+            ioc_.run();
+            break;
+          } catch (std::exception& e) {
+            spdlog::error("{}: {}", __func__, e.what());
+          }
+        }
       }) {}
 
 HealthcheckAsyncServer::~HealthcheckAsyncServer() {
