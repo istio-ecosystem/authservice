@@ -3,9 +3,8 @@
 #include <grpcpp/server_builder.h>
 
 #include <boost/asio.hpp>
-#include <boost/thread/thread.hpp>
+#include <csignal>
 #include <memory>
-#include <stdexcept>
 
 #include "boost/asio/io_context.hpp"
 #include "boost/thread/detail/thread.hpp"
@@ -24,7 +23,8 @@ ProcessingStateV2::ProcessingStateV2(
     envoy::service::auth::v2::Authorization::AsyncService &service)
     : parent_(parent), service_(service), responder_(&ctx_) {
   spdlog::warn(
-      "Creating V2 request processor state. V2 will be deprecated in 2021 Q1");
+      "Creating V2 request processor state. V2 will be deprecated in 2021 "
+      "Q1");
   service_.RequestCheck(&ctx_, &request_, &responder_, &parent_.cq_,
                         &parent_.cq_, this);
 }
@@ -144,16 +144,15 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
 void AsyncAuthServiceImpl::Run() {
   // Add a work object to the IO service so it will not shut down when it has
   // nothing left to do
-  auto work = std::make_shared<boost::asio::io_context::work>(*io_context_);
+  work_ = std::make_unique<boost::asio::io_context::work>(*io_context_);
 
   SchedulePeriodicCleanupTask();
 
   // Spin up our worker threads
-  // Config validation should have already ensured that the number of threads is
-  // > 0
-  boost::thread_group threadpool;
+  // Config validation should have already ensured that the number of threads
+  // is > 0
   for (unsigned int i = 0; i < config_.threads(); ++i) {
-    threadpool.create_thread([this]() {
+    thread_pool_.create_thread([this]() {
       while (true) {
         try {
           // The asio library provides a guarantee that callback handlers will
@@ -162,10 +161,10 @@ void AsyncAuthServiceImpl::Run() {
           // continue to run while there is still "work" to do. Async methods
           // which take a boost::asio::yield_context as an argument will use
           // that yield as a callback handler when the async operation has
-          // completed. The yield_context will restore the stack, registers, and
-          // execution pointer of the calling method, effectively allowing that
-          // method to pick up right where it left off, and continue on any
-          // worker thread.
+          // completed. The yield_context will restore the stack, registers,
+          // and execution pointer of the calling method, effectively allowing
+          // that method to pick up right where it left off, and continue on
+          // any worker thread.
           this->io_context_
               ->run();  // run the io_context's event processing loop
           break;
@@ -206,42 +205,6 @@ void AsyncAuthServiceImpl::Run() {
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
   }
-
-  spdlog::info("Server shutting down");
-
-  // Start shutting down gRPC
-  server_->Shutdown();
-  cq_->Shutdown();
-
-  // Start shutting down health server
-  health_server_.reset();
-
-  // The destructor of the completion queue will abort if there are any
-  // outstanding events, so we must drain the queue before we allow that to
-  // happen
-  try {
-    void *tag;
-    bool ok;
-    while (cq_->Next(&tag, &ok)) {
-      delete static_cast<ServiceState *>(tag);
-    }
-  } catch (const std::exception &e) {
-    spdlog::error("{}: Unexpected error: {}", __func__, e.what());
-  }
-
-  // Reset the work item for the IO service will terminate once it finishes any
-  // outstanding jobs
-  work.reset();
-
-  // The `SchedulePeriodicCleanupTask` is scheduled with `timer_`, which is
-  // bound with the io_context_. Calling `stop()` explicitly ensures that the
-  // periodic task won't be further scheduled onto `io_context` internal
-  // scheduling queue. Therefore the thread running periodic task can be
-  // terminated and joined here. This is because we will suffer from
-  // non-termination of I/O thread completion with non-empty internal scheduling
-  // queue.
-  io_context_->stop();
-  threadpool.join_all();
 }
 
 void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
@@ -262,6 +225,52 @@ void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
 
   // Schedule the first invocation of the handler on the timer
   timer_.async_wait(timer_handler_function_);
+}
+
+void AsyncAuthServiceImpl::Shutdown() {
+  spdlog::info("Server shutting down");
+
+  // Start shutting down gRPC
+  if (server_ != nullptr) {
+    server_->Shutdown();
+  }
+
+  if (cq_ != nullptr) {
+    cq_->Shutdown();
+
+    // The destructor of the completion queue will abort if there are any
+    // outstanding events, so we must drain the queue before we allow that to
+    // happen
+    try {
+      void *tag;
+      bool ok;
+      while (cq_->Next(&tag, &ok)) {
+        delete static_cast<ServiceState *>(tag);
+      }
+    } catch (const std::exception &e) {
+      spdlog::error("{}: Unexpected error: {}", __func__, e.what());
+    }
+  }
+
+  // Start shutting down health server
+  health_server_.reset();
+
+  if (work_ != nullptr) {
+    // Reset the work item for the IO service will terminate once it finishes
+    // any outstanding jobs
+    work_.reset();
+  }
+
+  if (io_context_ != nullptr) {
+    // The `SchedulePeriodicCleanupTask` is scheduled with `timer_`,
+    // which is bound with the io_context_.
+    // Calling `stop()` explicitly ensures that the periodic task
+    // won't be further scheduled onto `io_context` internal scheduling queue.
+    // Therefore the thread running periodic task can be terminated and joined
+    // here.
+    io_context_->stop();
+  }
+  thread_pool_.join_all();
 }
 
 }  // namespace service
