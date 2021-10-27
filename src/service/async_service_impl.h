@@ -5,7 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
+#include <memory>
 
+#include "boost/system/error_code.hpp"
 #include "common/config/version_converter.h"
 #include "config/config.pb.h"
 #include "envoy/common/exception.h"
@@ -222,7 +225,8 @@ class ProcessingStateFactory {
 
 class AsyncAuthServiceImpl {
  public:
-  explicit AsyncAuthServiceImpl(const config::Config &config);
+  AsyncAuthServiceImpl(const config::Config &config);
+  ~AsyncAuthServiceImpl() { Shutdown(); }
 
   void Run();
 
@@ -246,8 +250,11 @@ class AsyncAuthServiceImpl {
       timer_handler_function_;
 
   std::unique_ptr<ProcessingStateFactory> state_factory_;
+  std::unique_ptr<boost::asio::io_context::work> work_;
+  boost::thread_group thread_pool_;
 
   void SchedulePeriodicCleanupTask();
+  void Shutdown();
 };
 
 }  // namespace service

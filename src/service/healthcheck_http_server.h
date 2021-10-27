@@ -47,7 +47,6 @@ class HealthcheckHttpConnection {
   http::request<http::dynamic_body> request_;
   http::response<http::dynamic_body> response_;
   beast::flat_buffer read_buffer_{256};
-  boost::system::error_code ec_;
   HealthcheckAsyncServer& parent_;
 };
 
