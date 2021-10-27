@@ -47,7 +47,6 @@ class HealthcheckHttpConnection {
   http::request<http::dynamic_body> request_;
   http::response<http::dynamic_body> response_;
   beast::flat_buffer read_buffer_{256};
-  boost::system::error_code ec_;
   HealthcheckAsyncServer& parent_;
 };
 
@@ -59,6 +58,7 @@ class HealthcheckAsyncServer {
 
   ~HealthcheckAsyncServer();
 
+  int getPort() const { return acceptor_.local_endpoint().port(); }
   void removeConnection(HealthcheckHttpConnection* conn);
 
  private:

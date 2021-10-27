@@ -12,14 +12,24 @@ HealthcheckHttpConnection::HealthcheckHttpConnection(
 }
 
 void HealthcheckHttpConnection::startRead() {
-  http::async_read(sock_, read_buffer_, request_,
-                   [this](auto, auto) { onReadDone(); });
+  http::async_read(sock_, read_buffer_, request_, [this](auto ec, auto) {
+    if (!ec) {
+      onReadDone();
+    } else {
+      sock_.close();
+      parent_.removeConnection(this);
+    }
+  });
 }
 
 void HealthcheckHttpConnection::startWrite() {
   http::async_write(sock_, response_, [this](auto ec, auto) {
-    ec_ = ec;
-    onWriteDone();
+    if (!ec) {
+      onWriteDone();
+    } else {
+      sock_.close();
+      parent_.removeConnection(this);
+    }
   });
 }
 
@@ -44,7 +54,7 @@ void HealthcheckHttpConnection::onReadDone() {
 }
 
 void HealthcheckHttpConnection::onWriteDone() {
-  sock_.shutdown(tcp::socket::shutdown_send, ec_);
+  sock_.close();
   parent_.removeConnection(this);
 }
 
@@ -63,7 +73,8 @@ HealthcheckAsyncServer::~HealthcheckAsyncServer() {
   for (auto&& conn : active_connections_) {
     delete conn;
   }
-  sock_.close();
+  active_connections_.clear();
+  acceptor_.close();
   ioc_.stop();
   th_.join();
 }
