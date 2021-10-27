@@ -137,7 +137,7 @@ google::rpc::Code OidcFilter::Process(
     }
 
     auto id_token = GetIDTokenFromHeader(header_value);
-    std::cout << header_value << std::endl;
+
     if (!idtoken_verifier_.verify(std::string(id_token),
                                   {idp_config_.client_id()},
                                   absl::flat_hash_map<std::string, std::string>{
