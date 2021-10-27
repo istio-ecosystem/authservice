@@ -31,9 +31,9 @@ class AsyncServiceImplTest : public ::testing::Test {
 
     // Spawn a co-routine to run the filter.
     boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
-      status = authservice::service::Check(*request, *response, chains_,
-                                           trigger_rules_config_,
-                                           default_skip_auth_, ioc, yield);
+      status = authservice::service::Check(
+          *request, *response, chains_, trigger_rules_config_,
+          allow_unmatched_requests_, ioc, yield);
     });
 
     // Run the I/O context to completion, on the current thread.
@@ -44,7 +44,7 @@ class AsyncServiceImplTest : public ::testing::Test {
     return status;
   }
 
-  bool default_skip_auth_{true};
+  bool allow_unmatched_requests_{true};
   std::vector<std::unique_ptr<filters::FilterChain>> chains_;
   google::protobuf::RepeatedPtrField<config::TriggerRule> trigger_rules_config_;
   boost::asio::io_context ioc_;
@@ -166,7 +166,7 @@ TYPED_TEST(AsyncServiceImplTest,
            CheckRejectNoMatchedFilterChainWithDefaultDeny) {
   typename TypeParam::first_type request;
   typename TypeParam::second_type response;
-  this->default_skip_auth_ = false;
+  this->allow_unmatched_requests_ = false;
   request.mutable_attributes()->mutable_request()->mutable_http()->set_scheme(
       "https");
   request.mutable_attributes()->mutable_request()->mutable_http()->set_path(
@@ -175,6 +175,8 @@ TYPED_TEST(AsyncServiceImplTest,
                              ->mutable_request()
                              ->mutable_http()
                              ->mutable_headers();
+  // Set tenant identifier with "tenant2" to avoid matching with some filter
+  // chains that triggered by "x-tenant-identifier=tenant1".
   request_headers->insert({"x-tenant-identifier", "tenant2"});
 
   config::Config config = *config::GetConfig("test/fixtures/valid-config.json");
@@ -188,7 +190,7 @@ TYPED_TEST(AsyncServiceImplTest,
   auto status = this->check(&request, &response);
 
   // Can't find matched filter chain.
-  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.error_code(), grpc::StatusCode::PERMISSION_DENIED);
 }
 
 }  // namespace service

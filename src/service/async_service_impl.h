@@ -28,7 +28,7 @@ template <class RequestType, class ResponseType>
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
-    bool default_skip_auth, boost::asio::io_context &ioc,
+    const bool allow_unmatched_requests, boost::asio::io_context &ioc,
     boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
@@ -59,8 +59,13 @@ template <class RequestType, class ResponseType>
       return ::grpc::Status::OK;
     }
 
-    const auto default_behavior =
-        default_skip_auth ? grpc::Status::OK : grpc::Status::CANCELLED;
+    // TODO(incfly): Clean up trigger rule after checking the current Istio
+    // ExtAuthz API is sufficient.
+    const auto default_response_code =
+        allow_unmatched_requests
+            ? grpc::Status::OK
+            : grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                           "permission denied");
 
     // Find a configured processing chain.
     for (auto &chain : chains) {
@@ -122,11 +127,14 @@ template <class RequestType, class ResponseType>
     }
 
     // No matching filter chain found. Allow request to continue.
-    spdlog::debug("{}: no matching filter chain for request to {}://{}{} ",
-                  __func__, request.attributes().request().http().scheme(),
-                  request.attributes().request().http().host(),
-                  request.attributes().request().http().path());
-    return default_behavior;
+    spdlog::debug(
+        "{}: no matching filter chain for request to {}://{}{}, respond with: "
+        "{}",
+        __func__, request.attributes().request().http().scheme(),
+        request.attributes().request().http().host(),
+        request.attributes().request().http().path(),
+        default_response_code.error_code());
+    return default_response_code;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());
   } catch (...) {
@@ -200,7 +208,7 @@ class ProcessingStateFactory {
       std::vector<std::unique_ptr<filters::FilterChain>> &chains,
       const google::protobuf::RepeatedPtrField<config::TriggerRule>
           &trigger_rules_config,
-      bool default_skip_auth, grpc::ServerCompletionQueue &cq,
+      const bool allow_unmatched_requests, grpc::ServerCompletionQueue &cq,
       boost::asio::io_context &io_context);
 
   ProcessingStateV2 *createV2(
@@ -217,7 +225,7 @@ class ProcessingStateFactory {
   std::vector<std::unique_ptr<filters::FilterChain>> &chains_;
   const google::protobuf::RepeatedPtrField<config::TriggerRule>
       &trigger_rules_config_;
-  bool default_skip_auth_{false};
+  const bool allow_unmatched_requests_{false};
 
   friend class ProcessingStateV2;
   friend class ProcessingState;

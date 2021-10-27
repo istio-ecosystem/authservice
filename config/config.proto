@@ -122,10 +122,9 @@ message Config {
     // Optional.
     oidc.OIDCConfig default_oidc_config = 10;
 
-    // Configure default behavior, allow or deny if requests are not matched any filter chain,
-    // It is false by default.
+    // If true will allow the the requests even no filter chain match is found. Default false.
     // Optional.
-    bool default_skip_auth = 11;
+    bool allow_unmatched_requests = 11;
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if
