@@ -67,7 +67,7 @@ int64_t TokenResponse::GetIDTokenExpiry() const {
 
 TokenResponseParserImpl::TokenResponseParserImpl(
     google::jwt_verify::JwksPtr &keys)
-    : keys_(keys) {}
+    : idtoken_verifier_(keys) {}
 
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id, const std::string &nonce,
@@ -237,34 +237,9 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   // Verify the token contains a `nonce` claim and that it matches our expected
   // value. Verify the token signature & that our client_id is set as an entry
   // in the token's `aud` field.
-  std::vector<std::string> audiences = {client_id};
-
-  if (keys_ == nullptr) {
-    spdlog::warn("{}: missing active JWKs ", __func__);
-    return true;
-  }
-
-  auto jwt_status = google::jwt_verify::verifyJwt(id_token, *keys_, audiences);
-  if (jwt_status != google::jwt_verify::Status::Ok) {
-    spdlog::warn("{}: `id_token` verification failed: {}", __func__,
-                 google::jwt_verify::getStatusString(jwt_status));
-    return true;
-  }
-
-  std::string extracted_nonce;
-  google::jwt_verify::StructUtils getter(id_token.payload_pb_);
-  if (getter.GetString(nonce_field, &extracted_nonce) !=
-      google::jwt_verify::StructUtils::OK) {
-    spdlog::warn("{}: failed to retrieve `nonce` from id_token", __func__);
-    return true;
-  }
-
-  if (nonce != extracted_nonce) {
-    spdlog::warn("{}: invalid `nonce` field in id_token", __func__);
-    return true;
-  }
-
-  return false;
+  return !idtoken_verifier_.verify(
+      id_token, {client_id},
+      absl::flat_hash_map<std::string, std::string>{{nonce_field, nonce}});
 }
 
 absl::optional<int64_t> TokenResponseParserImpl::ParseAccessTokenExpiry(

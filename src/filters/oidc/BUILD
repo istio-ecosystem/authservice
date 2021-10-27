@@ -7,6 +7,7 @@ xx_library(
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
     deps = [
+        ":jwt_verifier",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -119,6 +120,19 @@ xx_library(
         "@com_github_abseil-cpp//absl/synchronization:synchronization",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
+)
+
+xx_library(
+    name = "jwt_verifier",
+    srcs = ["jwt_verifier.cc"],
+    hdrs = ["jwt_verifier.h"],
+    deps = [
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
+        "@com_google_protobuf//:protobuf",
+    ]
 )
 
 xx_library(

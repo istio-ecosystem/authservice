@@ -1,6 +1,8 @@
 #ifndef AUTHSERVICE_SRC_FILTERS_OIDC_AUTHORIZATION_STATE_H_
 #define AUTHSERVICE_SRC_FILTERS_OIDC_AUTHORIZATION_STATE_H_
 
+#include <memory>
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 

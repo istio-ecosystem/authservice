@@ -44,7 +44,7 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  HealthcheckAsyncServer server(chains, "0.0.0.0", 33333);
+  HealthcheckAsyncServer server(chains, "0.0.0.0", 0);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
@@ -108,7 +108,7 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
   std::vector<std::unique_ptr<filters::FilterChain>> chains;
   chains.push_back(std::move(chain));
 
-  HealthcheckAsyncServer server(chains, "0.0.0.0", 33334);
+  HealthcheckAsyncServer server(chains, "0.0.0.0", 0);
 
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 

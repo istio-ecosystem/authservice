@@ -32,6 +32,7 @@ class OidcFilter final : public filters::Filter {
   TokenResponseParserPtr parser_;
   common::session::SessionStringGeneratorPtr session_string_generator_;
   SessionStorePtr session_store_;
+  JwtVerifier idtoken_verifier_;
 
   /**
    * Set HTTP header helper in a response.
@@ -210,12 +211,17 @@ class OidcFilter final : public filters::Filter {
       envoy::service::auth::v3::CheckResponse *response,
       TokenResponse &tokenResponse);
 
+  std::pair<absl::optional<AuthorizationState>, absl::optional<SessionError>>
+  GetAuthorizationState(absl::string_view session_id);
+
+  absl::string_view GetIDTokenFromHeader(absl::string_view header_value);
+
  public:
   OidcFilter(
       common::http::ptr_t http_ptr, const config::oidc::OIDCConfig &idp_config,
       TokenResponseParserPtr parser,
       common::session::SessionStringGeneratorPtr session_string_generator,
-      SessionStorePtr session_store);
+      SessionStorePtr session_store, google::jwt_verify::JwksPtr &keys);
 
   google::rpc::Code Process(
       const ::envoy::service::auth::v3::CheckRequest *request,
