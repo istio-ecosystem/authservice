@@ -117,11 +117,9 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
         fmt::format("http://0.0.0.0:{}/healthz", server.getPort()), {}, "",
         io_context, yield);
     EXPECT_EQ(res->result(), boost::beast::http::status::ok);
-    std::cout <<"hoge" << std::endl;
   });
 
   io_context.run();
-  std::cout << "fuga" << std::endl;
 }
 
 }  // namespace service

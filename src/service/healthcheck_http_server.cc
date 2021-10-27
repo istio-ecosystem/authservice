@@ -70,24 +70,13 @@ HealthcheckAsyncServer::HealthcheckAsyncServer(
       }) {}
 
 HealthcheckAsyncServer::~HealthcheckAsyncServer() {
-std::cout << "piyo1" << std::endl;
   for (auto&& conn : active_connections_) {
     delete conn;
   }
-  std::cout << "piyo2" << std::endl;
-
   active_connections_.clear();
-std::cout << "piyo3" << std::endl;
-
   acceptor_.close();
-std::cout << "piyo4" << std::endl;
-
   ioc_.stop();
-std::cout << "piyo5" << std::endl;
-
   th_.join();
-std::cout << "piyo6" << std::endl;
-
 }
 
 void HealthcheckAsyncServer::removeConnection(HealthcheckHttpConnection* conn) {

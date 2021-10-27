@@ -69,7 +69,7 @@ class HealthcheckAsyncServer {
   boost::asio::io_context ioc_;
   tcp::acceptor acceptor_;
   tcp::socket sock_;
-  boost::thread th_;
+  std::thread th_;
 };
 
 }  // namespace service
