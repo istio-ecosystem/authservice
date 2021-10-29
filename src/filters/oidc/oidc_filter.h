@@ -3,6 +3,8 @@
 
 #include <ctime>
 
+#include "absl/status/statusor.h"
+#include "authorization_state.h"
 #include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "src/common/http/http.h"
@@ -211,8 +213,8 @@ class OidcFilter final : public filters::Filter {
       envoy::service::auth::v3::CheckResponse *response,
       TokenResponse &tokenResponse);
 
-  std::pair<absl::optional<AuthorizationState>, absl::optional<SessionError>>
-  GetAuthorizationState(absl::string_view session_id);
+  absl::StatusOr<absl::optional<AuthorizationState>> GetAuthorizationState(
+      absl::string_view session_id);
 
   absl::string_view GetIDTokenFromHeader(absl::string_view header_value);
 
@@ -221,7 +223,7 @@ class OidcFilter final : public filters::Filter {
       common::http::ptr_t http_ptr, const config::oidc::OIDCConfig &idp_config,
       TokenResponseParserPtr parser,
       common::session::SessionStringGeneratorPtr session_string_generator,
-      SessionStorePtr session_store, google::jwt_verify::JwksPtr &keys);
+      SessionStorePtr session_store, JwksResolverCachePtr resolver_cache);
 
   google::rpc::Code Process(
       const ::envoy::service::auth::v3::CheckRequest *request,

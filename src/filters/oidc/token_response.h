@@ -85,7 +85,8 @@ class TokenResponseParserImpl final : public TokenResponseParser {
       google::protobuf::Map<std::string, google::protobuf::Value> fields) const;
 
  public:
-  TokenResponseParserImpl(google::jwt_verify::JwksPtr &keys);
+  TokenResponseParserImpl(JwksResolverCachePtr resolver_cache);
+
   std::shared_ptr<TokenResponse> Parse(
       const std::string &client_id, const std::string &nonce,
       const std::string &raw_response_string) const override;

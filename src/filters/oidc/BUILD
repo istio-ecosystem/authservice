@@ -127,6 +127,8 @@ xx_library(
     srcs = ["jwt_verifier.cc"],
     hdrs = ["jwt_verifier.h"],
     deps = [
+        ":jwks_resolver",
+        "@com_github_abseil-cpp//absl/status:status",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_abseil-cpp//absl/container:flat_hash_map",
@@ -153,6 +155,8 @@ xx_library(
         "//src/filters/oidc:jwks_resolver",
         "@boost//:all",
         "@com_github_abseil-cpp//absl/time:time",
+        "@com_github_abseil-cpp//absl/status:status",
+        "@com_github_abseil-cpp//absl/status:statusor",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
     ],

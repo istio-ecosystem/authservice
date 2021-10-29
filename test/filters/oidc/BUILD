@@ -18,6 +18,7 @@ cc_test(
     name = "token_response_test",
     srcs = ["token_response_test.cc"],
     deps = [
+        ":mocks",
         "//src/filters/oidc:token_response",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",

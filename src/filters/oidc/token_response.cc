@@ -66,8 +66,8 @@ int64_t TokenResponse::GetIDTokenExpiry() const {
 }
 
 TokenResponseParserImpl::TokenResponseParserImpl(
-    google::jwt_verify::JwksPtr &keys)
-    : idtoken_verifier_(keys) {}
+    JwksResolverCachePtr resolver_cache)
+    : idtoken_verifier_(resolver_cache) {}
 
 std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
     const std::string &client_id, const std::string &nonce,
@@ -237,9 +237,11 @@ bool TokenResponseParserImpl::IsIDTokenInvalid(
   // Verify the token contains a `nonce` claim and that it matches our expected
   // value. Verify the token signature & that our client_id is set as an entry
   // in the token's `aud` field.
-  return !idtoken_verifier_.verify(
-      id_token, {client_id},
-      absl::flat_hash_map<std::string, std::string>{{nonce_field, nonce}});
+  return !idtoken_verifier_
+              .verify(id_token, {client_id},
+                      absl::flat_hash_map<std::string, std::string>{
+                          {nonce_field, nonce}})
+              .ok();
 }
 
 absl::optional<int64_t> TokenResponseParserImpl::ParseAccessTokenExpiry(
