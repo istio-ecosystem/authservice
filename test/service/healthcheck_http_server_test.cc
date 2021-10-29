@@ -37,6 +37,11 @@ class Runner {
     chains_.push_back(std::move(chain));
   }
 
+  void clearChain() {
+    jwks_.reset();
+    chains_.clear();
+  }
+
   int start() {
     server_ =
         std::make_unique<HealthcheckAsyncServer>(ioc_, chains_, "0.0.0.0", 0);
@@ -77,50 +82,47 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   });
 
   ioc.run();
-  runner.stop();
-}
+  runner.clearChain();
 
-TEST(TestHealthCheckHttpServer, BasicFlowWithActiveJwks) {
-  std::string valid_jwks = R"(
-{
-  "keys": [
-    {
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
-      "n":
-      "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
-      "e": "AQAB"
-    },
-    {
-      "kty": "RSA",
-      "alg": "RS256",
-      "use": "sig",
-      "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
-      "n":
-      "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
-      "e": "AQAB"
-    }
-  ]
-}
-)";
-  auto jwks = google::jwt_verify::Jwks::createFrom(
-      valid_jwks, google::jwt_verify::Jwks::JWKS);
+  {
+    std::string valid_jwks = R"(
+  {
+    "keys": [
+      {
+        "kty": "RSA",
+        "alg": "RS256",
+        "use": "sig",
+        "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
+        "n":
+        "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
+        "e": "AQAB"
+      },
+      {
+        "kty": "RSA",
+        "alg": "RS256",
+        "use": "sig",
+        "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
+        "n":
+        "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
+        "e": "AQAB"
+      }
+    ]
+  }
+  )";
+    auto jwks = google::jwt_verify::Jwks::createFrom(
+        valid_jwks, google::jwt_verify::Jwks::JWKS);
+    runner.addChain(std::make_unique<config::FilterChain>(), std::move(jwks));
 
-  Runner runner;
-  runner.addChain(std::make_unique<config::FilterChain>(), std::move(jwks));
-  const auto port = runner.start();
-  auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
+    boost::asio::io_context ioc2;
+    boost::asio::spawn(ioc2, [&](boost::asio::yield_context yield) {
+      auto res = http_ptr->SimpleGet(
+          fmt::format("http://0.0.0.0:{}/healthz", port), {}, "", ioc2, yield);
+      EXPECT_EQ(res->result(), boost::beast::http::status::ok);
+    });
 
-  boost::asio::io_context ioc;
-  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet(
-        fmt::format("http://0.0.0.0:{}/healthz", port), {}, "", ioc, yield);
-    EXPECT_EQ(res->result(), boost::beast::http::status::ok);
-  });
+    ioc2.run();
+  }
 
-  ioc.run();
   runner.stop();
 }
 
