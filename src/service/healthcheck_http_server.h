@@ -53,23 +53,21 @@ class HealthcheckHttpConnection {
 class HealthcheckAsyncServer {
  public:
   HealthcheckAsyncServer(
+      boost::asio::io_context& ioc,
       const std::vector<std::unique_ptr<filters::FilterChain>>& chains,
       std::string address, uint16_t port);
 
   ~HealthcheckAsyncServer();
 
+  void startAccept();
   int getPort() const { return acceptor_.local_endpoint().port(); }
   void removeConnection(HealthcheckHttpConnection* conn);
 
  private:
-  void startAccept();
-
   std::list<HealthcheckHttpConnection*> active_connections_;
   const std::vector<std::unique_ptr<filters::FilterChain>>& chains_;
-  boost::asio::io_context ioc_;
   tcp::acceptor acceptor_;
   tcp::socket sock_;
-  boost::thread th_;
 };
 
 }  // namespace service
