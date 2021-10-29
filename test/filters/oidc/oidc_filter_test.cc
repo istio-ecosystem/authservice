@@ -24,6 +24,7 @@ using ::testing::Eq;
 using ::testing::MatchesRegex;
 using ::testing::Property;
 using ::testing::Return;
+using ::testing::ReturnRef;
 using ::testing::StartsWith;
 using ::testing::StrEq;
 using ::testing::Throw;
@@ -103,7 +104,9 @@ class OidcFilterTest : public ::testing::Test {
   std::shared_ptr<TokenResponse> test_token_response_;
   ::envoy::service::auth::v3::CheckRequest request_;
   ::envoy::service::auth::v3::CheckResponse response_;
-  google::jwt_verify::JwksPtr mock_jwks_;
+  google::jwt_verify::JwksPtr jwks_;
+  std::shared_ptr<MockJwksResolver> mock_resolver_;
+  std::shared_ptr<MockJwksResolverCache> resolver_cache_;
 
   // id_token exp of Feb 2, 2062
   const char *test_id_token_jwt_string_ =
@@ -157,6 +160,13 @@ class OidcFilterTest : public ::testing::Test {
     httpRequest->set_host("example.com");
     httpRequest->set_path("/summary");
     httpRequest->set_query("foo=bar");
+
+    mock_resolver_ = std::make_shared<oidc::MockJwksResolver>();
+    ON_CALL(*mock_resolver_, jwks()).WillByDefault(ReturnRef(jwks_));
+
+    resolver_cache_ = std::make_shared<MockJwksResolverCache>();
+    ON_CALL(*resolver_cache_, getResolver())
+        .WillByDefault(Return(mock_resolver_));
   }
 
   void AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig,
@@ -207,12 +217,14 @@ google::rpc::Code OidcFilterTest::ProcessAndWaitForAsio(
 
 TEST_F(OidcFilterTest, Constructor) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 }
 
 TEST_F(OidcFilterTest, Name) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   ASSERT_EQ(filter.Name().compare("oidc"), 0);
 }
 
@@ -221,21 +233,22 @@ TEST_F(OidcFilterTest, GetSessionIdCookieName) {
 
   OidcFilter filter1(common::http::ptr_t(), config_, parser_mock_,
                      session_string_generator_mock_, session_store_,
-                     mock_jwks_);
+                     resolver_cache_);
   ASSERT_EQ(filter1.GetSessionIdCookieName(),
             "__Host-authservice-session-id-cookie");
 
   config_.set_cookie_name_prefix("my-prefix");
   OidcFilter filter2(common::http::ptr_t(), config_, parser_mock_,
                      session_string_generator_mock_, session_store_,
-                     mock_jwks_);
+                     resolver_cache_);
   ASSERT_EQ(filter2.GetSessionIdCookieName(),
             "__Host-my-prefix-authservice-session-id-cookie");
 }
 
 TEST_F(OidcFilterTest, NoHttpHeader) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   ::envoy::service::auth::v3::CheckRequest request;
   ::envoy::service::auth::v3::CheckResponse response;
@@ -260,7 +273,8 @@ TEST_F(OidcFilterTest, NoAuthorization) {
   MockSessionGenerator(session_id, state, nonce);
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
@@ -300,7 +314,7 @@ TEST_F(
       .WillRepeatedly(Throw(SessionError("session error msg")));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   AssertSessionErrorResponse(status);
@@ -315,7 +329,7 @@ TEST_F(
       .WillRepeatedly(Throw(SessionError("session error msg")));
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
@@ -334,7 +348,8 @@ TEST_F(OidcFilterTest, NoAuthorization_WithoutPathOrQueryParameters) {
   httpRequest->clear_path();
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   ProcessAndWaitForAsio(filter, &request_, &response_);
   AssertRequestedUrlAndStateAndNonceHaveBeenStored(
@@ -345,7 +360,8 @@ TEST_F(
     OidcFilterTest,
     AlreadyHasUnexpiredIdTokenShouldSendRequestToAppWithAuthorizationHeaderContainingIdToken) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   session_store_->SetTokenResponse("session123", test_token_response_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -380,7 +396,8 @@ TEST_F(
       old_session_id, std::make_shared<TokenResponse>(token_response));
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -425,7 +442,8 @@ TEST_F(
       old_session_id, std::make_shared<TokenResponse>(token_response));
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -483,7 +501,8 @@ TEST_F(
       .WillOnce(::testing::Return(test_refresh_token_response));
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -553,7 +572,7 @@ TEST_F(OidcFilterTest,
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -579,7 +598,8 @@ TEST_F(
   MockSessionGenerator(new_session_id, state, nonce);
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -629,7 +649,8 @@ TEST_F(
   MockSessionGenerator(new_session_id, state, nonce);
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -673,7 +694,8 @@ TEST_F(
   MockSessionGenerator(new_session_id, state, nonce);
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -726,7 +748,8 @@ TEST_F(
   ASSERT_EQ(jwt_status, google::jwt_verify::Status::Ok);
 
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -764,7 +787,8 @@ TEST_F(
       {Cookie, expected_session_cookie_name + "=" + "session123"});
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
 
@@ -788,7 +812,8 @@ TEST_F(
       "session123", std::make_shared<TokenResponse>(token_response));
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -833,7 +858,8 @@ TEST_F(
   MockSessionGenerator(new_session_id, state, nonce);
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -863,7 +889,8 @@ TEST_F(
   EnableAccessTokens(config_);
   session_store_->SetTokenResponse("session123", test_token_response_);
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -885,7 +912,7 @@ TEST_F(
     ReturnsUnauthorized_WhenSessionStoreThrowsErrorWhileTryingToGetTheSession) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -896,7 +923,6 @@ TEST_F(
       .WillRepeatedly(Throw(SessionError("session error msg")));
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
-  ;
 
   AssertSessionErrorResponse(status);
 }
@@ -906,7 +932,8 @@ TEST_F(OidcFilterTest, LogoutWithCookies) {
   config_.mutable_logout()->set_path("/logout");
   config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -937,7 +964,7 @@ TEST_F(OidcFilterTest,
   config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->mutable_headers()->insert(
@@ -948,7 +975,6 @@ TEST_F(OidcFilterTest,
       .WillRepeatedly(Throw(SessionError("session error msg")));
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
-  ;
 
   AssertSessionErrorResponse(status);
 }
@@ -957,7 +983,8 @@ TEST_F(OidcFilterTest, LogoutWithNoCookies) {
   config_.mutable_logout()->set_path("/logout");
   config_.mutable_logout()->set_redirect_uri("https://redirect-uri");
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_path("/logout");
@@ -1010,7 +1037,8 @@ TEST_F(
   std::string session_id = "session123";
   auto mocked_http = new common::http::HttpMock();
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -1041,7 +1069,7 @@ TEST_F(
   auto mocked_http = new common::http::HttpMock();
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -1105,7 +1133,7 @@ google::rpc::Code OidcFilterTest::MakeRequestWhichWillCauseTokenRetrieval(
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
-                    mock_jwks_);
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_on_request);
@@ -1142,7 +1170,8 @@ TEST_F(OidcFilterTest,
       .WillOnce(Return(ByMove(std::move(raw_http))));
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -1175,7 +1204,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingCode) {
   session_store_->SetAuthorizationState(session_id, authorization_state);
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -1196,7 +1226,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingCode) {
 
 TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenMissingState) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -1225,7 +1256,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenUnexpectedState) {
   session_store_->SetAuthorizationState(session_id, authorization_state);
 
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -1260,7 +1292,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
                                  Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -1297,7 +1330,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
                                  Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_);
@@ -1318,7 +1352,8 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
 
 TEST_F(OidcFilterTest, VerifyPresentedInvalidIDToken) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -1342,8 +1377,17 @@ TEST_F(OidcFilterTest, VerifyPresentedValidIDToken) {
   auto jwks = google::jwt_verify::Jwks::createFrom(
       valid_jwt_signing_key.data(), google::jwt_verify::Jwks::JWKS);
 
+  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
+
+  auto mock_resolver = std::make_shared<oidc::MockJwksResolver>();
+  ON_CALL(*mock_resolver, jwks()).WillByDefault(ReturnRef(jwks));
+
+  auto resolver_cache = std::make_shared<MockJwksResolverCache>();
+  ON_CALL(*resolver_cache, getResolver()).WillByDefault(Return(mock_resolver));
+
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_, jwks);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache);
 
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
@@ -1422,7 +1466,8 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig,
                                  Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_,
-                    session_string_generator_mock_, session_store_, mock_jwks_);
+                    session_string_generator_mock_, session_store_,
+                    resolver_cache_);
   auto httpRequest =
       request_.mutable_attributes()->mutable_request()->mutable_http();
   httpRequest->set_host(callback_host_on_request);
