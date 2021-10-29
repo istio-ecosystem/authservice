@@ -64,7 +64,6 @@ class HealthcheckAsyncServer {
   void removeConnection(HealthcheckHttpConnection* conn);
 
  private:
-
   std::list<HealthcheckHttpConnection*> active_connections_;
   const std::vector<std::unique_ptr<filters::FilterChain>>& chains_;
   tcp::acceptor acceptor_;
