@@ -59,23 +59,12 @@ void HealthcheckHttpConnection::onWriteDone() {
 }
 
 HealthcheckAsyncServer::HealthcheckAsyncServer(
+    boost::asio::io_context& ioc,
     const std::vector<std::unique_ptr<filters::FilterChain>>& chains,
     std::string address, uint16_t port)
     : chains_(chains),
-      acceptor_(ioc_, {beast::net::ip::make_address(address), port}),
-      sock_(ioc_),
-      th_([this] {
-        startAccept();
-
-        while (true) {
-          try {
-            ioc_.run();
-            break;
-          } catch (std::exception& e) {
-            spdlog::error("{}: {}", __func__, e.what());
-          }
-        }
-      }) {}
+      acceptor_(ioc, {beast::net::ip::make_address(address), port}),
+      sock_(ioc) {}
 
 HealthcheckAsyncServer::~HealthcheckAsyncServer() {
   for (auto&& conn : active_connections_) {
@@ -83,8 +72,6 @@ HealthcheckAsyncServer::~HealthcheckAsyncServer() {
   }
   active_connections_.clear();
   acceptor_.close();
-  ioc_.stop();
-  th_.join();
 }
 
 void HealthcheckAsyncServer::removeConnection(HealthcheckHttpConnection* conn) {

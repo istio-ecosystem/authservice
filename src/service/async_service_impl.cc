@@ -181,7 +181,8 @@ void AsyncAuthServiceImpl::Run() {
   spdlog::info("{}: Healthcheck Server listening on {}:{}", __func__,
                config_.listen_address(), kHealthCheckServerPort);
   health_server_ = std::make_unique<HealthcheckAsyncServer>(
-      chains_, config_.listen_address(), kHealthCheckServerPort);
+      *io_context_, chains_, config_.listen_address(), kHealthCheckServerPort);
+  health_server_->startAccept();
 
   spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
