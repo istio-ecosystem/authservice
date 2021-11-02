@@ -106,36 +106,6 @@ google::rpc::Code OidcFilter::Process(
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
-  // If the id_token header already exists,
-  // then OIDC filter verifies signature, aud and nonce on ID token which is
-  // extracted from request header.
-  if (headers.contains(idp_config_.id_token().header())) {
-    const auto &header_value = headers[idp_config_.id_token().header()];
-
-    if (!absl::StartsWith(header_value, idp_config_.id_token().preamble())) {
-      spdlog::info(
-          "{}: ID token header value doesn't match with the configured "
-          "preamble value",
-          __func__);
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-
-    auto id_token = GetIDTokenFromHeader(header_value);
-    const auto verify_status = idtoken_verifier_.verify(
-        std::string(id_token), {idp_config_.client_id()}, {});
-    if (!verify_status.ok()) {
-      spdlog::info("{}: Failed to verify presented ID token: {}", __func__,
-                   verify_status.message());
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-
-    spdlog::info(
-        "{}: ID Token header already present. Allowing request to proceed "
-        "without adding any additional headers.",
-        __func__);
-    return google::rpc::Code::OK;
-  }
-
   // If the request does not have a session_id cookie,
   // then generate a session id, put it in a header, and redirect for login.
   if (!session_id_optional.has_value()) {
