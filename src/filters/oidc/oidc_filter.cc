@@ -120,29 +120,9 @@ google::rpc::Code OidcFilter::Process(
       return google::rpc::Code::UNAUTHENTICATED;
     }
 
-    if (!session_id_optional.has_value()) {
-      spdlog::info("{}: Failed to fetch session ID from cookie", __func__);
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-
-    auto result = GetAuthorizationState(*session_id_optional);
-
-    if (!result.ok()) {
-      spdlog::info("{}: failed to fetch session state: {}", __func__,
-                   result.status().message());
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-
-    if (!result->has_value()) {
-      spdlog::info("{}: failed to fetch session state", __func__);
-      return google::rpc::Code::UNAUTHENTICATED;
-    }
-
     auto id_token = GetIDTokenFromHeader(header_value);
     const auto verify_status = idtoken_verifier_.verify(
-        std::string(id_token), {idp_config_.client_id()},
-        absl::flat_hash_map<std::string, std::string>{
-            {"nonce", result->value().GetNonce()}});
+        std::string(id_token), {idp_config_.client_id()}, {});
     if (!verify_status.ok()) {
       spdlog::info("{}: Failed to verify presented ID token: {}", __func__,
                    verify_status.message());
