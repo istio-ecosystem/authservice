@@ -1350,7 +1350,7 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
               }));
 }
 
-TEST_F(OidcFilterTest, VerifyPresentedInvalidIDToken) {
+TEST_F(OidcFilterTest, RejectOnlyIDToken) {
   OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
                     session_string_generator_mock_, session_store_,
                     resolver_cache_);
@@ -1361,42 +1361,6 @@ TEST_F(OidcFilterTest, VerifyPresentedInvalidIDToken) {
 
   auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
   ASSERT_EQ(status, google::rpc::Code::UNAUTHENTICATED);
-}
-
-TEST_F(OidcFilterTest, VerifyPresentedValidIDToken) {
-  config_.set_client_id("client1");
-
-  std::string session_id = "session123";
-  std::string state = "expectedstate";
-  std::string nonce = "random";
-  std::string requested_url = "https://example.com/summary";
-  auto authorization_state =
-      std::make_shared<AuthorizationState>(state, nonce, requested_url);
-  session_store_->SetAuthorizationState(session_id, authorization_state);
-
-  auto jwks = google::jwt_verify::Jwks::createFrom(
-      valid_jwt_signing_key.data(), google::jwt_verify::Jwks::JWKS);
-
-  EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::Ok);
-
-  auto mock_resolver = std::make_shared<oidc::MockJwksResolver>();
-  ON_CALL(*mock_resolver, jwks()).WillByDefault(ReturnRef(jwks));
-
-  auto resolver_cache = std::make_shared<MockJwksResolverCache>();
-  ON_CALL(*resolver_cache, getResolver()).WillByDefault(Return(mock_resolver));
-
-  OidcFilter filter(common::http::ptr_t(), config_, parser_mock_,
-                    session_string_generator_mock_, session_store_,
-                    resolver_cache);
-
-  auto httpRequest =
-      request_.mutable_attributes()->mutable_request()->mutable_http();
-  httpRequest->mutable_headers()->insert(
-      {Authorization, fmt::format("Bearer {}", valid_id_token.data())});
-  httpRequest->mutable_headers()->insert(
-      {Cookie, expected_session_cookie_name + "=" + session_id});
-  auto status = ProcessAndWaitForAsio(filter, &request_, &response_);
-  ASSERT_EQ(status, google::rpc::Code::OK);
 }
 
 void OidcFilterTest::AssertRequestedUrlAndStateAndNonceHaveBeenStored(
