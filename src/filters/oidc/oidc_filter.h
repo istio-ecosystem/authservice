@@ -216,8 +216,6 @@ class OidcFilter final : public filters::Filter {
   absl::StatusOr<absl::optional<AuthorizationState>> GetAuthorizationState(
       absl::string_view session_id);
 
-  absl::string_view GetIDTokenFromHeader(absl::string_view header_value);
-
  public:
   OidcFilter(
       common::http::ptr_t http_ptr, const config::oidc::OIDCConfig &idp_config,

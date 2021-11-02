@@ -417,16 +417,6 @@ OidcFilter::GetAuthorizationState(absl::string_view session_id) {
   return *authorization_state;
 }
 
-absl::string_view OidcFilter::GetIDTokenFromHeader(
-    absl::string_view header_value) {
-  auto premble_size = idp_config_.id_token().preamble().size();
-  if (premble_size != 0) {
-    premble_size += 1;
-  }
-  header_value.remove_prefix(premble_size);
-  return header_value;
-}
-
 bool OidcFilter::RequiredTokensPresent(
     std::shared_ptr<TokenResponse> token_response) {
   return token_response && (!idp_config_.has_access_token() ||
