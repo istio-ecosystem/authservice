@@ -74,14 +74,17 @@ TEST(TestHealthCheckHttpServer, BasicFlowWithInactiveJwks) {
   const auto port = runner.start();
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
-  boost::asio::io_context ioc;
-  boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
-    auto res = http_ptr->SimpleGet(
-        fmt::format("http://0.0.0.0:{}/healthz", port), {}, "", ioc, yield);
-    EXPECT_EQ(res->result(), boost::beast::http::status::not_found);
-  });
+  {
+    boost::asio::io_context ioc;
+    boost::asio::spawn(ioc, [&](boost::asio::yield_context yield) {
+      auto res = http_ptr->SimpleGet(
+          fmt::format("http://0.0.0.0:{}/healthz", port), {}, "", ioc, yield);
+      EXPECT_EQ(res->result(), boost::beast::http::status::not_found);
+    });
 
-  ioc.run();
+    ioc.run();
+  }
+
   runner.clearChain();
 
   {

@@ -4,11 +4,15 @@
 #include <boost/beast.hpp>
 #include <memory>
 #include <sstream>
+#include <string>
 
+#include "absl/status/status.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "config/oidc/config.pb.h"
 #include "google/rpc/code.pb.h"
 #include "jwks_resolver.h"
+#include "session_store.h"
 #include "spdlog/spdlog.h"
 #include "src/common/http/headers.h"
 #include "src/common/http/http.h"
@@ -41,12 +45,13 @@ OidcFilter::OidcFilter(
     common::http::ptr_t http_ptr, const config::oidc::OIDCConfig &idp_config,
     TokenResponseParserPtr parser,
     common::session::SessionStringGeneratorPtr session_string_generator,
-    SessionStorePtr session_store)
+    SessionStorePtr session_store, JwksResolverCachePtr resolver_cache)
     : http_ptr_(http_ptr),
       idp_config_(idp_config),
       parser_(parser),
       session_string_generator_(session_string_generator),
-      session_store_(session_store) {
+      session_store_(session_store),
+      idtoken_verifier_(resolver_cache) {
   spdlog::trace("{}", __func__);
 }
 
@@ -99,17 +104,6 @@ google::rpc::Code OidcFilter::Process(
     spdlog::info("{}: Logout complete. Sending user to re-authenticate.",
                  __func__);
     return google::rpc::Code::UNAUTHENTICATED;
-  }
-
-  // If the id_token header already exists,
-  // then let request continue.
-  // (It is up to the downstream system to validate the header is valid.)
-  if (headers.contains(idp_config_.id_token().header())) {
-    spdlog::info(
-        "{}: ID Token header already present. Allowing request to proceed "
-        "without adding any additional headers.",
-        __func__);
-    return google::rpc::Code::OK;
   }
 
   // If the request does not have a session_id cookie,
@@ -405,6 +399,24 @@ void OidcFilter::AddTokensToRequestHeaders(
   }
 }
 
+absl::StatusOr<absl::optional<AuthorizationState>>
+OidcFilter::GetAuthorizationState(absl::string_view session_id) {
+  std::shared_ptr<AuthorizationState> authorization_state;
+  try {
+    authorization_state = session_store_->GetAuthorizationState(session_id);
+  } catch (SessionError &err) {
+    spdlog::error("{}: Session error in GetAuthorizationState: {}", __func__,
+                  err.what());
+    return absl::UnauthenticatedError(err.what());
+  }
+
+  if (authorization_state == nullptr) {
+    return absl::nullopt;
+  }
+
+  return *authorization_state;
+}
+
 bool OidcFilter::RequiredTokensPresent(
     std::shared_ptr<TokenResponse> token_response) {
   return token_response && (!idp_config_.has_access_token() ||
@@ -593,16 +605,15 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
-  std::shared_ptr<AuthorizationState> authorization_state;
-  try {
-    authorization_state = session_store_->GetAuthorizationState(session_id);
-  } catch (SessionError &err) {
-    spdlog::error("{}: Session error in GetAuthorizationState: {}", __func__,
-                  err.what());
-    return SessionErrorResponse(response, err);
+  auto optional_authorization_state = GetAuthorizationState(session_id);
+
+  if (!optional_authorization_state.ok()) {
+    return SessionErrorResponse(
+        response, SessionError(std::string(
+                      optional_authorization_state.status().message())));
   }
 
-  if (!authorization_state) {
+  if (!optional_authorization_state->has_value()) {
     spdlog::info(
         "{}: Missing state, nonce, and original url requested by the user. "
         "Cannot redirect.",
@@ -614,8 +625,10 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::UNAUTHENTICATED;
   }
 
+  auto authorization_state = optional_authorization_state->value();
+
   // Compare state from request and session
-  if (state_from_request->second != authorization_state->GetState()) {
+  if (state_from_request->second != authorization_state.GetState()) {
     spdlog::info("{}: mismatch state", __func__);
     return google::rpc::Code::INVALID_ARGUMENT;
   }
@@ -651,7 +664,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
                  retrieve_token_response->result_int());
     return google::rpc::Code::UNKNOWN;
   } else {
-    auto nonce = authorization_state->GetNonce();
+    auto nonce = authorization_state.GetNonce();
     auto token_response = parser_->Parse(idp_config_.client_id(), nonce,
                                          retrieve_token_response->body());
     if (!token_response) {
@@ -686,7 +699,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
       return SessionErrorResponse(response, err);
     }
 
-    SetRedirectHeaders(authorization_state->GetRequestedUrl(), response);
+    SetRedirectHeaders(authorization_state.GetRequestedUrl(), response);
     return google::rpc::Code::UNAUTHENTICATED;
   }
 }
@@ -694,14 +707,15 @@ google::rpc::Code OidcFilter::RetrieveToken(
 absl::string_view OidcFilter::Name() const { return filter_name_; }
 
 FilterPtr FilterFactory::create() {
-  auto token_response_parser = std::make_shared<oidc::TokenResponseParserImpl>(
-      resolver_cache_->getResolver()->jwks());
+  auto token_response_parser =
+      std::make_shared<oidc::TokenResponseParserImpl>(resolver_cache_);
   auto session_string_generator =
       std::make_shared<common::session::SessionStringGenerator>();
   auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
 
   return std::make_unique<OidcFilter>(http_ptr, config_, token_response_parser,
-                                      session_string_generator, session_store_);
+                                      session_string_generator, session_store_,
+                                      resolver_cache_);
 }
 
 }  // namespace oidc

@@ -3,7 +3,9 @@
 #include <google/protobuf/util/json_util.h>
 #include <spdlog/spdlog.h>
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "test/filters/oidc/mocks.h"
 
 namespace authservice {
 namespace filters {
@@ -100,6 +102,9 @@ const char *
 
 };  // namespace
 
+using testing::Return;
+using testing::ReturnRef;
+
 class TokenResponseParserTest : public ::testing::Test {
  protected:
   std::shared_ptr<TokenResponseParserImpl> parser_;
@@ -108,7 +113,15 @@ class TokenResponseParserTest : public ::testing::Test {
     jwks_ = google::jwt_verify::Jwks::createFrom(
         valid_jwt_signing_key_, google::jwt_verify::Jwks::JWKS);
     EXPECT_EQ(jwks_->getStatus(), google::jwt_verify::Status::Ok);
-    parser_ = std::make_shared<TokenResponseParserImpl>(jwks_);
+
+    mock_resolver_ = std::make_shared<oidc::MockJwksResolver>();
+    ON_CALL(*mock_resolver_, jwks()).WillByDefault(ReturnRef(jwks_));
+
+    resolver_cache_ = std::make_shared<MockJwksResolverCache>();
+    ON_CALL(*resolver_cache_, getResolver())
+        .WillByDefault(Return(mock_resolver_));
+
+    parser_ = std::make_shared<TokenResponseParserImpl>(resolver_cache_);
   }
 
   std::shared_ptr<TokenResponse> ValidTokenResponse();
@@ -116,6 +129,8 @@ class TokenResponseParserTest : public ::testing::Test {
 
  private:
   google::jwt_verify::JwksPtr jwks_;
+  std::shared_ptr<MockJwksResolver> mock_resolver_;
+  std::shared_ptr<MockJwksResolverCache> resolver_cache_;
 };
 
 std::shared_ptr<TokenResponse> TokenResponseParserTest::ValidTokenResponse() {
@@ -167,7 +182,13 @@ TEST_F(TokenResponseParserTest, ParseInvalidJwtSignature) {
   auto jwks = google::jwt_verify::Jwks::createFrom(
       invalid_jwt_signing_key_, google::jwt_verify::Jwks::PEM);
   EXPECT_EQ(jwks->getStatus(), google::jwt_verify::Status::JwksPemBadBase64);
-  TokenResponseParserImpl parser(jwks);
+  auto mock_resolver = std::make_shared<oidc::MockJwksResolver>();
+  EXPECT_CALL(*mock_resolver, jwks()).WillOnce(ReturnRef(jwks));
+
+  auto resolver_cache = std::make_shared<MockJwksResolverCache>();
+  EXPECT_CALL(*resolver_cache, getResolver()).WillOnce(Return(mock_resolver));
+
+  TokenResponseParserImpl parser(resolver_cache);
   auto result = parser.Parse(client_id, nonce,
                              valid_token_response_Bearer_without_access_token);
   ASSERT_FALSE(result);
