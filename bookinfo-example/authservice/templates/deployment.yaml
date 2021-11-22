@@ -30,8 +30,9 @@ spec:
           - name: authservice-config # mount the volume containing the authservice ConfigMap
             mountPath: /etc/authservice
         readinessProbe:
-          path: /healthz
-          port: 10004
+          httpGet:
+            path: /healthz
+            port: 10004
 ---
 apiVersion: v1
 kind: Service
