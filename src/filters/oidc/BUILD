@@ -47,6 +47,7 @@ xx_library(
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
+        # "@envoy//external:jwt_verify_lib"
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
 )

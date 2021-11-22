@@ -10,3 +10,28 @@ build --copt -DGRPC_BAZEL_BUILD
 build --cxxopt=-std=c++17
 
 try-import %workspace%/user.bazelrc
+
+# Generated file, do not edit. If you want to disable clang, just delete this file.
+build:clang --action_env='PATH=/home/fly/workspace/bin/clang-12.0.1/bin:/home/fly/workspace/go/bin:/usr/local/go/bin:/home/fly/workspace/go/bin:/usr/local/go/bin:/home/fly/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/fly/.fzf/bin:/opt/local/bin:/opt/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/X11/bin:/usr/texbin:/home/fly/bin:/home/fly/workspace/bin/clang+llvm-10.0.0/bin:/home/fly/workspace/bin:/home/fly/bin/clang+llvm-10.0.0/bin:/opt/local/bin:/opt/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/X11/bin:/usr/texbin:/home/fly/bin:/home/fly/workspace/bin/clang+llvm-10.0.0/bin:/home/fly/workspace/bin:/home/fly/bin/clang+llvm-10.0.0/bin:/home/fly/workspace/bin/google-cloud-sdk/bin'
+build:clang --action_env=CC=clang
+build:clang --action_env=CXX=clang++
+build:clang --action_env='LLVM_CONFIG=/home/fly/workspace/bin/clang-12.0.1/bin/llvm-config'
+build:clang --repo_env='LLVM_CONFIG=/home/fly/workspace/bin/clang-12.0.1/bin/llvm-config'
+build:clang --linkopt='-L/home/fly/workspace/bin/clang-12.0.1/lib'
+build:clang --linkopt='-Wl,-rpath,/home/fly/workspace/bin/clang-12.0.1/lib'
+
+build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
+build:clang-asan --copt=-fsanitize=vptr,function
+build:clang-asan --linkopt=-fsanitize=vptr,function
+build:clang-asan --linkopt='-L/home/fly/workspace/bin/clang-12.0.1/lib/clang/12.0.1/lib/linux'
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a
+
+# Clang with libc++
+build:libc++ --config=clang
+build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=LDFLAGS=-stdlib=libc++
+build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
+build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
+build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
+build:libc++ --define force_libcpp=enabled
