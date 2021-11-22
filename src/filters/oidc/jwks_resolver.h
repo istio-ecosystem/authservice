@@ -48,6 +48,10 @@ class StaticJwksResolverImpl : public JwksResolver {
  public:
   explicit StaticJwksResolverImpl(const std::string& jwks) : raw_jwks_(jwks) {
     jwks_ = parseJwks(jwks);
+
+    if (jwks_->getStatus() != google::jwt_verify::Status::Ok) {
+      throw std::runtime_error("failed to parse jwks");
+    }
   }
 
   virtual google::jwt_verify::JwksPtr& jwks() override { return jwks_; }
@@ -118,8 +122,15 @@ class DynamicJwksResolverImpl : public JwksResolver {
 
 class JwksResolverCache {
  public:
-  JwksResolverCache(const config::oidc::OIDCConfig& config,
-                    boost::asio::io_context& ioc)
+  virtual ~JwksResolverCache() = default;
+
+  virtual JwksResolverPtr getResolver() = 0;
+};
+
+class JwksResolverCacheImpl final : public JwksResolverCache {
+ public:
+  JwksResolverCacheImpl(const config::oidc::OIDCConfig& config,
+                        boost::asio::io_context& ioc)
       : config_(config) {
     switch (config_.jwks_config_case()) {
       case config::oidc::OIDCConfig::kJwks:

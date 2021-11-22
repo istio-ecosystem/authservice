@@ -137,7 +137,28 @@ TEST_F(GetConfigTest, ReturnsTheConfig) {
   ASSERT_EQ(oidc.authorization_uri(), "https://google3/path3");
   ASSERT_EQ(oidc.token_uri(), "https://google2/path2");
   ASSERT_EQ(oidc.callback_uri(), "https://google4/path4");
-  ASSERT_EQ(oidc.jwks(), "jwks_placeholder");
+
+  constexpr absl::string_view expected_jwks = R"({
+  "keys": [
+    {
+      "e": "AQAB",
+      "kty": "RSA",
+      "kid": "462949174f1eedf4f9f9434877be483b324140f5",
+      "alg": "RS256",
+      "n": "2BHFUUq8NqZ3pxxi_RJcSIMG5nJoZQ8Nbvf-lW5o7hJ9CmLA4SeUmDL2IVK6CSuskTPj_ohAp_gtOg3PCJvn33grPoJQu38MoMB8kDqA4U-u3A86GGEjWtk6LPo7dEkojZNQkzhZCnEMTuRMtBZXsLWNGJpY3UADA3rxnHnBP1wrSt27iXIE0C6-1N5z00R13r3L0aWC0MuAUgjI2H4dGMr8B3niJ-NjOVPCwG7xSWsCwsSitAuhPGHaDtenB23ZsFJjbuTuiguoSJ9A1qo9kzBOg32xda4derbWasu7Tk8p53PFxXDJGR_h7dM-nsJHl7lAUDqL8zOrf9XXlPTjwQ",
+      "use": "sig"
+    },
+    {
+      "alg": "RS256",
+      "use": "sig",
+      "e": "AQAB",
+      "kid": "6ef4bd908591f697a8a9b893b03e6a77eb04e51f",
+      "kty": "RSA",
+      "n": "xkgm0jU0J7SgrmmuLypjWO6J9MlF9vpRpsw84sme4EtWMUyAu4zT-X9Ten5wB9W2z0Gft5QOmFL99ueP3MeOqZsXGwW2UWVuQCpkD0bo4qDDqwbt8Cl31Qjb5RHeuvmwYpNQK_1ppb6dwlUCA2Y9AaE7UsZITlR7r5XiBNvOEZh0LTsjPcikCheAs6nPSMBbdIeM28vii1PgPYTU6x6dRBVBAExaRnRDPZZh4acgfKIpbOCMJm2tucqwYhx3Wr5Lhu56oZALK4lvP9SAgOZdG3BA48PKIdLOeiTP-DI_pHJhIn1N5lMCcmcpG3OKMvWo0tFMOGj8Or-mHqB_5I-L4w"
+    }
+  ]
+})";
+  ASSERT_EQ(oidc.jwks(), expected_jwks);
 
   ASSERT_EQ(oidc.client_id(), "foo");
   ASSERT_EQ(oidc.client_secret(), "bar");

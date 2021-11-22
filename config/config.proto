@@ -121,6 +121,10 @@ message Config {
     // when it defined as `oidc_override`.
     // Optional.
     oidc.OIDCConfig default_oidc_config = 10;
+
+    // If true will allow the the requests even no filter chain match is found. Default false.
+    // Optional.
+    bool allow_unmatched_requests = 11;
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if

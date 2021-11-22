@@ -5,7 +5,10 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/asio.hpp>
+#include <boost/thread/thread.hpp>
+#include <memory>
 
+#include "boost/system/error_code.hpp"
 #include "common/config/version_converter.h"
 #include "config/config.pb.h"
 #include "envoy/common/exception.h"
@@ -14,6 +17,7 @@
 #include "src/common/http/http.h"
 #include "src/common/utilities/trigger_rules.h"
 #include "src/filters/filter_chain.h"
+#include "src/service/healthcheck_http_server.h"
 
 namespace authservice {
 namespace service {
@@ -24,7 +28,8 @@ template <class RequestType, class ResponseType>
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
-    boost::asio::io_context &ioc, boost::asio::yield_context yield) {
+    const bool allow_unmatched_requests, boost::asio::io_context &ioc,
+    boost::asio::yield_context yield) {
   spdlog::trace("{}", __func__);
 
   envoy::service::auth::v3::CheckRequest request_v3;
@@ -53,6 +58,14 @@ template <class RequestType, class ResponseType>
           request_v3.attributes().request().http().path());
       return ::grpc::Status::OK;
     }
+
+    // TODO(incfly): Clean up trigger rule after checking the current Istio
+    // ExtAuthz API is sufficient.
+    const auto default_response_code =
+        allow_unmatched_requests
+            ? grpc::Status::OK
+            : grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
+                           "permission denied");
 
     // Find a configured processing chain.
     for (auto &chain : chains) {
@@ -114,11 +127,14 @@ template <class RequestType, class ResponseType>
     }
 
     // No matching filter chain found. Allow request to continue.
-    spdlog::debug("{}: no matching filter chain for request to {}://{}{} ",
-                  __func__, request.attributes().request().http().scheme(),
-                  request.attributes().request().http().host(),
-                  request.attributes().request().http().path());
-    return ::grpc::Status::OK;
+    spdlog::debug(
+        "{}: no matching filter chain for request to {}://{}{}, respond with: "
+        "{}",
+        __func__, request.attributes().request().http().scheme(),
+        request.attributes().request().http().host(),
+        request.attributes().request().http().path(),
+        default_response_code.error_code());
+    return default_response_code;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());
   } catch (...) {
@@ -175,9 +191,9 @@ class ProcessingState : public ServiceState {
 class CompleteState : public ServiceState {
  public:
   explicit CompleteState(ProcessingStateV2 *processor)
-      : processor_v2_(processor) {}
+      : processor_v2_(processor), processor_v3_(nullptr) {}
   explicit CompleteState(ProcessingState *processor)
-      : processor_v3_(processor) {}
+      : processor_v2_(nullptr), processor_v3_(processor) {}
 
   void Proceed() override;
 
@@ -192,7 +208,8 @@ class ProcessingStateFactory {
       std::vector<std::unique_ptr<filters::FilterChain>> &chains,
       const google::protobuf::RepeatedPtrField<config::TriggerRule>
           &trigger_rules_config,
-      grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context);
+      const bool allow_unmatched_requests, grpc::ServerCompletionQueue &cq,
+      boost::asio::io_context &io_context);
 
   ProcessingStateV2 *createV2(
       envoy::service::auth::v2::Authorization::AsyncService &service);
@@ -208,6 +225,7 @@ class ProcessingStateFactory {
   std::vector<std::unique_ptr<filters::FilterChain>> &chains_;
   const google::protobuf::RepeatedPtrField<config::TriggerRule>
       &trigger_rules_config_;
+  const bool allow_unmatched_requests_{false};
 
   friend class ProcessingStateV2;
   friend class ProcessingState;
@@ -215,7 +233,8 @@ class ProcessingStateFactory {
 
 class AsyncAuthServiceImpl {
  public:
-  explicit AsyncAuthServiceImpl(const config::Config &config);
+  AsyncAuthServiceImpl(const config::Config &config);
+  ~AsyncAuthServiceImpl() { Shutdown(); }
 
   void Run();
 
@@ -229,6 +248,7 @@ class AsyncAuthServiceImpl {
   envoy::service::auth::v3::Authorization::AsyncService service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;
   std::unique_ptr<grpc::Server> server_;
+  std::unique_ptr<HealthcheckAsyncServer> health_server_;
 
   std::shared_ptr<boost::asio::io_context> io_context_;
 
@@ -238,8 +258,11 @@ class AsyncAuthServiceImpl {
       timer_handler_function_;
 
   std::unique_ptr<ProcessingStateFactory> state_factory_;
+  std::unique_ptr<boost::asio::io_context::work> work_;
+  boost::thread_group thread_pool_;
 
   void SchedulePeriodicCleanupTask();
+  void Shutdown();
 };
 
 }  // namespace service

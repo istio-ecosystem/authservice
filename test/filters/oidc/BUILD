@@ -6,16 +6,19 @@ cc_library(
         "//src/filters/oidc:authorization_state",
         "//src/filters/oidc:session_store",
         "//src/filters/oidc:redis_wrapper",
+        "//src/filters/oidc:jwks_resolver",
         "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
     ],
+    visibility = ["//visibility:public"],
 )
 
 cc_test(
     name = "token_response_test",
     srcs = ["token_response_test.cc"],
     deps = [
+        ":mocks",
         "//src/filters/oidc:token_response",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",

@@ -14,6 +14,7 @@ cc_test(
     srcs = ["filter_chain_test.cc"],
     deps = [
         "//src/filters:filter_chain",
+        "//test/filters/oidc:mocks",
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],

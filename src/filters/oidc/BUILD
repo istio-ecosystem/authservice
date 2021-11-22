@@ -7,6 +7,7 @@ xx_library(
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
     deps = [
+        ":jwt_verifier",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -122,6 +123,22 @@ xx_library(
 )
 
 xx_library(
+    name = "jwt_verifier",
+    srcs = ["jwt_verifier.cc"],
+    hdrs = ["jwt_verifier.h"],
+    deps = [
+        ":jwks_resolver",
+        "@com_github_abseil-cpp//absl/status:status",
+        "@com_github_abseil-cpp//absl/strings:strings",
+        "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_abseil-cpp//absl/container:flat_hash_map",
+        "@com_github_gabime_spdlog//:spdlog",
+        "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
+        "@com_google_protobuf//:protobuf",
+    ]
+)
+
+xx_library(
     name = "oidc_filter",
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],
@@ -138,6 +155,8 @@ xx_library(
         "//src/filters/oidc:jwks_resolver",
         "@boost//:all",
         "@com_github_abseil-cpp//absl/time:time",
+        "@com_github_abseil-cpp//absl/status:status",
+        "@com_github_abseil-cpp//absl/status:statusor",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
     ],

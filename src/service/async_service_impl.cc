@@ -3,22 +3,28 @@
 #include <grpcpp/server_builder.h>
 
 #include <boost/asio.hpp>
-#include <boost/thread/thread.hpp>
+#include <csignal>
 #include <memory>
-#include <stdexcept>
 
+#include "boost/asio/io_context.hpp"
+#include "boost/thread/detail/thread.hpp"
 #include "src/common/http/http.h"
 #include "src/config/get_config.h"
 
 namespace authservice {
 namespace service {
 
+namespace {
+constexpr uint16_t kHealthCheckServerPort = 10004;
+}
+
 ProcessingStateV2::ProcessingStateV2(
     ProcessingStateFactory &parent,
     envoy::service::auth::v2::Authorization::AsyncService &service)
     : parent_(parent), service_(service), responder_(&ctx_) {
   spdlog::warn(
-      "Creating V2 request processor state. V2 will be deprecated in 2021 Q1");
+      "Creating V2 request processor state. V2 will be deprecated in 2021 "
+      "Q1");
   service_.RequestCheck(&ctx_, &request_, &responder_, &parent_.cq_,
                         &parent_.cq_, this);
 }
@@ -36,9 +42,9 @@ void ProcessingStateV2::Proceed() {
         spdlog::trace("Processing V2 request");
 
         envoy::service::auth::v2::CheckResponse response;
-        authservice::service::Check(request_, response, parent_.chains_,
-                                    parent_.trigger_rules_config_,
-                                    parent_.io_context_, yield);
+        authservice::service::Check(
+            request_, response, parent_.chains_, parent_.trigger_rules_config_,
+            parent_.allow_unmatched_requests_, parent_.io_context_, yield);
 
         this->responder_.Finish(response, grpc::Status::OK,
                                 new CompleteState(this));
@@ -72,9 +78,9 @@ void ProcessingState::Proceed() {
         spdlog::trace("Processing request");
 
         envoy::service::auth::v3::CheckResponse response;
-        authservice::service::Check(request_, response, parent_.chains_,
-                                    parent_.trigger_rules_config_,
-                                    parent_.io_context_, yield);
+        authservice::service::Check(
+            request_, response, parent_.chains_, parent_.trigger_rules_config_,
+            parent_.allow_unmatched_requests_, parent_.io_context_, yield);
 
         this->responder_.Finish(response, grpc::Status::OK,
                                 new CompleteState(this));
@@ -86,10 +92,8 @@ void ProcessingState::Proceed() {
 void CompleteState::Proceed() {
   spdlog::trace("Processing completion and deleting state");
 
-  if (!processor_v2_) delete processor_v2_;
-
-  if (!processor_v3_) delete processor_v3_;
-
+  delete processor_v2_;
+  delete processor_v3_;
   delete this;
 }
 
@@ -97,11 +101,13 @@ ProcessingStateFactory::ProcessingStateFactory(
     std::vector<std::unique_ptr<filters::FilterChain>> &chains,
     const google::protobuf::RepeatedPtrField<config::TriggerRule>
         &trigger_rules_config,
-    grpc::ServerCompletionQueue &cq, boost::asio::io_context &io_context)
+    bool allow_unmatched_requests, grpc::ServerCompletionQueue &cq,
+    boost::asio::io_context &io_context)
     : cq_(cq),
       io_context_(io_context),
       chains_(chains),
-      trigger_rules_config_(trigger_rules_config) {}
+      trigger_rules_config_(trigger_rules_config),
+      allow_unmatched_requests_(allow_unmatched_requests) {}
 
 ProcessingStateV2 *ProcessingStateFactory::createV2(
     envoy::service::auth::v2::Authorization::AsyncService &service) {
@@ -134,22 +140,22 @@ AsyncAuthServiceImpl::AsyncAuthServiceImpl(const config::Config &config)
   server_ = builder.BuildAndStart();
 
   state_factory_ = std::make_unique<ProcessingStateFactory>(
-      chains_, config_.trigger_rules(), *cq_, *io_context_);
+      chains_, config_.trigger_rules(), config_.allow_unmatched_requests(),
+      *cq_, *io_context_);
 }
 
 void AsyncAuthServiceImpl::Run() {
   // Add a work object to the IO service so it will not shut down when it has
   // nothing left to do
-  auto work = std::make_shared<boost::asio::io_context::work>(*io_context_);
+  work_ = std::make_unique<boost::asio::io_context::work>(*io_context_);
 
   SchedulePeriodicCleanupTask();
 
   // Spin up our worker threads
-  // Config validation should have already ensured that the number of threads is
-  // > 0
-  boost::thread_group threadpool;
+  // Config validation should have already ensured that the number of threads
+  // is > 0
   for (unsigned int i = 0; i < config_.threads(); ++i) {
-    threadpool.create_thread([this]() {
+    thread_pool_.create_thread([this]() {
       while (true) {
         try {
           // The asio library provides a guarantee that callback handlers will
@@ -158,10 +164,10 @@ void AsyncAuthServiceImpl::Run() {
           // continue to run while there is still "work" to do. Async methods
           // which take a boost::asio::yield_context as an argument will use
           // that yield as a callback handler when the async operation has
-          // completed. The yield_context will restore the stack, registers, and
-          // execution pointer of the calling method, effectively allowing that
-          // method to pick up right where it left off, and continue on any
-          // worker thread.
+          // completed. The yield_context will restore the stack, registers,
+          // and execution pointer of the calling method, effectively allowing
+          // that method to pick up right where it left off, and continue on
+          // any worker thread.
           this->io_context_
               ->run();  // run the io_context's event processing loop
           break;
@@ -171,6 +177,12 @@ void AsyncAuthServiceImpl::Run() {
       }
     });
   }
+
+  spdlog::info("{}: Healthcheck Server listening on {}:{}", __func__,
+               config_.listen_address(), kHealthCheckServerPort);
+  health_server_ = std::make_unique<HealthcheckAsyncServer>(
+      *io_context_, chains_, config_.listen_address(), kHealthCheckServerPort);
+  health_server_->startAccept();
 
   spdlog::info("{}: Server listening on {}", __func__, address_and_port_);
 
@@ -192,36 +204,11 @@ void AsyncAuthServiceImpl::Run() {
       if (!ok) {
         spdlog::error("{}: Unexpected error: !ok", __func__);
       }
-
       static_cast<ServiceState *>(tag)->Proceed();
     }
   } catch (const std::exception &e) {
     spdlog::error("{}: Unexpected error: {}", __func__, e.what());
   }
-
-  spdlog::info("Server shutting down");
-
-  // Start shutting down gRPC
-  server_->Shutdown();
-  cq_->Shutdown();
-
-  // The destructor of the completion queue will abort if there are any
-  // outstanding events, so we must drain the queue before we allow that to
-  // happen
-  try {
-    void *tag;
-    bool ok;
-    while (cq_->Next(&tag, &ok)) {
-      delete static_cast<ServiceState *>(tag);
-    }
-  } catch (const std::exception &e) {
-    spdlog::error("{}: Unexpected error: {}", __func__, e.what());
-  }
-
-  // Reset the work item for the IO service will terminate once it finishes any
-  // outstanding jobs
-  work.reset();
-  threadpool.join_all();
 }
 
 void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
@@ -242,6 +229,52 @@ void AsyncAuthServiceImpl::SchedulePeriodicCleanupTask() {
 
   // Schedule the first invocation of the handler on the timer
   timer_.async_wait(timer_handler_function_);
+}
+
+void AsyncAuthServiceImpl::Shutdown() {
+  spdlog::info("Server shutting down");
+
+  // Start shutting down gRPC
+  if (server_ != nullptr) {
+    server_->Shutdown();
+  }
+
+  if (cq_ != nullptr) {
+    cq_->Shutdown();
+
+    // The destructor of the completion queue will abort if there are any
+    // outstanding events, so we must drain the queue before we allow that to
+    // happen
+    try {
+      void *tag;
+      bool ok;
+      while (cq_->Next(&tag, &ok)) {
+        delete static_cast<ServiceState *>(tag);
+      }
+    } catch (const std::exception &e) {
+      spdlog::error("{}: Unexpected error: {}", __func__, e.what());
+    }
+  }
+
+  // Start shutting down health server
+  health_server_.reset();
+
+  if (work_ != nullptr) {
+    // Reset the work item for the IO service will terminate once it finishes
+    // any outstanding jobs
+    work_.reset();
+  }
+
+  if (io_context_ != nullptr) {
+    // The `SchedulePeriodicCleanupTask` is scheduled with `timer_`,
+    // which is bound with the io_context_.
+    // Calling `stop()` explicitly ensures that the periodic task
+    // won't be further scheduled onto `io_context` internal scheduling queue.
+    // Therefore the thread running periodic task can be terminated and joined
+    // here.
+    io_context_->stop();
+  }
+  thread_pool_.join_all();
 }
 
 }  // namespace service

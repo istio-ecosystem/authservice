@@ -10,7 +10,7 @@ namespace utilities {
 
 class TimeServiceMock : public TimeService {
  public:
-  MOCK_METHOD0(GetCurrentTimeInSecondsSinceEpoch, int64_t());
+  MOCK_METHOD(int64_t, GetCurrentTimeInSecondsSinceEpoch, ());
 };
 
 }  // namespace utilities

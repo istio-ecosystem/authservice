@@ -47,10 +47,12 @@ URI to be hosted on a protected endpoint.
    mesh: |-
       extensionProviders:
       - name: "authservice-grpc"
-         envoyExtAuthzGrpc:
-           service: authservice.default.svc.cluster.local
-           port: "10003"
+        envoyExtAuthzGrpc:
+          service: authservice.default.svc.cluster.local
+          port: "10003"
    ```
+
+   Alternatively you can install Istio with a sample [operator.yaml](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/authservice/istio-operatory.yaml) we provide when using `istioctl install -f istio-operator.yaml`.
 
 1. Fetch the identity provider public key and populate into the configmap. In our example, run
 `scripts/google-jwks.sh`.
