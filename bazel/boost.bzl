@@ -13,6 +13,10 @@ def boost_library(name, deps = []):
                     "libboost_{}.a".format(name),
                     "libboost_{}.dylib".format(name)
                 ],
+                "clang": [
+                    "libboost_{}.a".format(name),
+                    "libboost_{}.so.{}".format(name, BOOST_VERSION),
+                ],
                 "//conditions:default": [
                     "libboost_{}.a".format(name),
                     "libboost_{}.so.{}".format(name, BOOST_VERSION),
@@ -70,16 +74,25 @@ def boost_build_rule(name):
                     ROOT=$$(dirname $(location Jamroot))
                     cp $(location project-config.jam) $$ROOT
                     pushd $$ROOT
-                        ../../$(location b2) toolset=clang libboost_{name}.a libboost_{name}.dylib
+                        ../../$(location b2) libboost_{name}.a libboost_{name}.dylib
                     popd
                     cp $$ROOT/stage/lib/libboost_{name}.a $(location libboost_{name}.a)
                     cp $$ROOT/stage/lib/libboost_{name}.dylib $(location libboost_{name}.dylib)
                 """.format(name = name),
-                "//conditions:default": """
+                "clang": """
                     ROOT=$$(dirname $(location Jamroot))
                     cp $(location project-config.jam) $$ROOT
                     pushd $$ROOT
                         ../../$(location b2) toolset=clang libboost_{name}.a libboost_{name}.so.{version}
+                    popd
+                    cp $$ROOT/stage/lib/libboost_{name}.a $(location libboost_{name}.a)
+                    cp $$ROOT/stage/lib/libboost_{name}.so.{version} $(location libboost_{name}.so.{version})
+                """.format(name = name, version = BOOST_VERSION),
+                "//conditions:default": """
+                    ROOT=$$(dirname $(location Jamroot))
+                    cp $(location project-config.jam) $$ROOT
+                    pushd $$ROOT
+                        ../../$(location b2) libboost_{name}.a libboost_{name}.so.{version}
                     popd
                     cp $$ROOT/stage/lib/libboost_{name}.a $(location libboost_{name}.a)
                     cp $$ROOT/stage/lib/libboost_{name}.so.{version} $(location libboost_{name}.so.{version})

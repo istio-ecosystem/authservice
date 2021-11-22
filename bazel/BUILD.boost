@@ -6,6 +6,13 @@ config_setting(
     visibility = ["//visibility:public"],
 )
 
+config_setting(
+    name = "clang",
+    values = {
+        "define": "clang_cl=1",
+    },
+)
+
 load("@//bazel:boost.bzl", "new_boost_library")
 
 cc_library(
