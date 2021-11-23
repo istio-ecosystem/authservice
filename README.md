@@ -39,6 +39,13 @@ See the [Makefile](Makefile) for common tasks.
 
 If you are developing on a Mac, [this setup guide](https://github.com/istio-ecosystem/authservice/wiki/Setting-up-CLion-on-MacOS-for-Authservice-development) may be helpful.
 
+To build authservice with Clang, first setup the `clang.bazelrc` and then build the authservice with `--config=clang` option with bazel.
+
+```
+./bazel/setup_clang.sh <path-to-clang>
+bazel build //src/main:all  --config clang
+```
+
 ## Roadmap
 See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)
 
