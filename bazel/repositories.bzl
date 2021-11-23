@@ -10,7 +10,6 @@ def oidcservice_dependencies():
   com_github_redis_hiredis()
   com_github_sewenew_redis_plus_plus()
   com_github_google_jwt_verify_lib()
-  # com_googlesource_boringssl()
   io_bazel_rules_go()
   bazel_gazelle()
   com_envoyproxy_protoc_gen_validate()
@@ -89,16 +88,6 @@ def com_github_google_jwt_verify_lib():
       "https://github.com/google/jwt_verify_lib/archive/28efec2e4df1072db0ed03597591360ec9f80aac.tar.gz"
     ],
   )
-
-# def com_googlesource_boringssl():
-#   http_archive(
-#     name = "com_googlesource_boringssl",
-#     sha256 = "15d855e5ec7c28b6b99159f1c6bbc7803e1623ed540f637174c6b88e7abd001c",
-#     strip_prefix = "boringssl-936ca21922d266a31e3309144b082bdb3a689af7",
-#     urls = [
-#       "https://github.com/google/boringssl/archive/936ca21922d266a31e3309144b082bdb3a689af7.tar.gz"
-#     ],
-#   )
 
 def zlib():
   http_archive(

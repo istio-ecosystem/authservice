@@ -16,7 +16,6 @@ xx_library(
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
-        # "@com_googlesource_boringssl//:ssl",
-        "@boringssl_fips//:crypto",
+        "@envoy//bazel:boringssl",
     ],
 )

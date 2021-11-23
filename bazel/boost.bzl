@@ -74,7 +74,7 @@ def boost_build_rule(name):
                     ROOT=$$(dirname $(location Jamroot))
                     cp $(location project-config.jam) $$ROOT
                     pushd $$ROOT
-                        ../../$(location b2) toolset=clang libboost_{name}.a libboost_{name}.dylib
+                        ../../$(location b2) libboost_{name}.a libboost_{name}.dylib
                     popd
                     cp $$ROOT/stage/lib/libboost_{name}.a $(location libboost_{name}.a)
                     cp $$ROOT/stage/lib/libboost_{name}.dylib $(location libboost_{name}.dylib)
@@ -92,7 +92,7 @@ def boost_build_rule(name):
                     ROOT=$$(dirname $(location Jamroot))
                     cp $(location project-config.jam) $$ROOT
                     pushd $$ROOT
-                        ../../$(location b2) toolset=clang libboost_{name}.a libboost_{name}.so.{version}
+                        ../../$(location b2) libboost_{name}.a libboost_{name}.so.{version}
                     popd
                     cp $$ROOT/stage/lib/libboost_{name}.a $(location libboost_{name}.a)
                     cp $$ROOT/stage/lib/libboost_{name}.so.{version} $(location libboost_{name}.so.{version})
