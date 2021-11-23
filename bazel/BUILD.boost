@@ -9,7 +9,7 @@ config_setting(
 config_setting(
     name = "clang",
     values = {
-        "define": "clang_cl=1",
+        "action_env": "CXX=clang++",
     },
 )
 
