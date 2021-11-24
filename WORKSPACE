@@ -54,3 +54,10 @@ grpc_extra_deps()
 load("@rules_foreign_cc//:workspace_definitions.bzl", "rules_foreign_cc_dependencies")
 
 rules_foreign_cc_dependencies()
+
+# gRPC depends on the libssl. This binds ensures that all boringssl libraries options are consistent.
+# For example, fips boringssl is selected.
+bind(
+  name = "libssl",
+  actual = "@envoy//bazel:boringssl"
+)

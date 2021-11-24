@@ -1,4 +1,5 @@
 load("//bazel:bazel.bzl", "xx_library")
+load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -9,7 +10,7 @@ xx_library(
     deps = [
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
-        "@com_googlesource_boringssl//:crypto",
+        "@envoy//bazel:boringssl",
     ],
 )
 
