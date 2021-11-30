@@ -41,8 +41,21 @@ To build authservice with Clang, first setup the `clang.bazelrc` and then build 
 ```
 ./bazel/setup_clang.sh <path-to-clang>
 bazel build //src/main:all  --config clang
-# To Build with FIPS compliant version.
+```
+
+To Build with FIPS compliant version, add `--define boringssl=fips`.
+
+```
 bazel build //src/main:all  --config clang --define boringssl=fips
+```
+
+To build with a containeried environment, with customized bazel arguments.
+
+```
+export CONTAINER_REGISTRY=gcr.io/your-project
+docker build --build-arg bazel_flags="--config=clang" \
+  -t ${CONTAINER_REGISTRY}/authservice:latest \
+  -f ./build/Dockerfile.build .
 ```
 
 ## Roadmap

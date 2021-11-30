@@ -3,7 +3,7 @@
 SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
 TARGET:=//src/main:auth_server
-BAZEL_FLAGS:= --verbose_failures
+BAZEL_FLAGS:=$(BAZEL_FLAGS)
 IMAGE?=authservice:$(USER)
 
 all: build test docs
