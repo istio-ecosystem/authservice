@@ -14,15 +14,15 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Setup clang-format
+      env:
+        CLANG_VERSION: '12.0.0'
       run: |
-        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.1/clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-        tar -xvf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-        sudo mv ./clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/bin/clang-format /usr/local/bin
-        rm -rf clang+llvm-10.0.1-x86_64-linux-gnu-ubuntu-16.04/
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        mkdir -p /opt/llvm && tar -xvf clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz -C /opt/llvm --strip-components 1
         git clone https://github.com/Sarcasm/run-clang-format.git
     - name: Run clang-format
-      run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py
-  build:
+      run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py --clang-format-executable=/opt/llvm/bin/clang-format
+  gcc-test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -34,3 +34,22 @@ jobs:
       run: |
        sudo chmod -R a+rxw /home
        make test
+  clang-fips-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Bazel
+      run: sudo build/install-bazel.sh
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get -y install make cmake ninja-build build-essential
+    - name: Setup clang
+      env:
+        CLANG_VERSION: '12.0.0'
+      run: |
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        mkdir -p /opt/llvm && tar -xvf clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz -C /opt/llvm --strip-components 1
+        bazel/setup_clang.sh /opt/llvm
+    - name: make test
+      run: |
+        sudo chmod -R a+rxw /home
+        BAZEL_FLAGS="--config=clang --define=boringssl=fips" make test

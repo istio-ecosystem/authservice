@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//bazel:bazel.bzl", "authsvc_cc_test")
+
 cc_library(
     name = "mocks",
     hdrs = ["mocks.h"],
@@ -14,7 +17,7 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-cc_test(
+authsvc_cc_test(
     name = "token_response_test",
     srcs = ["token_response_test.cc"],
     deps = [
@@ -23,10 +26,9 @@ cc_test(
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
-cc_test(
+authsvc_cc_test(
     name = "in_memory_session_store_test",
     srcs = ["in_memory_session_store_test.cc"],
     deps = [
@@ -35,10 +37,9 @@ cc_test(
         "//src/filters/oidc:in_memory_session_store",
         "@com_google_googletest//:gtest_main",
     ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
-cc_test(
+authsvc_cc_test(
     name = "redis_session_store_test",
     srcs = ["redis_session_store_test.cc"],
     deps = [
@@ -49,10 +50,9 @@ cc_test(
         "//test/shared:shared_test_helpers",
         "@com_google_googletest//:gtest_main",
     ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
-cc_test(
+authsvc_cc_test(
     name = "redis_retry_wrapper_test",
     srcs = ["redis_retry_wrapper_test.cc"],
     deps = [
@@ -61,10 +61,9 @@ cc_test(
         "//test/filters/oidc:mocks",
         "//test/shared:shared_test_helpers",
     ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
-cc_test(
+authsvc_cc_test(
     name = "oidc_filter_test",
     srcs = ["oidc_filter_test.cc"],
     deps = [
@@ -75,10 +74,9 @@ cc_test(
         "@com_github_grpc_grpc//:grpc++",
         "@com_google_googletest//:gtest_main",
     ],
-    linkstatic = select({"@boost//:osx": True, "//conditions:default": False}), # workaround for not being able to figure out how to link dynamically on MacOS
 )
 
-cc_test(
+authsvc_cc_test(
     name = "jwks_resolver_test",
     srcs = ["jwks_resolver_test.cc"],
     deps = [
