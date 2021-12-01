@@ -61,8 +61,3 @@ bind(
   name = "libssl",
   actual = "@envoy//bazel:boringssl"
 )
-
-bind(
-  name = "ssl",
-  actual = "@envoy//bazel:boringssl",
-)
