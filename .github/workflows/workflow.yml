@@ -40,8 +40,6 @@ jobs:
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get -y install make cmake ninja-build build-essential
     - name: Setup clang
-      env:
-        CLANG_VERSION: '12.0.0'
       run: |
         sudo sh -c ${PWD}/bazel/install-clang-ci.sh
         bazel/setup_clang.sh /opt/llvm
