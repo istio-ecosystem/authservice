@@ -4,7 +4,7 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 _DEFAULT_COPTS = ["-Wall", "-Wextra"]
 
-def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = [], , visibility = []):
+def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = [], visibility = []):
     cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs, visibility = visibility)
 
 def authsvc_cc_binary(name, deps = [], srcs = [], copts = [], defines = []):
