@@ -4,13 +4,13 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 _DEFAULT_COPTS = ["-Wall", "-Wextra"]
 
-def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = []):
-    cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs)
+def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = [], , visibility = []):
+    cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs, visibility = visibility)
 
 def authsvc_cc_binary(name, deps = [], srcs = [], copts = [], defines = []):
     cc_binary(name = name, deps = deps, srcs = srcs, copts = _DEFAULT_COPTS + copts, defines = defines)
 
-def authsvc_cc_test(name, deps = [], srcs = [], data = [], visibility = []):
+def authsvc_cc_test(name, deps = [], srcs = [], data = []):
     cc_test(
         name = name,
         deps = deps,
@@ -20,5 +20,4 @@ def authsvc_cc_test(name, deps = [], srcs = [], data = [], visibility = []):
         # to resolved for unit test,
         # https://gist.github.com/Shikugawa/0ff7ef056cf6fdb2605ad81fcb0be814 (optional)
         linkstatic = False,
-        visibility = visibility,
     )
