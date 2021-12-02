@@ -10,7 +10,7 @@ def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], define
 def authsvc_cc_binary(name, deps = [], srcs = [], copts = [], defines = []):
     cc_binary(name = name, deps = deps, srcs = srcs, copts = _DEFAULT_COPTS + copts, defines = defines)
 
-def authsvc_cc_test(name, deps = [], srcs = [], data = []):
+def authsvc_cc_test(name, deps = [], srcs = [], data = [], visibility = []):
     cc_test(
         name = name,
         deps = deps,
@@ -19,5 +19,6 @@ def authsvc_cc_test(name, deps = [], srcs = [], data = []):
         # We choose to use static link because boringssl FIPS build seem not be able
         # to resolved for unit test,
         # https://gist.github.com/Shikugawa/0ff7ef056cf6fdb2605ad81fcb0be814 (optional)
-        linkstatic = False
+        linkstatic = False,
+        visibility = visibility,
     )
