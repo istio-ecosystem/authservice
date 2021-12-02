@@ -1,9 +1,9 @@
-load("//bazel:bazel.bzl", "xx_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library")
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_library(
+authsvc_cc_library(
     name = "http",
     srcs = ["http.cc"],
     hdrs = [

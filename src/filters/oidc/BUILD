@@ -1,8 +1,8 @@
-load("//bazel:bazel.bzl", "xx_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_library(
+authsvc_cc_library(
     name = "token_response",
     srcs = ["token_response.cc"],
     hdrs = ["token_response.h"],
@@ -16,7 +16,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "authorization_state",
     srcs = ["authorization_state.cc"],
     hdrs = ["authorization_state.h"],
@@ -26,7 +26,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "session_store_factory",
     hdrs = ["session_store_factory.h"],
     deps = [
@@ -34,7 +34,7 @@ xx_library(
     ]
 )
 
-xx_library(
+authsvc_cc_library(
     name = "in_memory_session_store",
     srcs = ["in_memory_session_store.cc"],
     hdrs = ["in_memory_session_store.h", "session_store.h"],
@@ -51,7 +51,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "session_store",
     srcs = [],
     hdrs = ["session_store.h"],
@@ -63,7 +63,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "redis_session_store",
     srcs = ["redis_session_store.cc"],
     hdrs = ["redis_session_store.h", "session_store.h"],
@@ -82,7 +82,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "redis_wrapper",
     srcs = ["redis_wrapper.cc"],
     hdrs = ["redis_wrapper.h"],
@@ -96,7 +96,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "redis_retry_wrapper",
     srcs = ["redis_retry_wrapper.cc"],
     hdrs = ["redis_retry_wrapper.h"],
@@ -109,7 +109,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "jwks_resolver",
     srcs = ["jwks_resolver.cc"],
     hdrs = ["jwks_resolver.h"],
@@ -122,7 +122,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "jwt_verifier",
     srcs = ["jwt_verifier.cc"],
     hdrs = ["jwt_verifier.h"],
@@ -138,7 +138,7 @@ xx_library(
     ]
 )
 
-xx_library(
+authsvc_cc_library(
     name = "oidc_filter",
     srcs = ["oidc_filter.cc"],
     hdrs = ["oidc_filter.h"],

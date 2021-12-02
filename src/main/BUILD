@@ -1,8 +1,8 @@
-load("//bazel:bazel.bzl", "xx_binary")
+load("//bazel:bazel.bzl", "authsvc_cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_binary(
+authsvc_cc_binary(
     name = "auth_server",
     srcs = ["auth_server.cc"],
     deps = [

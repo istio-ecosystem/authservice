@@ -1,8 +1,8 @@
-load("//bazel:bazel.bzl", "xx_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_library(
+authsvc_cc_library(
     name = "filter",
     srcs = [],
     hdrs = ["filter.h"],
@@ -14,7 +14,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "pipe",
     srcs = ["pipe.cc"],
     hdrs = ["pipe.h"],
@@ -24,7 +24,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "filter_factory",
     hdrs = ["filter_factory.h"],
     deps = [
@@ -32,7 +32,7 @@ xx_library(
     ]
 )
 
-xx_library(
+authsvc_cc_library(
     name = "filter_chain",
     srcs = [
         "filter_chain.cc",

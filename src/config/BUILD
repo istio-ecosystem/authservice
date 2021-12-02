@@ -1,8 +1,8 @@
-load("//bazel:bazel.bzl", "xx_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_library(
+authsvc_cc_library(
     name = "config",
     srcs = ["get_config.cc"],
     hdrs = [

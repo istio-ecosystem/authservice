@@ -1,9 +1,9 @@
-load("//bazel:bazel.bzl", "xx_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library")
 load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 package(default_visibility = ["//visibility:public"])
 
-xx_library(
+authsvc_cc_library(
     name = "random",
     srcs = ["random.cc"],
     hdrs = ["random.h"],
@@ -14,7 +14,7 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "time_service",
     srcs = ["time_service.cc"],
     hdrs = ["time_service.h"],
@@ -22,14 +22,14 @@ xx_library(
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "synchronized",
     hdrs = ["synchronized.h"],
     deps = [
     ],
 )
 
-xx_library(
+authsvc_cc_library(
     name = "trigger_rules",
     srcs = ["trigger_rules.cc"],
     hdrs = ["trigger_rules.h"],
