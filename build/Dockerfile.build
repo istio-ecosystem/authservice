@@ -8,7 +8,8 @@ COPY . /src/
 ARG bazel_flags=""
 WORKDIR /src
 RUN bash ./bazel/setup_clang.sh /usr/lib/llvm-12/
-RUN BAZEL_FLAGS=$bazel_flags make bazel-bin/src/main/auth_server
+# RUN BAZEL_FLAGS=$bazel_flags make bazel-bin/src/main/auth_server
+RUN BAZEL_FLAGS=$bazel_flags make test
 
 # Create our final auth-server container image.
 FROM debian:buster

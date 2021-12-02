@@ -14,11 +14,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Setup clang-format
-      env:
-        CLANG_VERSION: '12.0.0'
       run: |
-        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-        mkdir -p /opt/llvm && tar -xvf clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz -C /opt/llvm --strip-components 1
+        sudo sh -c ${PWD}/bazel/install-clang-ci.sh
         git clone https://github.com/Sarcasm/run-clang-format.git
     - name: Run clang-format
       run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py --clang-format-executable=/opt/llvm/bin/clang-format
@@ -46,8 +43,7 @@ jobs:
       env:
         CLANG_VERSION: '12.0.0'
       run: |
-        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-${CLANG_VERSION}/clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-        mkdir -p /opt/llvm && tar -xvf clang+llvm-${CLANG_VERSION}-x86_64-linux-gnu-ubuntu-20.04.tar.xz -C /opt/llvm --strip-components 1
+        sudo sh -c ${PWD}/bazel/install-clang-ci.sh
         bazel/setup_clang.sh /opt/llvm
     - name: make test
       run: |

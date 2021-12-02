@@ -16,5 +16,5 @@ def authsvc_cc_test(name, deps = [], srcs = [], data = []):
         deps = deps,
         srcs = srcs,
         data = data,
-        linkstatic = True
+        linkstatic = False
     )

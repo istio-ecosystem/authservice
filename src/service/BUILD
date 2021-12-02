@@ -1,6 +1,8 @@
+load("//bazel:bazel.bzl", "authsvc_cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+authsvc_cc_library(
     name = "healthcheck_http_server_lib",
     hdrs = [
         "healthcheck_http_server.h"
@@ -14,7 +16,7 @@ cc_library(
     ]
 )
 
-cc_library(
+authsvc_cc_library(
     name = "serviceimpl",
     srcs = [
         "async_service_impl.cc",

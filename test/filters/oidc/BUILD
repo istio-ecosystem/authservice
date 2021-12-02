@@ -1,7 +1,6 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
-load("//bazel:bazel.bzl", "authsvc_cc_test")
+load("//bazel:bazel.bzl", "authsvc_cc_test", "authsvc_cc_library")
 
-cc_library(
+authsvc_cc_library(
     name = "mocks",
     hdrs = ["mocks.h"],
     deps = [
