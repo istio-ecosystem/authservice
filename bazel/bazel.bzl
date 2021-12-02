@@ -16,5 +16,8 @@ def authsvc_cc_test(name, deps = [], srcs = [], data = []):
         deps = deps,
         srcs = srcs,
         data = data,
+        # We choose to use static link because boringssl FIPS build seem not be able
+        # to resolved for unit test,
+        # https://gist.github.com/Shikugawa/0ff7ef056cf6fdb2605ad81fcb0be814 (optional)
         linkstatic = False
     )
