@@ -1,0 +1,42 @@
+version: "3.7"
+services:
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+    ports:
+      - 5432
+  idp:
+    image: "quay.io/keycloak/keycloak:latest"
+    ports:
+      - "9990:9990"
+      - "8443:8443"
+      - "8080:8080"
+    environment:
+      - KEYCLOAK_USER=admin
+      - KEYCLOAK_PASSWORD=password
+      - DB_VENDOR=POSTGRES
+      - DB_ADDR=postgres
+      - DB_SCHEMA=public
+      - DB_DATABASE=keycloak
+      - DB_PASSWORD=password
+    depends_on:
+      - postgres
+  envoy:
+    image: "envoyproxy/envoy:v1.20.1"
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./run/envoy:/etc/envoy:ro
+  auth:
+    image: authservice:root
+    command: ["-filter_config", "/etc/authservice/e2e.json"]
+    ports:
+      - "10003:10003"
+    volumes:
+      - .:/etc/authservice:ro
+    depends_on:
+      - idp

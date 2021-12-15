@@ -4,6 +4,7 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
+#include <boost/asio/ssl/verify_mode.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <sstream>
@@ -383,7 +384,7 @@ response_t HttpImpl::Post(
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
+    ctx.set_verify_mode(ssl::verify_none);
     ctx.set_default_verify_paths();
 
     if (!ca_cert.empty()) {
@@ -508,7 +509,7 @@ response_t HttpImpl::Get(
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
+    ctx.set_verify_mode(ssl::verify_none);
     ctx.set_default_verify_paths();
 
     if (!ca_cert.empty()) {
