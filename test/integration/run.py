@@ -2,11 +2,12 @@ from urllib.parse import urlparse, unquote
 from html.parser import HTMLParser
 from keycloak import KeycloakAdmin
 import requests
+import time
 
 def setup_keycloak():
   # setup testuser
   admin = KeycloakAdmin(
-    server_url="http://127.0.0.1:8080/auth/admin",
+    server_url="http://localhost:8080/auth/admin",
     username='admin',
     password='password',
   )
@@ -79,6 +80,7 @@ def validate_token_fetch_callback_response(res):
 
 
 if __name__ == '__main__':
+  time.sleep(300)
   setup_keycloak()
 
   # 1, Check redicect after requested without valid cookie.
