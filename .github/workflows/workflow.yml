@@ -47,3 +47,16 @@ jobs:
       run: |
         sudo chmod -R a+rxw /home
         BAZEL_FLAGS="--config=clang --define=boringssl=fips" make test
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare service container
+        run: |
+          docker-compose -f docker-compose.e2e.yml up -d
+      - name: Run integration test
+        run: |
+          pip3 install --upgrade pip
+          pip3 install setuptools
+          pip3 install -r requirements.txt
+          python3 test/integration/run.py

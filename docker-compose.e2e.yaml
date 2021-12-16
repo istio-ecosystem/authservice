@@ -32,11 +32,13 @@ services:
     volumes:
       - ./run/envoy:/etc/envoy:ro
   auth:
-    image: authservice:root
-    command: ["-filter_config", "/etc/authservice/e2e.json"]
+    build:
+      dockerfile: ./build/Dockerfile.build
+      context: .
+    command: ["-filter_config", "/etc/authservice/authservice.json"]
     ports:
       - "10003:10003"
     volumes:
-      - .:/etc/authservice:ro
+      - ./test/integration:/etc/authservice:ro
     depends_on:
       - idp
