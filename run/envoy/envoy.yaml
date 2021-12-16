@@ -78,5 +78,5 @@ static_resources:
               - endpoint:
                   address:
                     socket_address:
-                      address: www.thales.com
+                      address: httpbin.org
                       port_value: 80
