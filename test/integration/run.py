@@ -79,7 +79,7 @@ def validate_token_fetch_callback_response(res):
 
 
 if __name__ == '__main__':
-  # setup_keycloak()
+  setup_keycloak()
 
   # 1, Check redicect after requested without valid cookie.
   res = requests.get(url='https://localhost:9000', verify=False, allow_redirects=False)
