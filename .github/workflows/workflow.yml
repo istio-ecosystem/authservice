@@ -60,4 +60,6 @@ jobs:
           pip3 install --upgrade pip
           pip3 install setuptools
           pip3 install -r test/integration/requirements.txt
+          timeout -s TERM 300 bash -c \
+          'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' http://localhost:8080)" != "200" ]]; echo $(curl --insecure -s -o /dev/null -w ''%{http_code}'' http://localhost:8080); do sleep 5; done'
           python3 test/integration/run.py
