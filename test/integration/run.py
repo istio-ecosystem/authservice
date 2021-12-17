@@ -4,6 +4,10 @@ from keycloak import KeycloakAdmin
 import requests
 import time
 
+CLIENT_ID = "authservice5"
+CLIENT_SECRET = "secret5"
+CALLBACK_URL = "https://localhost:9000/oauth/callback"
+
 def setup_keycloak():
   # setup testuser
   admin = KeycloakAdmin(
@@ -26,11 +30,9 @@ def setup_keycloak():
   # setup authservice client
   admin.create_client({
     "name": "authservice",
-    "clientId": "authservice",
-    "secret": "secret",
-    "redirectUris": [
-      "https://localhost:9000/oauth/callback"
-    ]
+    "clientId": CLIENT_ID,
+    "secret": CLIENT_SECRET,
+    "redirectUris": [CALLBACK_URL]
   })
 
 
@@ -60,18 +62,18 @@ def validate_unauthenticated_response(res):
   for raw_query in parsed_loc.query.split('&'):
     key, value = raw_query.split('=')
     queries[key] = value
-  
-  assert(queries['client_id'] == 'authservice')
+
+  assert(queries['client_id'] == CLIENT_ID)
   assert(len(queries['nonce']) != 0)
-  assert(unquote(queries['redirect_uri']) == "https://localhost:9000/oauth/callback")
-  assert(queries['response_type'] == 'code')
-  assert(queries['scope'] == 'openid')
+  assert(unquote(queries['redirect_uri']) == CALLBACK_URL)
+  assert(queries['response_type'] == "code")
+  assert(queries['scope'] == "openid")
   assert(len(queries['state']) != 0)
 
 
 def validate_idp_authentication_response(res):
   assert(res.status_code == 302)
-  assert(res.headers['Location'].startswith('https://localhost:9000/oauth/callback'))
+  assert(res.headers['Location'].startswith(CALLBACK_URL))
 
 
 def validate_token_fetch_callback_response(res):
@@ -80,7 +82,7 @@ def validate_token_fetch_callback_response(res):
 
 
 if __name__ == '__main__':
-  time.sleep(300)
+  time.sleep(20)
   setup_keycloak()
 
   # 1, Check redicect after requested without valid cookie.

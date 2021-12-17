@@ -50,12 +50,13 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Prepare service container
-        run: |
-          docker-compose -f docker-compose.e2e.yml up -d
+      - uses: actions/checkout@v1
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y install python3-pip
       - name: Run integration test
         run: |
+          pip3 install docker-compose
+          docker-compose -f docker-compose.e2e.yml up -d
           pip3 install --upgrade pip
           pip3 install setuptools
           pip3 install -r test/integration/requirements.txt
