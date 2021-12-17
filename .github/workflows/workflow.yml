@@ -62,5 +62,6 @@ jobs:
           pip3 install -r test/integration/requirements.txt
           timeout -s TERM 300 bash -c \
           'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' http://localhost:8080)" != "200" ]]; do sleep 5; done'
-          echo "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' https://localhost:9000)"
+          timeout -s TERM 300 bash -c \
+          'while [[ "$(curl --insecure -s -o /dev/null -w ''%{http_code}'' https://localhost:9000)" == "000" ]]; do sleep 5; done'
           python3 test/integration/run.py
