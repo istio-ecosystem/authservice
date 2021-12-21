@@ -10,7 +10,7 @@
       {
         "oidc":
           {
-            "authorization_uri": "https://idp:8443/auth/realms/master/protocol/openid-connect/auth",
+            "authorization_uri": "https://localhost:8443/auth/realms/master/protocol/openid-connect/auth",
             "token_uri": "https://idp:8443/auth/realms/master/protocol/openid-connect/token",
             "client_id": "authservice5",
             "client_secret": "secret5",
