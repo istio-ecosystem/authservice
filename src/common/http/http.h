@@ -12,6 +12,8 @@
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "boost/beast/core/tcp_stream.hpp"
+#include "boost/beast/ssl/ssl_stream.hpp"
 
 namespace beast = boost::beast;  // from <boost/beast.hpp>
 
@@ -43,6 +45,17 @@ class PathQueryFragment {
   inline const std::string &Fragment() const { return fragment_; }
 
   inline bool HasFragment() const { return !fragment_.empty(); }
+};
+
+struct TransportSocketOptions {
+  // the ca cert to be trusted in the http call
+  std::string ca_cert_;
+  // whether or not to validate peer cert.
+  bool verify_peer_ = true;
+
+  bool operator==(const TransportSocketOptions &opt) const {
+    return opt.verify_peer_ == verify_peer_ && opt.ca_cert_ == ca_cert_;
+  }
 };
 
 class Uri {
@@ -178,13 +191,12 @@ class Http {
    * @param endpoint the endpoint to call
    * @param headers the http headers
    * @param body the http request body
-   * @param ca_cert the ca cert to be trusted in the http call
    * @return http response.
    */
   virtual response_t Post(
       absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body, absl::string_view ca_cert,
+      absl::string_view body, const TransportSocketOptions &options,
       absl::string_view proxy_uri, boost::asio::io_context &ioc,
       boost::asio::yield_context yield) const = 0;
 
@@ -193,13 +205,12 @@ class Http {
    * @param endpoint the endpoint to call
    * @param headers the http headers
    * @param body the http request body
-   * @param ca_cert the ca cert to be trusted in the http call
    * @return http response.
    */
   virtual response_t Get(
       absl::string_view uri,
       const std::map<absl::string_view, absl::string_view> &headers,
-      absl::string_view body, absl::string_view ca_cert,
+      absl::string_view body, const TransportSocketOptions &options,
       absl::string_view proxy_uri, boost::asio::io_context &ioc,
       boost::asio::yield_context yield) const = 0;
 
@@ -224,13 +235,13 @@ class HttpImpl : public Http {
  public:
   response_t Post(absl::string_view uri,
                   const std::map<absl::string_view, absl::string_view> &headers,
-                  absl::string_view body, absl::string_view ca_cert,
+                  absl::string_view body, const TransportSocketOptions &options,
                   absl::string_view proxy_uri, boost::asio::io_context &ioc,
                   boost::asio::yield_context yield) const override;
 
   response_t Get(absl::string_view uri,
                  const std::map<absl::string_view, absl::string_view> &headers,
-                 absl::string_view body, absl::string_view ca_cert,
+                 absl::string_view body, const TransportSocketOptions &options,
                  absl::string_view proxy_uri, boost::asio::io_context &ioc,
                  boost::asio::yield_context yield) const override;
 

@@ -12,6 +12,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "boost/asio/ssl/verify_mode.hpp"
 #include "boost/beast/core/tcp_stream.hpp"
 #include "spdlog/spdlog.h"
 
@@ -375,7 +376,7 @@ PathQueryFragment::PathQueryFragment(absl::string_view path_query_fragment) {
 response_t HttpImpl::Post(
     absl::string_view uri,
     const std::map<absl::string_view, absl::string_view> &headers,
-    absl::string_view body, absl::string_view ca_cert,
+    absl::string_view body, const TransportSocketOptions &options,
     absl::string_view proxy_uri, boost::asio::io_context &ioc,
     boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
@@ -383,14 +384,16 @@ response_t HttpImpl::Post(
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
+    ctx.set_verify_mode(options.verify_peer_ ? ssl::verify_peer
+                                             : ssl::verify_none);
     ctx.set_default_verify_paths();
 
-    if (!ca_cert.empty()) {
+    if (!options.ca_cert_.empty()) {
       spdlog::info("{}: Trusting the provided certificate authority", __func__);
       beast::error_code ca_ec;
       ctx.add_certificate_authority(
-          boost::asio::buffer(ca_cert.data(), ca_cert.size()), ca_ec);
+          boost::asio::buffer(options.ca_cert_.data(), options.ca_cert_.size()),
+          ca_ec);
       if (ca_ec) {
         throw boost::system::system_error{ca_ec};
       }
@@ -500,7 +503,7 @@ response_t HttpImpl::Post(
 response_t HttpImpl::Get(
     absl::string_view uri,
     const std::map<absl::string_view, absl::string_view> &headers,
-    absl::string_view body, absl::string_view ca_cert,
+    absl::string_view body, const TransportSocketOptions &options,
     absl::string_view proxy_uri, boost::asio::io_context &ioc,
     boost::asio::yield_context yield) const {
   spdlog::trace("{}", __func__);
@@ -508,14 +511,16 @@ response_t HttpImpl::Get(
     int version = 11;
 
     ssl::context ctx(ssl::context::tlsv12_client);
-    ctx.set_verify_mode(ssl::verify_peer);
+    ctx.set_verify_mode(options.verify_peer_ ? ssl::verify_peer
+                                             : ssl::verify_none);
     ctx.set_default_verify_paths();
 
-    if (!ca_cert.empty()) {
+    if (!options.ca_cert_.empty()) {
       spdlog::info("{}: Trusting the provided certificate authority", __func__);
       beast::error_code ca_ec;
       ctx.add_certificate_authority(
-          boost::asio::buffer(ca_cert.data(), ca_cert.size()), ca_ec);
+          boost::asio::buffer(options.ca_cert_.data(), options.ca_cert_.size()),
+          ca_ec);
       if (ca_ec) {
         throw boost::system::system_error{ca_ec};
       }

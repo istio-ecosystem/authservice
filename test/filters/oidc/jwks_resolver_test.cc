@@ -92,16 +92,18 @@ TEST(JwksResolverTest, TestStaticJwksResolver) {
 void setExpectedRemoteJwks(common::http::HttpMock& mock_http,
                            const char jwks[]) {
   EXPECT_CALL(mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([jwks](absl::string_view,
-                        const std::map<absl::string_view, absl::string_view>,
-                        absl::string_view, absl::string_view, absl::string_view,
-                        boost::asio::io_context&, boost::asio::yield_context) {
-            common::http::response_t response = std::make_unique<
-                beast::http::response<beast::http::string_body>>();
-            response->body() = jwks;
-            return response;
-          }));
+      .WillRepeatedly(Invoke([jwks](absl::string_view,
+                                    const std::map<absl::string_view,
+                                                   absl::string_view>,
+                                    absl::string_view,
+                                    const common::http::TransportSocketOptions&,
+                                    absl::string_view, boost::asio::io_context&,
+                                    boost::asio::yield_context) {
+        common::http::response_t response =
+            std::make_unique<beast::http::response<beast::http::string_body>>();
+        response->body() = jwks;
+        return response;
+      }));
 }
 
 TEST(JwksResolverTest, TestDynamicJwksResolver) {
@@ -143,16 +145,18 @@ TEST(JwksResolverTest, TestDynamicJwksResolverWithInvalidHttpStatus) {
 
   // Never initialized with invalid HTTP status.
   EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([](absl::string_view,
-                    const std::map<absl::string_view, absl::string_view>,
-                    absl::string_view, absl::string_view, absl::string_view,
-                    boost::asio::io_context&, boost::asio::yield_context) {
-            common::http::response_t response = std::make_unique<
-                beast::http::response<beast::http::string_body>>();
-            response->result(503);
-            return response;
-          }));
+      .WillRepeatedly(Invoke([](absl::string_view,
+                                const std::map<absl::string_view,
+                                               absl::string_view>,
+                                absl::string_view,
+                                const common::http::TransportSocketOptions&,
+                                absl::string_view, boost::asio::io_context&,
+                                boost::asio::yield_context) {
+        common::http::response_t response =
+            std::make_unique<beast::http::response<beast::http::string_body>>();
+        response->result(503);
+        return response;
+      }));
   io_context.run_for(std::chrono::seconds(3));
   EXPECT_EQ(nullptr, resolver.jwks());
 }
@@ -169,16 +173,18 @@ TEST(JwksResolverTest,
 
   // Initially make mock server always return invalid HTTP response as 503.
   EXPECT_CALL(*mock_http, Get(Eq("istio.io"), _, _, _, _, _, _))
-      .WillRepeatedly(
-          Invoke([](absl::string_view,
-                    const std::map<absl::string_view, absl::string_view>,
-                    absl::string_view, absl::string_view, absl::string_view,
-                    boost::asio::io_context&, boost::asio::yield_context) {
-            common::http::response_t response = std::make_unique<
-                beast::http::response<beast::http::string_body>>();
-            response->result(503);
-            return response;
-          }));
+      .WillRepeatedly(Invoke([](absl::string_view,
+                                const std::map<absl::string_view,
+                                               absl::string_view>,
+                                absl::string_view,
+                                const common::http::TransportSocketOptions&,
+                                absl::string_view, boost::asio::io_context&,
+                                boost::asio::yield_context) {
+        common::http::response_t response =
+            std::make_unique<beast::http::response<beast::http::string_body>>();
+        response->result(503);
+        return response;
+      }));
 
   io_context.run_for(std::chrono::seconds(4));
   EXPECT_EQ(nullptr, resolver.jwks());
