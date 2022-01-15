@@ -48,7 +48,7 @@ class PathQueryFragment {
 };
 
 struct TransportSocketOptions {
-  // the ca cert to be trusted in the http call
+  // the ca cert to be trusted in the http call, in PEM format.
   std::string ca_cert_;
   // whether or not to validate peer cert.
   bool verify_peer_ = true;

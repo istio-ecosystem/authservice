@@ -69,6 +69,9 @@ constexpr absl::string_view valid_jwt_signing_key = R"(
 }
 )";
 
+const common::http::TransportSocketOptions kDefaultTransportSocketOpts{
+    .ca_cert_ = "some-ca", .verify_peer_ = true};
+
 ::testing::internal::UnorderedElementsAreArrayMatcher<
     ::testing::Matcher<envoy::config::core::v3::HeaderValueOption>>
 ContainsHeaders(
@@ -480,10 +483,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status =
@@ -538,10 +540,9 @@ TEST_F(OidcFilterTest,
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   auto jwt_status =
@@ -639,10 +640,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   EXPECT_CALL(*parser_mock_, ParseRefreshTokenResponse(_, _))
@@ -689,10 +689,9 @@ TEST_F(
   SetExpiredAccessTokenResponseInSessionStore();
 
   auto mocked_http = new common::http::HttpMock();
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(nullptr)));
 
   auto old_session_id = std::string("session123");
@@ -738,10 +737,9 @@ TEST_F(
   auto *pMessage = new beast::http::response<beast::http::string_body>();
   auto raw_http_token_response_from_idp = common::http::response_t(pMessage);
   raw_http_token_response_from_idp->result(beast::http::status::bad_request);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http_token_response_from_idp))));
 
   // we want the code to return before attempting to parse the bad response
@@ -1138,10 +1136,9 @@ google::rpc::Code OidcFilterTest::MakeRequestWhichWillCauseTokenRetrieval(
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_mock_,
@@ -1177,10 +1174,9 @@ TEST_F(OidcFilterTest,
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   ASSERT_FALSE(session_store_->GetTokenResponse(session_id));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
@@ -1302,10 +1298,9 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenBrokenPipe) {
 
   auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t();
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_,
@@ -1342,10 +1337,9 @@ TEST_F(OidcFilterTest, RetrieveToken_ReturnsError_WhenInvalidResponse) {
   auto *mocked_http = new common::http::HttpMock();
   auto raw_http = common::http::response_t(
       (new beast::http::response<beast::http::string_body>()));
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), config_, parser_mock_,
                     session_string_generator_mock_, session_store_,
@@ -1444,10 +1438,9 @@ void OidcFilterTest::AssertRetrieveToken(config::oidc::OIDCConfig &oidcConfig,
   auto raw_http = common::http::response_t(
       new beast::http::response<beast::http::string_body>());
   raw_http->result(beast::http::status::ok);
-  const common::http::TransportSocketOptions opt{.ca_cert_ = "some-ca",
-                                                 .verify_peer_ = true};
-  EXPECT_CALL(*mocked_http, Post(Eq(token_uri), _, _, Eq(opt),
-                                 Eq("http://some-proxy-uri.com"), _, _))
+  EXPECT_CALL(*mocked_http,
+              Post(Eq(token_uri), _, _, Eq(kDefaultTransportSocketOpts),
+                   Eq("http://some-proxy-uri.com"), _, _))
       .WillOnce(Return(ByMove(std::move(raw_http))));
   OidcFilter filter(common::http::ptr_t(mocked_http), oidcConfig, parser_mock_,
                     session_string_generator_mock_, session_store_,
