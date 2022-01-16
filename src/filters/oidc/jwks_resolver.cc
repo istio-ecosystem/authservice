@@ -32,7 +32,8 @@ DynamicJwksResolverImpl::JwksFetcher::JwksFetcher(
 void DynamicJwksResolverImpl::JwksFetcher::request(
     const boost::system::error_code&) {
   boost::asio::spawn(ioc_, [this](boost::asio::yield_context yield) {
-    auto resp = http_ptr_->Get(jwks_uri_, {}, "", "", "", ioc_, yield);
+    common::http::TransportSocketOptions opt;
+    auto resp = http_ptr_->Get(jwks_uri_, {}, "", opt, "", ioc_, yield);
     auto next_schedule_interval = periodic_fetch_interval_sec_;
 
     if (resp == nullptr) {

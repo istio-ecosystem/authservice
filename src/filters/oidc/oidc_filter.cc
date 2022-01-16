@@ -552,10 +552,11 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
   };
 
   spdlog::info("{}: POSTing to refresh access token", __func__);
+  common::http::TransportSocketOptions opt;
+  opt.ca_cert_ = idp_config_.trusted_certificate_authority();
   auto retrieved_token_response =
       http_ptr_->Post(idp_config_.token_uri(), headers,
-                      common::http::Http::EncodeFormData(params),
-                      idp_config_.trusted_certificate_authority(),
+                      common::http::Http::EncodeFormData(params), opt,
                       idp_config_.proxy_uri(), ioc, yield);
 
   if (retrieved_token_response == nullptr) {
@@ -649,10 +650,11 @@ google::rpc::Code OidcFilter::RetrieveToken(
       {"grant_type", "authorization_code"},
   };
 
+  common::http::TransportSocketOptions opt;
+  opt.ca_cert_ = idp_config_.trusted_certificate_authority();
   auto retrieve_token_response =
       http_ptr_->Post(idp_config_.token_uri(), headers,
-                      common::http::Http::EncodeFormData(params),
-                      idp_config_.trusted_certificate_authority(),
+                      common::http::Http::EncodeFormData(params), opt,
                       idp_config_.proxy_uri(), ioc, yield);
   if (retrieve_token_response == nullptr) {
     spdlog::info("{}: HTTP error encountered: {}", __func__,
