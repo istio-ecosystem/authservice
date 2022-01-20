@@ -146,4 +146,4 @@ if __name__ == '__main__':
   res = requests.get(url=res.headers['Location'], cookies={
     '__Host-authservice-session-id-cookie': sess_id
   }, verify=False, allow_redirects=False)
-  RichAssert.assert_eq(res.status_code == 200)
+  RichAssert.assert_eq(res.status_code, 200)
