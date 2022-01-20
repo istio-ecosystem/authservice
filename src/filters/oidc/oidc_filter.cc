@@ -554,7 +554,7 @@ std::shared_ptr<TokenResponse> OidcFilter::RefreshToken(
   spdlog::info("{}: POSTing to refresh access token", __func__);
   common::http::TransportSocketOptions opt;
   opt.ca_cert_ = idp_config_.trusted_certificate_authority();
-  opt.verify_peer_ = !idp_config_.skip_verify_peer_cert;
+  opt.verify_peer_ = !idp_config_.skip_verify_peer_cert();
   auto retrieved_token_response =
       http_ptr_->Post(idp_config_.token_uri(), headers,
                       common::http::Http::EncodeFormData(params), opt,
@@ -653,7 +653,7 @@ google::rpc::Code OidcFilter::RetrieveToken(
 
   common::http::TransportSocketOptions opt;
   opt.ca_cert_ = idp_config_.trusted_certificate_authority();
-  opt.verify_peer_ = !idp_config_.skip_verify_peer_cert;
+  opt.verify_peer_ = !idp_config_.skip_verify_peer_cert();
   auto retrieve_token_response =
       http_ptr_->Post(idp_config_.token_uri(), headers,
                       common::http::Http::EncodeFormData(params), opt,

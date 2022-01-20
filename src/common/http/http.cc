@@ -4,6 +4,7 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/asio/ssl/error.hpp>
 #include <boost/asio/ssl/stream.hpp>
+#include <boost/asio/ssl/verify_mode.hpp>
 #include <boost/beast.hpp>
 #include <boost/beast/ssl.hpp>
 #include <sstream>
