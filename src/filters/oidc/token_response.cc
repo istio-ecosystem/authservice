@@ -97,7 +97,7 @@ std::shared_ptr<TokenResponse> TokenResponseParserImpl::Parse(
 
   google::jwt_verify::Jwt &id_token = optional_id_token.value();
   const auto verify_result = IsIDTokenInvalid(client_id, nonce, id_token);
-  if (!verify_result) {
+  if (verify_result) {
     spdlog::warn("{}: {}", __func__, verify_result);
     return nullptr;
   }
