@@ -15,6 +15,7 @@ def setup_keycloak():
     server_url="http://localhost:8443/auth/admin",
     username='admin',
     password='password',
+    verify=False,
   )
 
   username = "test@example.com"
