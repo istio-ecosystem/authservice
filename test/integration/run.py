@@ -2,9 +2,11 @@ from urllib.parse import urlparse, unquote
 from html.parser import HTMLParser
 from keycloak import KeycloakAdmin
 import requests
+from urllib3.util import Retry
+from requests.adapters import HTTPAdapter
 
-CLIENT_ID = "authservice5"
-CLIENT_SECRET = "secret5"
+CLIENT_ID = "authservice"
+CLIENT_SECRET = "secret"
 CALLBACK_URL = "https://localhost:9000/oauth/callback"
 
 def setup_keycloak():
@@ -80,7 +82,24 @@ def validate_token_fetch_callback_response(res):
   assert(res.headers['location'].startswith('https://localhost:9000/'))
 
 
+def check_idp_connectivity():
+  session = requests.Session()
+  session.mount("https://", HTTPAdapter(max_retries=Retry(total=10, connect=10, backoff_factor=1)))
+  res = session.get(url='https://localhost:8443/auth/realms/master', verify=False)
+  assert(res.status_code == 200)
+
+
+def check_envoy_connectivity():
+  session = requests.Session()
+  session.mount("https://", HTTPAdapter(max_retries=Retry(total=10, connect=10, backoff_factor=1)))
+  res = session.get(url='https://localhost:9000', verify=False)
+  assert(res.status_code >= 100)
+
+
 if __name__ == '__main__':
+  check_idp_connectivity()
+  check_envoy_connectivity()
+
   setup_keycloak()
 
   # 1, Check redicect after requested without valid cookie.
