@@ -11,9 +11,7 @@ services:
   idp:
     image: "quay.io/keycloak/keycloak:latest"
     ports:
-      - "9990:9990"
       - "8443:8443"
-      - "8080:8080"
     environment:
       - KEYCLOAK_USER=admin
       - KEYCLOAK_PASSWORD=password
@@ -25,7 +23,7 @@ services:
     depends_on:
       - postgres
     healthcheck:
-      test: ["CMD", "curl", "http://0.0.0.0:8080/auth/realms/master"]
+      test: ["CMD", "curl", "https://0.0.0.0:8443/auth/realms/master", "-k"]
       interval: 5s
       timeout: 5s
   envoy:

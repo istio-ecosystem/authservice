@@ -3,14 +3,14 @@ from html.parser import HTMLParser
 from keycloak import KeycloakAdmin
 import requests
 
-CLIENT_ID = "authservice10"
-CLIENT_SECRET = "secret10"
+CLIENT_ID = "authservice5"
+CLIENT_SECRET = "secret5"
 CALLBACK_URL = "https://localhost:9000/oauth/callback"
 
 def setup_keycloak():
   # setup testuser
   admin = KeycloakAdmin(
-    server_url="http://localhost:8080/auth/admin",
+    server_url="http://localhost:8443/auth/admin",
     username='admin',
     password='password',
   )
@@ -56,7 +56,7 @@ def validate_unauthenticated_response(res):
   assert(res.status_code == 302)
   loc = res.headers['location']
   parsed_loc = urlparse(loc)
-  
+
   queries = {}
   for raw_query in parsed_loc.query.split('&'):
     key, value = raw_query.split('=')
