@@ -188,4 +188,10 @@ message OIDCConfig {
     // When specified, the Authservice will use the configured Redis server to store session data.
     // Optional.
     RedisConfig redis_session_store_config = 16;
+
+    // If set to true, the verification of the destination certificate will be skipped when
+    // making a request to the Token Endpoint. This option is useful when you want to use a
+    // self-signed certificate for testing purposes, but basically should not be set to true.
+    // Optional.
+    bool skip_verify_peer_cert = 18;
 }
