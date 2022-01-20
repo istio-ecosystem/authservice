@@ -8,19 +8,23 @@ namespace oidc {
 
 namespace {
 constexpr uint32_t kJwksInitialFetchDelaySec = 3;
-}
+constexpr uint32_t kJwksPeriodicFetchIntervalSec = 1200;
+}  // namespace
 
 DynamicJwksResolverImpl::JwksFetcher::JwksFetcher(
     DynamicJwksResolverImpl* parent, common::http::ptr_t http_ptr,
-    const std::string& jwks_uri,
-    std::chrono::seconds periodic_fetch_interval_sec,
+    const config::oidc::OIDCConfig::JwksFetcherConfig& config,
     boost::asio::io_context& io_context)
     : parent_(parent),
-      jwks_uri_(jwks_uri),
+      jwks_uri_(config.jwks_uri()),
       http_ptr_(http_ptr),
       ioc_(io_context),
-      periodic_fetch_interval_sec_(periodic_fetch_interval_sec),
-      timer_(ioc_, periodic_fetch_interval_sec_) {
+      periodic_fetch_interval_sec_(
+          std::chrono::seconds(config.periodic_fetch_interval_sec() != 0
+                                   ? config.periodic_fetch_interval_sec()
+                                   : kJwksPeriodicFetchIntervalSec)),
+      timer_(ioc_, periodic_fetch_interval_sec_),
+      verify_peer_cert_(!config.skip_verify_peer_cert()) {
   // Extract initial JWKs.
   // After timer callback sucessful, next timer invocation will be scheduled.
   timer_.expires_at(std::chrono::steady_clock::now() +
@@ -33,6 +37,7 @@ void DynamicJwksResolverImpl::JwksFetcher::request(
     const boost::system::error_code&) {
   boost::asio::spawn(ioc_, [this](boost::asio::yield_context yield) {
     common::http::TransportSocketOptions opt;
+    opt.verify_peer_ = verify_peer_cert_;
     auto resp = http_ptr_->Get(jwks_uri_, {}, "", opt, "", ioc_, yield);
     auto next_schedule_interval = periodic_fetch_interval_sec_;
 
