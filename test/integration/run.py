@@ -1,3 +1,4 @@
+import unittest
 from urllib.parse import urlparse, unquote
 from html.parser import HTMLParser
 from keycloak import KeycloakAdmin
@@ -5,8 +6,8 @@ import requests
 from urllib3.util import Retry
 from requests.adapters import HTTPAdapter
 
-CLIENT_ID = "authservice"
-CLIENT_SECRET = "secret"
+CLIENT_ID = "authservice5"
+CLIENT_SECRET = "secret5"
 CALLBACK_URL = "https://localhost:9000/oauth/callback"
 
 def setup_keycloak():
@@ -55,8 +56,19 @@ class SubmitFormExtractor(HTMLParser):
     return {key: value for (key, value) in attrs}
 
 
+class RichAssert(unittest.TestCase):
+  @classmethod
+  def assert_eq(self, a1, a2):
+    RichAssert().assertEqual(a1, a2)
+
+  @classmethod
+  def assert_ne(self, a1, a2):
+    RichAssert().assertNotEqual(a1, a2)
+
+
 def validate_unauthenticated_response(res):
-  assert(res.status_code == 302)
+  RichAssert.assert_eq(res.status_code, 302)
+
   loc = res.headers['location']
   parsed_loc = urlparse(loc)
 
@@ -65,23 +77,23 @@ def validate_unauthenticated_response(res):
     key, value = raw_query.split('=')
     queries[key] = value
 
-  assert(queries['client_id'] == CLIENT_ID)
-  assert(len(queries['nonce']) != 0)
-  assert(unquote(queries['redirect_uri']) == CALLBACK_URL)
-  assert(queries['response_type'] == "code")
-  assert(queries['scope'] == "openid")
-  assert(len(queries['state']) != 0)
+  RichAssert.assert_eq(queries['client_id'], CLIENT_ID)
+  RichAssert.assert_ne(len(queries['nonce']), 0)
+  RichAssert.assert_eq(unquote(queries['redirect_uri']), CALLBACK_URL)
+  RichAssert.assert_eq(queries['response_type'], "code")
+  RichAssert.assert_eq(queries['scope'], "openid")
+  RichAssert.assert_ne(len(queries['state']), 0)
   print("success validate_unauthenticated_response")
 
 
 def validate_idp_authentication_response(res):
-  assert(res.status_code == 302)
+  RichAssert.assert_eq(res.status_code, 302)
   assert(res.headers['Location'].startswith(CALLBACK_URL))
   print("success validate_idp_authentication_response")
 
 
 def validate_token_fetch_callback_response(res):
-  assert(res.status_code == 302)
+  RichAssert.assert_eq(res.status_code, 302)
   assert(res.headers['location'].startswith('https://localhost:9000/'))
   print("success validate_token_fetch_callback_response")
 
@@ -134,4 +146,4 @@ if __name__ == '__main__':
   res = requests.get(url=res.headers['Location'], cookies={
     '__Host-authservice-session-id-cookie': sess_id
   }, verify=False, allow_redirects=False)
-  assert(res.status_code == 200)
+  RichAssert.assert_eq(res.status_code == 200)
