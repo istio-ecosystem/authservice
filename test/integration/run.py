@@ -12,7 +12,7 @@ CALLBACK_URL = "https://localhost:9000/oauth/callback"
 def setup_keycloak():
   # setup testuser
   admin = KeycloakAdmin(
-    server_url="http://localhost:8443/auth/admin",
+    server_url="https://localhost:8443/auth/admin",
     username='admin',
     password='password',
     verify=False,
