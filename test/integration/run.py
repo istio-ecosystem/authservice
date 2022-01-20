@@ -70,16 +70,19 @@ def validate_unauthenticated_response(res):
   assert(queries['response_type'] == "code")
   assert(queries['scope'] == "openid")
   assert(len(queries['state']) != 0)
+  print("success validate_unauthenticated_response")
 
 
 def validate_idp_authentication_response(res):
   assert(res.status_code == 302)
   assert(res.headers['Location'].startswith(CALLBACK_URL))
+  print("success validate_idp_authentication_response")
 
 
 def validate_token_fetch_callback_response(res):
   assert(res.status_code == 302)
   assert(res.headers['location'].startswith('https://localhost:9000/'))
+  print("success validate_token_fetch_callback_response")
 
 
 def check_idp_connectivity():
