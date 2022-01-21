@@ -89,7 +89,8 @@ message OIDCConfig {
 
         // If set to true, the verification of the destination certificate will be skipped when
         // making a request to the JWKs URI. This option is useful when you want to use a
-        // self-signed certificate for testing purposes, but basically should not be set to true.
+        // self-signed certificate for testing purposes, but basically should not be set to
+        // true in any other cases.
         // Optional.
         bool skip_verify_peer_cert = 3;
     }
@@ -197,7 +198,8 @@ message OIDCConfig {
 
     // If set to true, the verification of the destination certificate will be skipped when
     // making a request to the Token Endpoint. This option is useful when you want to use a
-    // self-signed certificate for testing purposes, but basically should not be set to true.
+    // self-signed certificate for testing purposes, but basically should not be set to true
+    // in any other cases.
     // Optional.
     bool skip_verify_peer_cert = 18;
 }
