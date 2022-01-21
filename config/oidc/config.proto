@@ -86,6 +86,12 @@ message OIDCConfig {
         // default to 1200 seconds, 20min.
         // Optional.
         uint32 periodic_fetch_interval_sec = 2;
+
+        // If set to true, the verification of the destination certificate will be skipped when
+        // making a request to the JWKs URI. This option is useful when you want to use a
+        // self-signed certificate for testing purposes, but basically should not be set to true.
+        // Optional.
+        bool skip_verify_peer_cert = 3;
     }
 
     oneof jwks_config {

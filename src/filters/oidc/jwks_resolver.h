@@ -15,9 +15,6 @@
 namespace authservice {
 namespace filters {
 namespace oidc {
-namespace {
-constexpr uint32_t kJwksPeriodicFetchIntervalSec = 1200;
-}
 class JwksResolver {
  public:
   virtual ~JwksResolver() = default;
@@ -68,7 +65,7 @@ class DynamicJwksResolverImpl : public JwksResolver {
   class JwksFetcher {
    public:
     JwksFetcher(DynamicJwksResolverImpl* parent, common::http::ptr_t http_ptr,
-                const std::string& jwks_uri, std::chrono::seconds duration,
+                const config::oidc::OIDCConfig::JwksFetcherConfig& config,
                 boost::asio::io_context& ioc);
 
    private:
@@ -80,16 +77,13 @@ class DynamicJwksResolverImpl : public JwksResolver {
     boost::asio::io_context& ioc_;
     std::chrono::seconds periodic_fetch_interval_sec_;
     boost::asio::steady_timer timer_;
+    bool verify_peer_cert_ = false;
   };
 
-  explicit DynamicJwksResolverImpl(const std::string& jwks_uri,
-                                   std::chrono::seconds duration,
-                                   common::http::ptr_t http_ptr,
-                                   boost::asio::io_context& ioc) {
-    if (duration != std::chrono::seconds(0)) {
-      jwks_fetcher_ = std::make_unique<JwksFetcher>(this, http_ptr, jwks_uri,
-                                                    duration, ioc);
-    }
+  explicit DynamicJwksResolverImpl(
+      const config::oidc::OIDCConfig::JwksFetcherConfig& config,
+      common::http::ptr_t http_ptr, boost::asio::io_context& ioc) {
+    jwks_fetcher_ = std::make_unique<JwksFetcher>(this, http_ptr, config, ioc);
   }
 
   void updateJwks(const std::string& new_jwks) {
@@ -138,16 +132,9 @@ class JwksResolverCacheImpl final : public JwksResolverCache {
             std::make_shared<oidc::StaticJwksResolverImpl>(config_.jwks());
         break;
       case config::oidc::OIDCConfig::kJwksFetcher: {
-        uint32_t periodic_fetch_interval_sec =
-            config_.jwks_fetcher().periodic_fetch_interval_sec();
-        if (periodic_fetch_interval_sec == 0) {
-          periodic_fetch_interval_sec = kJwksPeriodicFetchIntervalSec;
-        }
-
         auto http_ptr = common::http::ptr_t(new common::http::HttpImpl);
         resolver_ = std::make_shared<oidc::DynamicJwksResolverImpl>(
-            config_.jwks_fetcher().jwks_uri(),
-            std::chrono::seconds(periodic_fetch_interval_sec), http_ptr, ioc);
+            config_.jwks_fetcher(), http_ptr, ioc);
         break;
       }
       default:
