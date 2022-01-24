@@ -53,6 +53,23 @@ bool IsFormDataSafeCharacter(const char character) {
   return IsUrlSafeCharacter(character) || (character == '+');
 }
 
+// We found that at least accounts.google.com[1] could contain `/` in the
+// authorization code, as part of OAuth callback URl query param.
+// such as `..../?code=4/Abc38.
+// RFC 6749[2] specifies "code" could be `VSCHAR`, containing all printable
+// ascii chars. RFC 3986[3] about URI specifies that:
+// If a reserved character is found in a URI component and
+//  no delimiting role is known for that character, then it must be
+//  interpreted as representing the data octet corresponding to that
+//  character's encoding in US-ASCII.
+// [1]
+// https://developers.google.com/identity/protocols/oauth2/openid-connect#sendauthrequest
+// [2] https://datatracker.ietf.org/doc/html/rfc6749#appendix-A.11.
+// [3] https://www.rfc-editor.org/rfc/rfc3986#page-12
+bool IsOIDCCodeSafeCharacter(const char character) {
+  return IsUrlSafeCharacter(character) || (character == '/');
+}
+
 std::string SafeEncode(absl::string_view in, SafeCharacterFunc IsSafe) {
   std::stringstream builder;
   for (auto character : in) {
@@ -142,18 +159,28 @@ absl::optional<std::multimap<std::string, std::string>> Http::DecodeQueryData(
   std::multimap<std::string, std::string> result;
   std::vector<std::string> parts;
   boost::split(parts, query, boost::is_any_of("&"));
+  spdlog::trace("{} decode query: {}", __func__, query);
   for (auto part : parts) {
     std::vector<std::string> pair;
     boost::split(pair, part, boost::is_any_of("="));
     if (pair.size() != 2) {
       return absl::nullopt;
     }
-    auto escaped_key = SafeDecode(pair[0], IsUrlSafeCharacter);
+    SafeCharacterFunc checker = IsUrlSafeCharacter;
+    auto escaped_key = SafeDecode(pair[0], checker);
     if (!escaped_key.has_value()) {
+      spdlog::error("{} decode query fail at the query pair {}, key part.",
+                    __func__, part);
       return absl::nullopt;
     }
-    auto escaped_value = SafeDecode(pair[1], IsUrlSafeCharacter);
+    // If the key is the "code", then we use a different checker function.
+    if (pair[0] == "code") {
+      checker = IsOIDCCodeSafeCharacter;
+    }
+    auto escaped_value = SafeDecode(pair[1], checker);
     if (!escaped_value.has_value()) {
+      spdlog::error("{} decode query fail at the query pair {}, value part.",
+                    __func__, part);
       return absl::nullopt;
     }
     result.insert(std::make_pair(*escaped_key, *escaped_value));

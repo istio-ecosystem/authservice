@@ -28,6 +28,13 @@ struct {
 struct {
   const char *raw;
   const std::multimap<absl::string_view, absl::string_view> encoded;
+} query_oidc_code_case = {
+    .raw = R"RAW(code=4/fod_AB8&state=abc%20123)RAW",
+    .encoded = {{"code", "4/fod_AB8"}, {"state", "abc 123"}}};
+
+struct {
+  const char *raw;
+  const std::multimap<absl::string_view, absl::string_view> encoded;
 } form_test_case = {.raw = R"RAW(abc=123&cde=456+7&987=%0D%0A)RAW",
                     .encoded = {
                         {"abc", "123"},
@@ -60,6 +67,24 @@ TEST(Http, EncodeQueryData) {
   ASSERT_TRUE(decoded.has_value());
   ASSERT_EQ(query_test_case.encoded.size(), decoded->size());
   for (auto val : query_test_case.encoded) {
+    auto iter = decoded->find(val.first.data());
+    ASSERT_TRUE(iter != decoded->end());
+    ASSERT_EQ(iter->second, val.second);
+  }
+}
+
+// Checks that the OIDC callback "?code=x/xxx", code parameter can contains
+// valid characters, such as "/".
+TEST(Http, DecodeQueryDataOIDCCode) {
+  auto decoded =
+      Http::DecodeQueryData(R"RAW(code=4/fod_AB8&state=abc%2F123)RAW");
+  // param "code" is not encoding "/", but the param "state" is handled as usual
+  // URL encoding.
+  std::multimap<absl::string_view, absl::string_view> encoded = {
+      {"code", "4/fod_AB8"}, {"state", "abc/123"}};
+  ASSERT_TRUE(decoded.has_value());
+  ASSERT_EQ(encoded.size(), decoded->size());
+  for (auto val : encoded) {
     auto iter = decoded->find(val.first.data());
     ASSERT_TRUE(iter != decoded->end());
     ASSERT_EQ(iter->second, val.second);
