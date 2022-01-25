@@ -66,6 +66,8 @@ bool IsFormDataSafeCharacter(const char character) {
 // https://developers.google.com/identity/protocols/oauth2/openid-connect#sendauthrequest
 // [2] https://datatracker.ietf.org/doc/html/rfc6749#appendix-A.11.
 // [3] https://www.rfc-editor.org/rfc/rfc3986#page-12
+// TODO(incfly): move to a separate library specific for OIDC instead of putting
+// in http lib.
 bool IsOIDCCodeSafeCharacter(const char character) {
   return IsUrlSafeCharacter(character) || (character == '/');
 }
