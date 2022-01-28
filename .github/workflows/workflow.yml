@@ -8,6 +8,10 @@ on:
     branches:
       - master
 
+env:
+  kind_version: v0.11.1
+  kind_config: .github/kind-config.yaml
+
 jobs:
   format:
     runs-on: ubuntu-latest
@@ -19,6 +23,7 @@ jobs:
         git clone https://github.com/Sarcasm/run-clang-format.git
     - name: Run clang-format
       run: find ./ -iname "*.h" -o -iname "*.cc" | xargs ./run-clang-format/run-clang-format.py --clang-format-executable=/opt/llvm/bin/clang-format
+
   gcc-test:
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +36,7 @@ jobs:
       run: |
        sudo chmod -R a+rxw /home
        make test
+
   clang-fips-test:
     runs-on: ubuntu-latest
     steps:
@@ -47,17 +53,31 @@ jobs:
       run: |
         sudo chmod -R a+rxw /home
         BAZEL_FLAGS="--config=clang --define=boringssl=fips" make test
+
   integration:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - name: Checkout kind config
+        uses: actions/checkout@v1
+        with:
+          persist-credentials: false
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          version: ${{ env.kind_version }}
+          config: ${{ env.kind_config }}
+
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get -y install python3-pip
+
+      - name: Deploy pods
+        run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
+
       - name: Run integration test
         run: |
-          pip3 install docker-compose
-          docker-compose -f docker-compose.e2e.yml up -d
           pip3 install --upgrade pip
           pip3 install setuptools
           pip3 install -r test/integration/requirements.txt
+          kubectl wait --for=condition=Ready pods --all --timeout=5m
           python3 test/integration/run.py

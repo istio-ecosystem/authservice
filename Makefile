@@ -4,7 +4,7 @@ SRCS=$(shell find . -name '*.cc')
 HDRS=$(shell find . -name '*.h')
 TARGET:=//src/main:auth_server
 BAZEL_FLAGS:=$(BAZEL_FLAGS)
-IMAGE?=authservice:$(USER)
+IMAGE?=${REPO_NAME}/authservice:$(IMAGE_TAG)
 
 all: build test docs
 

@@ -113,10 +113,13 @@ def check_envoy_connectivity():
 
 
 if __name__ == '__main__':
-  check_idp_connectivity()
-  check_envoy_connectivity()
+  # check_idp_connectivity()
+  # check_envoy_connectivity()
 
   setup_keycloak()
+
+  session = requests.Session()
+  session.mount("https://", HTTPAdapter(max_retries=Retry(total=10, status_forcelist=[503])))
 
   # 1, Check redicect after requested without valid cookie.
   res = requests.get(url='https://localhost:9000', verify=False, allow_redirects=False)

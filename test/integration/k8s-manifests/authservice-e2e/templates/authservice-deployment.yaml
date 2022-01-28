@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+    kompose.version: 1.26.1 (a9d05d509)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: authservice
+  name: authservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: authservice
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+        kompose.version: 1.26.1 (a9d05d509)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: authservice
+    spec:
+      containers:
+        - args:
+            - -filter_config
+            - /etc/authservice/config.json
+          image: ayamaruyama/authservice:latest
+          name: authservice
+          ports:
+            - containerPort: 10003
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 10004
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/authservice
+              name: authservice-config
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: authservice-config
+          configMap:
+            name: authservice-config
+status: {}

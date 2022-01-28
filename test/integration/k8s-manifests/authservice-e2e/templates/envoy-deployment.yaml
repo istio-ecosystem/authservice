@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+    kompose.version: 1.26.1 (a9d05d509)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: envoy
+  name: envoy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: envoy
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+        kompose.version: 1.26.1 (a9d05d509)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: envoy
+    spec:
+      containers:
+        - args:
+            - envoy
+            - -c
+            - /etc/envoy/config/envoy.json
+            - -l
+            - debug
+          image: envoyproxy/envoy:v1.20.1
+          name: envoy
+          ports:
+            - containerPort: 9000
+          resources: {}
+          volumeMounts:
+            - mountPath: /etc/envoy/config
+              name: envoy-config
+              readOnly: true
+            - mountPath: /etc/envoy/secret
+              name: envoy-secret
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: envoy-config
+        - name: envoy-secret        
+          secret:
+            secretName: envoy-secret
+status: {}
