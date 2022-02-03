@@ -7,6 +7,7 @@ authsvc_cc_library(
     srcs = [],
     hdrs = ["filter.h"],
     deps = [
+        "@boost//:asio",
         "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_google_googleapis//google/rpc:code_cc_proto",
@@ -29,7 +30,7 @@ authsvc_cc_library(
     hdrs = ["filter_factory.h"],
     deps = [
         ":pipe",
-    ]
+    ],
 )
 
 authsvc_cc_library(
@@ -46,13 +47,13 @@ authsvc_cc_library(
         "//src/config",
         "//src/filters:filter",
         "//src/filters:pipe",
-        "//src/filters/oidc:oidc_filter",
         "//src/filters/mock:mock_filter",
-        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
-        "//src/filters/oidc:redis_wrapper",
+        "//src/filters/oidc:oidc_filter",
         "//src/filters/oidc:redis_session_store",
+        "//src/filters/oidc:redis_wrapper",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_grpc",
     ],
 )

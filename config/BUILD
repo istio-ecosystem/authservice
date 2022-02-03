@@ -16,8 +16,8 @@ proto_library(
     name = "config_proto",
     srcs = ["config.proto"],
     deps = [
-        "//config/oidc:config_proto",
         "//config/mock:config_proto",
+        "//config/oidc:config_proto",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
     ],
 )

@@ -10,7 +10,7 @@ authsvc_cc_library(
     ],
     deps = [
         "//config:config_cc",
-        "//src/common/http:http",
+        "//src/common/http",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_gabime_spdlog//:spdlog",
         "@envoy//source/common/http:header_map_lib",

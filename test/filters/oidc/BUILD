@@ -1,19 +1,19 @@
-load("//bazel:bazel.bzl", "authsvc_cc_test", "authsvc_cc_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library", "authsvc_cc_test")
 
 authsvc_cc_library(
     name = "mocks",
     hdrs = ["mocks.h"],
+    visibility = ["//visibility:public"],
     deps = [
-        "//src/filters/oidc:token_response",
         "//src/filters/oidc:authorization_state",
-        "//src/filters/oidc:session_store",
-        "//src/filters/oidc:redis_wrapper",
         "//src/filters/oidc:jwks_resolver",
-        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+        "//src/filters/oidc:redis_wrapper",
+        "//src/filters/oidc:session_store",
+        "//src/filters/oidc:token_response",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
     ],
-    visibility = ["//visibility:public"],
 )
 
 authsvc_cc_test(
@@ -31,9 +31,9 @@ authsvc_cc_test(
     name = "in_memory_session_store_test",
     srcs = ["in_memory_session_store_test.cc"],
     deps = [
-        "//test/common/utilities:mocks",
         "//src/common/utilities:time_service",
         "//src/filters/oidc:in_memory_session_store",
+        "//test/common/utilities:mocks",
         "@com_google_googletest//:gtest_main",
     ],
 )
@@ -42,9 +42,9 @@ authsvc_cc_test(
     name = "redis_session_store_test",
     srcs = ["redis_session_store_test.cc"],
     deps = [
-        "//test/common/utilities:mocks",
         "//src/common/utilities:time_service",
         "//src/filters/oidc:redis_session_store",
+        "//test/common/utilities:mocks",
         "//test/filters/oidc:mocks",
         "//test/shared:shared_test_helpers",
         "@com_google_googletest//:gtest_main",
@@ -56,9 +56,9 @@ authsvc_cc_test(
     srcs = ["redis_retry_wrapper_test.cc"],
     deps = [
         "//src/filters/oidc:redis_retry_wrapper",
-        "@com_google_googletest//:gtest_main",
         "//test/filters/oidc:mocks",
         "//test/shared:shared_test_helpers",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -79,8 +79,8 @@ authsvc_cc_test(
     name = "jwks_resolver_test",
     srcs = ["jwks_resolver_test.cc"],
     deps = [
-        "//test/common/http:mocks",
         "//src/filters/oidc:jwks_resolver",
+        "//test/common/http:mocks",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -1,0 +1,58 @@
+# TODO(dio): This eventually needs to be merged with the main (Linux) workflow.
+
+name: "commit"
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "**/*.md"
+
+  # Allows triggering the workflow manually in github actions page.
+  workflow_dispatch:
+
+defaults:
+  run: # use bash for all operating systems unless overridden.
+    shell: bash
+
+jobs:
+  test:
+    name: test
+    outputs: # allows to refer it as ${{ needs.build.outputs.version }} in subsequent jobs.
+      version: ${{ steps.describe.outputs.version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90 # instead of 360 by default.
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are operating system specific
+      matrix:
+        os:
+          - "macos-11"
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+
+      - name: Setup Go
+        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
+        with:
+          go-version: 1.17.x
+
+      - name: Install macOS prerequisites
+        run: brew install cmake ninja coreutils
+        if: runner.os == 'macOS'
+
+      - name: Run all tests
+        run: make test
+
+      - name: Build current binary
+        run: make build
