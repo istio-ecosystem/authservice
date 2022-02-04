@@ -3,12 +3,10 @@
 # Include versions of tools we build or fetch on-demand.
 include Tools.mk
 
-.DEFAULT_GOAL:=all
-SRCS=$(shell find . -name '*.cc')
-HDRS=$(shell find . -name '*.h')
-TARGET:=//src/main:auth_server
-BAZEL_FLAGS:=$(BAZEL_FLAGS)
-IMAGE?=authservice:$(USER)
+.DEFAULT_GOAL := all
+TARGET        := //src/main:auth_server
+BAZEL_FLAGS   ?=
+IMAGE         ?= authservice:$(USER)
 
 # Root dir returns absolute path of current directory. It has a trailing "/".
 root_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -97,8 +95,8 @@ filter-test:
 coverage:
 	$(bazel) coverage $(BAZEL_FLAGS) --instrumentation_filter=//src/ //...
 
-format:
-	@go run $(buildifier@v) --lint=fix -r .
+format: $(clang-format)
+	@$(go) run $(buildifier@v) --lint=fix -r .
 	@$(clang-format) -i $(main_cc_sources) $(testable_cc_sources) $(protos)
 
 clean:
