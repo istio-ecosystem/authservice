@@ -1,0 +1,17 @@
+# Copyright Istio Authors
+# Licensed under the Apache License, Version 2.0 (the "License")
+
+build:clang --action_env='PATH=${PATH}'
+build:clang --action_env=CC=clang
+build:clang --action_env=CXX=clang++
+build:clang --action_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
+build:clang --repo_env='LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config'
+build:clang --linkopt='-L${LLVM_PREFIX}/lib'
+build:clang --linkopt='-Wl,-rpath,${LLVM_PREFIX}/lib'
+
+build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
+build:clang-asan --copt=-fsanitize=vptr,function
+build:clang-asan --linkopt=-fsanitize=vptr,function
+build:clang-asan --linkopt='-L${RT_LIBRARY_PATH}'
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone-x86_64.a
+build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx-x86_64.a

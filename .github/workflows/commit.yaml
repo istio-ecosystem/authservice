@@ -33,6 +33,7 @@ jobs:
       matrix:
         os:
           - "macos-11"
+          - "ubuntu-20.04"
     steps:
       - name: Cancel when duplicated
         uses: styfle/cancel-workflow-action@0.4.1
@@ -41,6 +42,12 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v2 # shallow checkout.
+
+      - name: Download cache for Tools
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/tools
+          key: ${{ runner.os }}-tools-${{ hashFiles('Tools.mk') }}
 
       - name: Setup Go
         uses: actions/setup-go@v2 # prepare Go. This is required for tools.
@@ -51,10 +58,23 @@ jobs:
         run: brew install cmake ninja coreutils
         if: runner.os == 'macOS'
 
+      - name: Install Ubuntu prerequisites
+        run: sudo apt-get update && sudo apt-get -y install make cmake ninja-build build-essential
+        if: runner.os == 'Linux'
+
+      - name: Check format
+        run: make check
+        if: runner.os == 'Linux'
+
       - name: Run all tests
-        run: |
+        run: make test
+
+      - name: Run all tests using clang
+        run : |
+          make clang.bazelrc
           make test
-          BAZEL_FLAGS="--config=clang --define=boringssl=fips" make test
+        env:
+          BAZEL_FLAGS: "--config=clang --define=boringssl=fips"
 
       - name: Build current binary
         run: make build
