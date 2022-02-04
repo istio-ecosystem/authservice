@@ -63,7 +63,6 @@ filter-test:
 coverage:
 	$(bazel) coverage $(BAZEL_FLAGS) --instrumentation_filter=//src/ //...
 
-buildifier@v := github.com/bazelbuild/buildtools/buildifier@4.2.5
 format:
 	@go run $(buildifier@v) --lint=fix -r .
 	clang-format -i $(SRCS) $(HDRS)
