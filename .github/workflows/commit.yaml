@@ -52,7 +52,9 @@ jobs:
         if: runner.os == 'macOS'
 
       - name: Run all tests
-        run: make test
+        run: |
+          make test
+          BAZEL_FLAGS="--config=clang --define=boringssl=fips" make test
 
       - name: Build current binary
         run: make build
