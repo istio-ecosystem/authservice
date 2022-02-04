@@ -1,5 +1,3 @@
-# TODO(dio): This eventually needs to be merged with the main (Linux) workflow.
-
 name: "commit"
 
 on:
@@ -69,7 +67,7 @@ jobs:
       - name: Run all tests
         run: make test
 
-      - name: Run all tests using clang
+      - name: Run all tests with FIPS mode
         run : |
           make clang.bazelrc
           make test

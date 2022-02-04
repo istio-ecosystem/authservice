@@ -36,26 +36,27 @@ See the [Makefile](Makefile) for common tasks.
 
 We run bazel through [bazelisk](https://github.com/bazelbuild/bazelisk) to make sure we use the correct version of [bazel](https://bazel.build/).
 Due to some limitation in current dependencies, we need to request `bazel` dist as "amd64" arch exclusively for both macOS and Linux: for that we require to run
-[bazelisk](https://github.com/bazelbuild/bazelisk) through `go run` with `GOARCH` environment variable set to `amd64`. Thus, we require [Go](https://go.dev/doc/install) for building this project.
+[bazelisk](https://github.com/bazelbuild/bazelisk) through `go run` with `GOARCH` environment variable set to `amd64`. Thus, we require [Go 1.17.x](https://go.dev/doc/install) for building this project.
 
 If you are developing on a Mac, [this setup guide](https://github.com/istio-ecosystem/authservice/wiki/Setting-up-CLion-on-MacOS-for-Authservice-development) may be helpful.
 
 To build authservice with Clang, first setup the `clang.bazelrc` and then build the authservice with `--config=clang` option with bazel.
 
-```
-./bazel/setup_clang.sh <path-to-clang>
+```console
+make clang.bazelrc
 bazel build //src/main:all  --config clang
 ```
 
 To Build with FIPS compliant version, add `--define boringssl=fips`.
 
-```
+```console
+make clang.bazelrc
 bazel build //src/main:all  --config clang --define boringssl=fips
 ```
 
 To build with a containeried environment, with customized bazel arguments.
 
-```
+```console
 export CONTAINER_REGISTRY=gcr.io/your-project
 docker build --build-arg bazel_flags="--config=clang" \
   -t ${CONTAINER_REGISTRY}/authservice:latest \
