@@ -6,7 +6,8 @@ authsvc_cc_test(
     data = ["//test/fixtures"],
     deps = [
         "//src/config",
+        "//test/shared:shared_test_helpers",
+        "@boost//:filesystem",
         "@com_google_googletest//:gtest_main",
-        "//test/shared:shared_test_helpers"
     ],
 )

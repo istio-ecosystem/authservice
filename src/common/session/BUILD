@@ -11,6 +11,6 @@ authsvc_cc_library(
         "session_string_generator.h",
     ],
     deps = [
-        "//src/common/utilities:random"
+        "//src/common/utilities:random",
     ],
 )

@@ -1,5 +1,4 @@
 load("//bazel:bazel.bzl", "authsvc_cc_library")
-load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -34,7 +33,7 @@ authsvc_cc_library(
     srcs = ["trigger_rules.cc"],
     hdrs = ["trigger_rules.h"],
     deps = [
-        "@com_github_abseil-cpp//absl/strings:strings",
         "//config:config_cc",
+        "@com_github_abseil-cpp//absl/strings:strings",
     ],
 )

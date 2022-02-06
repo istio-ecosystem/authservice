@@ -1,4 +1,4 @@
-load("//bazel:bazel.bzl", "authsvc_cc_test", "authsvc_cc_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library", "authsvc_cc_test")
 
 authsvc_cc_library(
     name = "mocks",

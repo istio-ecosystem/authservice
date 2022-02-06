@@ -1,11 +1,11 @@
-load("//bazel:bazel.bzl", "authsvc_cc_test", "authsvc_cc_library")
+load("//bazel:bazel.bzl", "authsvc_cc_library", "authsvc_cc_test")
 
 authsvc_cc_library(
     name = "mocks",
     hdrs = ["mocks.h"],
     visibility = ["//test:__subpackages__"],
     deps = [
-        "//src/common/session:session_string_generator"
+        "//src/common/session:session_string_generator",
     ],
 )
 
