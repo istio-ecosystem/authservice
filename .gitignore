@@ -10,3 +10,5 @@ user.bazelrc
 compile_commands.json
 
 .cache
+# The dist archive.
+/dist
