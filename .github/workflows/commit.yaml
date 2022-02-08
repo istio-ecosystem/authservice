@@ -53,7 +53,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90 # instead of 360 by default.
     strategy:
-      fail-fast: false # don't fail fast as sometimes failures are operating system specific
+      fail-fast: false # don't fail fast as sometimes failures are operating system specific.
       matrix:
         os:
           - "macos-11"
