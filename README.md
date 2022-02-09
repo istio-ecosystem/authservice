@@ -31,37 +31,12 @@ Refer to the [configuration options guide](docs/README.md) for all of the availa
 ## How does authservice work?
 We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to explain how authservice makes decisions at different points in the login lifecycle.
 
-## Developer Notes
-See the [Makefile](Makefile) for common tasks.
+## Contributing
 
-We run bazel through [bazelisk](https://github.com/bazelbuild/bazelisk) to make sure we use the correct version of [bazel](https://bazel.build/).
-Due to some limitation in current dependencies, we need to request `bazel` dist as "amd64" arch exclusively for both macOS and Linux: for that we require to run
-[bazelisk](https://github.com/bazelbuild/bazelisk) through `go run` with `GOARCH` environment variable set to `amd64`. Thus, we require [Go 1.17.x](https://go.dev/doc/install) for building this project.
+To get started:
 
-If you are developing on a Mac, [this setup guide](https://github.com/istio-ecosystem/authservice/wiki/Setting-up-CLion-on-MacOS-for-Authservice-development) may be helpful.
-
-To build authservice with Clang, first setup the `clang.bazelrc` and then build the authservice with `--config=clang` option with bazel.
-
-```console
-make clang.bazelrc
-bazel build //src/main:all  --config clang
-```
-
-To Build with FIPS compliant version, add `--define boringssl=fips`.
-
-```console
-make clang.bazelrc
-bazel build //src/main:all  --config clang --define boringssl=fips
-```
-
-To build with a containeried environment, with customized bazel arguments.
-
-```console
-export CONTAINER_REGISTRY=gcr.io/your-project
-docker build --build-arg bazel_flags="--config=clang" \
-  -t ${CONTAINER_REGISTRY}/authservice:latest \
-  -f ./build/Dockerfile.build .
-```
+- [Contributing guide](./CONTRIBUTING.md)
+- [Developer guide](./DEVELOPER.md)
 
 ## Roadmap
 See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)

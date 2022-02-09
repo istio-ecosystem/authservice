@@ -3,6 +3,8 @@
 Authservice (main binary name: `auth_server`) is built using Bazel build system. Every submitted
 commit is checked (by running tests and build jobs) by our CI on GitHub Actions.
 
+Currently, we only support macOS and Linux as development platform.
+
 We run [`bazel`](https://bazel.build/) through [`bazelisk`](https://github.com/bazelbuild/bazelisk)
 to make sure we use the correct version of `bazel`. Due to some limitation in current dependencies,
 we need to request `bazel` dist as "amd64" arch exclusively for both macOS and Linux: for that we
