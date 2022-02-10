@@ -118,10 +118,17 @@ jobs:
         run: make test
   
   integration:
+    name: integration
+    needs: check
     runs-on: ubuntu-20.04
     steps:
-      - name: Checkout kind config
-        uses: actions/checkout@v1
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
         with:
           persist-credentials: false
 
