@@ -94,7 +94,7 @@ jobs:
       - name: Deploy pods
         run: |
           helm template test/integration/k8s-manifests/authservice-e2e \
-            --set authservice.image=ayamaruyama/authservice:latest | kubectl apply -f -
+            --set authservice.image=ghcr.io/istio-ecosystem/authservice/authservice:0.4.1-66-gac335be-dirty | kubectl apply -f -
 
       - name: Setup Python
         uses: actions/setup-python@v2
