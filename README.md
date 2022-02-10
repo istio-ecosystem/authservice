@@ -11,7 +11,7 @@ Together, they allow developers to protect their APIs and web apps without any a
 Some of the features it provides:
 - Transparent login and logout
   - Retrieves OAuth2 Access tokens, ID tokens, and refresh tokens
-- Fine-grained control over which url paths are protected 
+- Fine-grained control over which url paths are protected
 - Session management
   - Configuration of session lifetime and idle timeouts
   - Refreshes expired tokens automatically
@@ -29,43 +29,23 @@ Please refer to the [bookinfo-example](./bookinfo-example) directory for an exam
 Refer to the [configuration options guide](docs/README.md) for all of the available configuration options.
 
 ## How does authservice work?
-We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to explain how authservice makes decisions at different points in the login lifecycle. 
+We have created a [flowchart](https://miro.com/app/board/o9J_kvus6b4=/) to explain how authservice makes decisions at different points in the login lifecycle.
 
-## Developer Notes
-See the [Makefile](Makefile) for common tasks.
+## Contributing
 
-If you are developing on a Mac, [this setup guide](https://github.com/istio-ecosystem/authservice/wiki/Setting-up-CLion-on-MacOS-for-Authservice-development) may be helpful.
+To get started:
 
-To build authservice with Clang, first setup the `clang.bazelrc` and then build the authservice with `--config=clang` option with bazel.
-
-```
-./bazel/setup_clang.sh <path-to-clang>
-bazel build //src/main:all  --config clang
-```
-
-To Build with FIPS compliant version, add `--define boringssl=fips`.
-
-```
-bazel build //src/main:all  --config clang --define boringssl=fips
-```
-
-To build with a containeried environment, with customized bazel arguments.
-
-```
-export CONTAINER_REGISTRY=gcr.io/your-project
-docker build --build-arg bazel_flags="--config=clang" \
-  -t ${CONTAINER_REGISTRY}/authservice:latest \
-  -f ./build/Dockerfile.build .
-```
+- [Contributing guide](./CONTRIBUTING.md)
+- [Developer guide](./DEVELOPER.md)
 
 ## Roadmap
 See the [authservice github Project](https://github.com/istio-ecosystem/authservice/projects/1)
 
 Additional features being considered:
- - A more Istio-integrated experience of deploying/configuring/enabling `authservice` 
- (e.g.: extending Istio Authentication Policy to include `authservice` configs).  
- 
+ - A more Istio-integrated experience of deploying/configuring/enabling `authservice`
+ (e.g.: extending Istio Authentication Policy to include `authservice` configs).
+
 ## Contributing & Contact
-We welcome feedback and contributions. Aside from submitting Github issues/PRs, you can reach out at `#oidc-proposal` 
-or `#security` channel on [Istio’s Slack](https://istio.slack.com/) workspace 
+We welcome feedback and contributions. Aside from submitting Github issues/PRs, you can reach out at `#oidc-proposal`
+or `#security` channel on [Istio’s Slack](https://istio.slack.com/) workspace
 ([here's how to join](https://istio.io/about/community/join/)).

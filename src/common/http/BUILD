@@ -1,5 +1,4 @@
 load("//bazel:bazel.bzl", "authsvc_cc_library")
-load("@envoy//bazel:repositories.bzl", "envoy_dependencies")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -11,7 +10,8 @@ authsvc_cc_library(
         "http.h",
     ],
     deps = [
-        "@boost//:all",
+        "@boost//:asio_ssl",
+        "@boost//:beast",
         "@boost//:coroutine",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",

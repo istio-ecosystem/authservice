@@ -9,3 +9,7 @@ clang.bazelrc
 user.bazelrc
 compile_commands.json
 
+# This holds the .cache of tools and bazel build output.
+.cache
+# This holds the current binary dist archive.
+/dist

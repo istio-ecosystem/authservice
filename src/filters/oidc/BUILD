@@ -31,19 +31,22 @@ authsvc_cc_library(
     hdrs = ["session_store_factory.h"],
     deps = [
         "//config:config_cc",
-    ]
+    ],
 )
 
 authsvc_cc_library(
     name = "in_memory_session_store",
     srcs = ["in_memory_session_store.cc"],
-    hdrs = ["in_memory_session_store.h", "session_store.h"],
+    hdrs = [
+        "in_memory_session_store.h",
+        "session_store.h",
+    ],
     deps = [
         ":session_store_factory",
-        "//src/filters/oidc:token_response",
-        "//src/filters/oidc:authorization_state",
-        "//src/common/utilities:time_service",
         "//src/common/utilities:synchronized",
+        "//src/common/utilities:time_service",
+        "//src/filters/oidc:authorization_state",
+        "//src/filters/oidc:token_response",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -56,8 +59,8 @@ authsvc_cc_library(
     srcs = [],
     hdrs = ["session_store.h"],
     deps = [
-        "//src/filters/oidc:token_response",
         "//src/filters/oidc:authorization_state",
+        "//src/filters/oidc:token_response",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
     ],
@@ -66,15 +69,18 @@ authsvc_cc_library(
 authsvc_cc_library(
     name = "redis_session_store",
     srcs = ["redis_session_store.cc"],
-    hdrs = ["redis_session_store.h", "session_store.h"],
+    hdrs = [
+        "redis_session_store.h",
+        "session_store.h",
+    ],
     deps = [
         ":session_store_factory",
+        "//src/common/utilities:synchronized",
+        "//src/common/utilities:time_service",
+        "//src/filters/oidc:authorization_state",
+        "//src/filters/oidc:redis_retry_wrapper",
         "//src/filters/oidc:session_store",
         "//src/filters/oidc:token_response",
-        "//src/filters/oidc:authorization_state",
-        "//src/common/utilities:time_service",
-        "//src/common/utilities:synchronized",
-        "//src/filters/oidc:redis_retry_wrapper",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
@@ -87,12 +93,12 @@ authsvc_cc_library(
     srcs = ["redis_wrapper.cc"],
     hdrs = ["redis_wrapper.h"],
     deps = [
-        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
+        "@boost//:asio",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
-        "@com_github_redis_hiredis//:hiredis", # needed for linking
-        "@boost//:all",
+        "@com_github_redis_hiredis//:hiredis",  # needed for linking
+        "@com_github_sewenew_redis_plus_plus//:redis_plus_plus",
     ],
 )
 
@@ -102,10 +108,10 @@ authsvc_cc_library(
     hdrs = ["redis_retry_wrapper.h"],
     deps = [
         "//src/filters/oidc:redis_wrapper",
+        "@boost//:asio",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
         "@com_github_gabime_spdlog//:spdlog",
-        "@boost//:all",
     ],
 )
 
@@ -116,7 +122,7 @@ authsvc_cc_library(
     deps = [
         "//config/oidc:config_cc",
         "//src/common/http",
-        "@boost//:all",
+        "@boost//:asio",
         "@com_github_abseil-cpp//absl/synchronization:synchronization",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
     ],
@@ -128,14 +134,14 @@ authsvc_cc_library(
     hdrs = ["jwt_verifier.h"],
     deps = [
         ":jwks_resolver",
+        "@com_github_abseil-cpp//absl/container:flat_hash_map",
         "@com_github_abseil-cpp//absl/status:status",
         "@com_github_abseil-cpp//absl/strings:strings",
         "@com_github_abseil-cpp//absl/types:optional",
-        "@com_github_abseil-cpp//absl/container:flat_hash_map",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_github_google_jwt_verify_lib//:jwt_verify_lib",
         "@com_google_protobuf//:protobuf",
-    ]
+    ],
 )
 
 authsvc_cc_library(
@@ -147,16 +153,16 @@ authsvc_cc_library(
         "//src/common/http",
         "//src/common/session:session_string_generator",
         "//src/common/utilities:random",
+        "//src/common/utilities:time_service",
         "//src/filters:filter",
         "//src/filters:filter_factory",
         "//src/filters/oidc:in_memory_session_store",
-        "//src/common/utilities:time_service",
-        "//src/filters/oidc:token_response",
         "//src/filters/oidc:jwks_resolver",
-        "@boost//:all",
-        "@com_github_abseil-cpp//absl/time:time",
+        "//src/filters/oidc:token_response",
+        "@boost//:asio",
         "@com_github_abseil-cpp//absl/status:status",
         "@com_github_abseil-cpp//absl/status:statusor",
+        "@com_github_abseil-cpp//absl/time:time",
         "@com_github_gabime_spdlog//:spdlog",
         "@com_google_googleapis//google/rpc:code_cc_proto",
     ],

@@ -1,0 +1,149 @@
+name: "commit"
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "**/*.md"
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "**/*.md"
+
+  # Allows triggering the workflow manually in github actions page.
+  workflow_dispatch:
+
+defaults:
+  run: # use bash for all operating systems unless overridden.
+    shell: bash
+
+env:
+  kind_version: v0.11.1
+  kind_config: .github/kind-config.yaml
+
+jobs:
+  check:
+    name: check
+    timeout-minutes: 90 # instead of 360 by default.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+
+      - name: Download cache for Tools
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/tools
+          key: ${{ runner.os }}-check-tools-${{ hashFiles('Tools.mk') }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
+        with:
+          go-version: 1.17.x
+
+      - name: Check format
+        run: make check
+
+  test:
+    needs: check
+    name: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90 # instead of 360 by default.
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are operating system specific.
+      matrix:
+        os:
+          - "macos-11"
+          - "ubuntu-20.04"
+        mode:
+          - "default"
+          - "clang"
+          - "clang-fips"
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+
+      - name: Download cache for Tools
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/tools
+          key: ${{ runner.os }}-${{ matrix.mode }}-tools-${{ hashFiles('Tools.mk') }}
+
+      - name: Download cache for Bazel
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/bazel
+          key: ${{ runner.os }}-${{ matrix.mode }}-bazel-${{ hashFiles('Tools.mk', '.bazelversion', 'bazel/repositories.bzl') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.mode }}-bazel-
+
+      - name: Setup Go
+        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
+        with:
+          go-version: 1.17.x
+
+      - name: Install macOS prerequisites
+        run: brew install cmake ninja coreutils # make is already installed.
+        if: runner.os == 'macOS'
+
+      - name: Install Ubuntu prerequisites
+        run: sudo apt-get update && sudo apt-get -y install cmake ninja-build # make is already installed.
+        if: runner.os == 'Linux'
+
+      # Prepare clang tooling and config when it is required.
+      - name: Setup clang
+        if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
+        # This downloads the required clang tooling when it is not downloaded yet.
+        run: |
+          make clang.bazelrc
+          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+
+      # Set BAZEL_FLAGS to FIPS mode only when it is required.
+      - name: Setup FIPS mode
+        if: matrix.mode == 'clang-fips'
+        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+
+      - name: Run all tests
+        run: make test
+
+  integration:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout kind config
+        uses: actions/checkout@v1
+        with:
+          persist-credentials: false
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          version: ${{ env.kind_version }}
+          config: ${{ env.kind_config }}
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y install python3-pip
+
+      - name: Deploy pods
+        run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
+
+      - name: Run integration test
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+        run: |
+          pip3 install --upgrade pip
+          pip3 install setuptools
+          pip3 install -r test/integration/requirements.txt
+          kubectl wait --for=condition=Ready pods --all --timeout=5m
+          python3 test/integration/run.py

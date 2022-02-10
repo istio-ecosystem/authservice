@@ -1,0 +1,107 @@
+name: "release" # please read on RELEASE.md on how to trigger this workflow.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+**"  # For example: v0.5.0 v0.5.1-rc2
+
+defaults:
+  run: # use bash for all operating systems unless overridden.
+    shell: bash
+
+jobs:
+  dist:
+    name: dist
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90 # instead of 360 by default.
+    strategy:
+      fail-fast: false # don't fail fast as sometimes failures are operating system specific.
+      matrix:
+        os:
+          - "macos-11"
+          - "ubuntu-20.04"
+        mode:
+          - "default"
+          - "clang"
+          - "clang-fips"
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+
+      - name: Download cache for Tools
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/tools
+          key: ${{ runner.os }}-${{ matrix.mode }}-tools-${{ hashFiles('Tools.mk') }}
+
+      - name: Download cache for Bazel
+        uses: actions/cache@v2
+        with:
+          path: ./.cache/bazel
+          key: ${{ runner.os }}-${{ matrix.mode }}-bazel-${{ hashFiles('Tools.mk', '.bazelversion', 'bazel/repositories.bzl') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.mode }}-bazel-
+
+      - name: Setup Go
+        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
+        with:
+          go-version: 1.17.x
+
+      - name: Install macOS prerequisites
+        run: brew install cmake ninja coreutils # make is already installed.
+        if: runner.os == 'macOS'
+
+      - name: Install Ubuntu prerequisites
+        run: sudo apt-get update && sudo apt-get -y install cmake ninja-build # make is already installed.
+        if: runner.os == 'Linux'
+
+      # Prepare clang tooling and config when it is required.
+      - name: Setup clang
+        if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
+        # This downloads the required clang tooling when it is not downloaded yet.
+        run: |
+          make clang.bazelrc
+          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+
+      # Set BAZEL_FLAGS to FIPS mode only when it is required.
+      - name: Setup FIPS mode
+        if: matrix.mode == 'clang-fips'
+        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+
+      - name: Create artifacts # We strip the "v"-prefix from the current tag.
+        run: VERSION=${GITHUB_REF#refs/tags/v} MODE=${{ matrix.mode }} make dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-${{ runner.os }}-${{ matrix.mode }}
+          path: dist
+
+  release:
+    name: release
+    runs-on: ubuntu-20.04
+    needs: dist
+    timeout-minutes: 90 # instead of 360 by default.
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Download artifacts # get all of the uploaded artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Release downloaded artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist-Linux-default/**/*.tar.gz
+            dist-Linux-clang/**/*.tar.gz
+            dist-Linux-clang-fips/**/*.tar.gz
+            dist-macOS-default/**/*.tar.gz
+            dist-macOS-clang/**/*.tar.gz
+            dist-macOS-clang-fips/**/*.tar.gz

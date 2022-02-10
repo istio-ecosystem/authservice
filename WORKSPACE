@@ -1,5 +1,3 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 load("//bazel:repositories.bzl", "oidcservice_dependencies")
 
 oidcservice_dependencies()
@@ -9,7 +7,8 @@ oidcservice_dependencies()
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
 
 go_rules_dependencies()
-go_register_toolchains(version = "1.15.6")
+
+go_register_toolchains(version = "1.17.6")
 
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies")
 
@@ -58,6 +57,12 @@ rules_foreign_cc_dependencies()
 # gRPC depends on the libssl. This binds ensures that all boringssl libraries options are consistent.
 # For example, fips boringssl is selected.
 bind(
-  name = "libssl",
-  actual = "@envoy//bazel:boringssl"
+    name = "libssl",
+    actual = "@envoy//bazel:boringssl",
 )
+
+# Load rules_boost dependencies.
+
+load("@com_github_nelhage_rules_boost//:boost/boost.bzl", "boost_deps")
+
+boost_deps()
