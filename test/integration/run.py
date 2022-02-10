@@ -111,10 +111,12 @@ def check_envoy_connectivity():
   res = session.get(url='https://localhost:9000', verify=False)
   assert(res.status_code >= 100)
 
+import ssl
 
 if __name__ == '__main__':
-  # check_idp_connectivity()
-  # check_envoy_connectivity()
+  print(ssl.OPENSSL_VERSION)
+  check_idp_connectivity()
+  check_envoy_connectivity()
 
   setup_keycloak()
 

@@ -28,7 +28,7 @@ spec:
         - args:
             - -filter_config
             - /etc/authservice/config.json
-          image: ayamaruyama/authservice:latest # TODO: FIXME
+          image: {{ .Values.authservice.image }}
           name: authservice
           ports:
             - containerPort: 10003

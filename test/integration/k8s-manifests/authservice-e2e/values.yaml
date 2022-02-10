@@ -1,0 +1,2 @@
+authservice:
+  image: ghcr.io/istio-ecosystem/authservice/authservice:0.5.0
