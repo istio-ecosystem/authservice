@@ -75,6 +75,9 @@ jobs:
         run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
 
       - name: Run integration test
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
         run: |
           pip3 install --upgrade pip
           pip3 install setuptools
