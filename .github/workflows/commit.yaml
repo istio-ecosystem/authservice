@@ -51,6 +51,44 @@ jobs:
       - name: Check format
         run: make check
 
+  integration:
+    name: check
+    timeout-minutes: 90 # instead of 360 by default.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+        with:
+          persist-credentials: false
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          version: ${{ env.kind_version }}
+          config: ${{ env.kind_config }}
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y install python3-pip
+
+      - name: Deploy pods
+        run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
+
+      - name: Run integration test
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+        run: |
+          pip3 install --upgrade pip
+          pip3 install setuptools
+          pip3 install -r test/integration/requirements.txt
+          kubectl wait --for=condition=Ready pods --all --timeout=5m
+          python3 test/integration/run.py
+
   test:
     needs: check
     name: test
@@ -116,41 +154,3 @@ jobs:
 
       - name: Run all tests
         run: make test
-  
-  # integration:
-  #   name: integration
-  #   needs: check
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #     - name: Cancel when duplicated
-  #       uses: styfle/cancel-workflow-action@0.4.1
-  #       with:
-  #         access_token: ${{ github.token }}
-
-  #     - name: Checkout
-  #       uses: actions/checkout@v2 # shallow checkout.
-  #       with:
-  #         persist-credentials: false
-
-  #     - name: Create kind cluster
-  #       uses: helm/kind-action@v1.2.0
-  #       with:
-  #         version: ${{ env.kind_version }}
-  #         config: ${{ env.kind_config }}
-
-  #     - name: Install dependencies
-  #       run: sudo apt-get update && sudo apt-get -y install python3-pip
-
-  #     - name: Deploy pods
-  #       run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
-
-  #     - name: Run integration test
-  #       uses: actions/setup-python@v2
-  #       with:
-  #         python-version: '3.8'
-  #       run: |
-  #         pip3 install --upgrade pip
-  #         pip3 install setuptools
-  #         pip3 install -r test/integration/requirements.txt
-  #         kubectl wait --for=condition=Ready pods --all --timeout=5m
-  #         python3 test/integration/run.py
