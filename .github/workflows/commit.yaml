@@ -52,7 +52,8 @@ jobs:
         run: make check
 
   integration:
-    name: check
+    name: integration
+    needs: check
     timeout-minutes: 90 # instead of 360 by default.
     runs-on: ubuntu-20.04
     steps:
@@ -72,16 +73,18 @@ jobs:
           version: ${{ env.kind_version }}
           config: ${{ env.kind_config }}
 
-      - name: Install dependencies
+      - name: Install Ubuntu prerequisites
         run: sudo apt-get update && sudo apt-get -y install python3-pip
 
       - name: Deploy pods
         run: helm template test/integration/k8s-manifests/authservice-e2e | kubectl apply -f -
 
-      - name: Run integration test
+      - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.8'
+      
+      - name: Run tests
         run: |
           pip3 install --upgrade pip
           pip3 install setuptools
