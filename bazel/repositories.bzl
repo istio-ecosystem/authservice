@@ -48,8 +48,8 @@ def com_google_abseil():
     )
 
 def boost():
-    # The commit after this requires us to update bazel since: "@platforms//cpu:aarch64 is not a valid
-    # select() condition for @boost//:apple_ctx_asm_sources" (introduced in:
+    # The commit after this requires us to update bazel since: "@platforms//cpu:aarch64 is not a
+    # valid select() condition for @boost//:apple_ctx_asm_sources" (introduced in:
     # https://github.com/nelhage/rules_boost/commit/5be5ea4be5e5de7675a9c10f6b376dee8f352e2b).
     _RULES_BOOST_COMMIT = "7523a494d35098dfd972399963b00b71064cbb11"
 

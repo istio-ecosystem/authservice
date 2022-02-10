@@ -1,55 +1,17 @@
-name: "commit"
+name: "release" # please read on RELEASE.md on how to trigger this workflow.
 
 on:
   push:
-    branches:
-      - master
-    paths-ignore:
-      - "**/*.md"
-  pull_request:
-    branches:
-      - master
-    paths-ignore:
-      - "**/*.md"
-
-  # Allows triggering the workflow manually in github actions page.
-  workflow_dispatch:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+**"  # For example: v0.5.0 v0.5.1-rc2
 
 defaults:
   run: # use bash for all operating systems unless overridden.
     shell: bash
 
 jobs:
-  check:
-    name: check
-    timeout-minutes: 90 # instead of 360 by default.
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Cancel when duplicated
-        uses: styfle/cancel-workflow-action@0.4.1
-        with:
-          access_token: ${{ github.token }}
-
-      - name: Checkout
-        uses: actions/checkout@v2 # shallow checkout.
-
-      - name: Download cache for Tools
-        uses: actions/cache@v2
-        with:
-          path: ./.cache/tools
-          key: ${{ runner.os }}-check-tools-${{ hashFiles('Tools.mk') }}
-
-      - name: Setup Go
-        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
-        with:
-          go-version: 1.17.x
-
-      - name: Check format
-        run: make check
-
-  test:
-    needs: check
-    name: test
+  dist:
+    name: dist
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90 # instead of 360 by default.
     strategy:
@@ -110,5 +72,36 @@ jobs:
         if: matrix.mode == 'clang-fips'
         run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
 
-      - name: Run all tests
-        run: make test
+      - name: Create artifacts # We strip the "v"-prefix from the current tag.
+        run: VERSION=${GITHUB_REF#refs/tags/v} MODE=${{ matrix.mode }} make dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist-${{ runner.os }}-${{ matrix.mode }}
+          path: dist
+
+  release:
+    name: release
+    runs-on: ubuntu-20.04
+    needs: dist
+    timeout-minutes: 90 # instead of 360 by default.
+    steps:
+      - name: Cancel when duplicated
+        uses: styfle/cancel-workflow-action@0.4.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Download artifacts # get all of the uploaded artifacts
+        uses: actions/download-artifact@v2
+
+      - name: Release downloaded artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist-Linux-default/**/*.tar.gz
+            dist-Linux-clang/**/*.tar.gz
+            dist-Linux-clang-fips/**/*.tar.gz
+            dist-macOS-default/**/*.tar.gz
+            dist-macOS-clang/**/*.tar.gz
+            dist-macOS-clang-fips/**/*.tar.gz
