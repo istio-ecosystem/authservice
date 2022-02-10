@@ -57,10 +57,10 @@ jobs:
     timeout-minutes: 90 # instead of 360 by default.
     runs-on: ubuntu-20.04
     steps:
-      - name: Cancel when duplicated
-        uses: styfle/cancel-workflow-action@0.4.1
-        with:
-          access_token: ${{ github.token }}
+      # - name: Cancel when duplicated
+      #   uses: styfle/cancel-workflow-action@0.4.1
+      #   with:
+      #     access_token: ${{ github.token }}
 
       - name: Checkout
         uses: actions/checkout@v2 # shallow checkout.
@@ -86,10 +86,12 @@ jobs:
       
       - name: Run tests
         run: |
+          openssl version
           pip3 install --upgrade pip
           pip3 install setuptools
           pip3 install -r test/integration/requirements.txt
           kubectl wait --for=condition=Ready pods --all --timeout=5m
+          curl https://localhost:8443/auth/realms/master
           python3 test/integration/run.py
 
   test:
