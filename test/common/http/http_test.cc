@@ -369,6 +369,34 @@ TEST(Http, ParsePathQueryFragment) {
   ASSERT_EQ("fragment/still_fragment?still_fragment", result9.Fragment());
 }
 
+TEST(Http, PostDebug) {
+  // Theory.
+  // Doc reading, confirming the theory:
+  // async_shutdown will not return util the ssl handshake is done.
+  // Seems correct.
+  //
+  // async_shutdown close_notify, then no longer need to wait, set a timeout.
+  // things to verify: set a timeout, would not cause issue for the async_read,
+  // which only returns when the read operation is completed according to the
+  // doc.
+
+  // Read: What does the yield and coroutine works.
+  // yield context wraps the stack; yields the control flow; later resume.
+  // https://stackoverflow.com/questions/30557582/what-does-boostasiospawn-do
+  // https://www.boost.org/doc/libs/1_58_0/libs/coroutine/doc/html/index.html
+
+  // when handshake is not completed? able to simulate?
+
+  // Simulate.
+  // Verify above. read is always complete when execute shutdown.
+  // Timeout on the shutdown should work.
+  // HttpImpl construction.
+  // HttpImpl::Post -> self signed server, returns a
+
+  // To Customers.
+  // Prepare images, hand over customer.
+}
+
 }  // namespace http
 }  // namespace common
 }  // namespace authservice
