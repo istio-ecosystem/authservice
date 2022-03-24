@@ -501,52 +501,26 @@ response_t HttpImpl::Post(
     // Read response
     beast::flat_buffer buffer;
     response_t res(new beast::http::response<beast::http::string_body>);
-
-    // TODO: figure out when `res` object returns complete.
-    // https://www.boost.org/doc/libs/1_52_0/doc/html/boost_asio/reference/async_read/overload2.html
-    // https://www.boost.org/doc/libs/1_52_0/doc/html/boost_asio/reference/async_read/overload2.html
-
-    // Log with this instrumentation.
-    // [2022-03-23 18:39:19.093] [console] [info] Post: adfs debug, returned
-    // from async_read, http response payload {
-    //   "access_token":
-    //   "ya29.A0ARrdaM8v78Rq02zDuFcvt5PCYhrdNY8kgjsIQFc501q0viN6QPmwMoCywf8SZTV8R7cQt6J0EKNJF36gGWkyObdWyx93tpaQzvzf-5WwZkgqJMgnnua9SKRl5lp4N8JG0FhkwfBVwNRlHdr1IfzVCh0WUyfI",
-    //   "expires_in": 3599,
-    //   "scope": "openid",
-    //   "token_type": "Bearer", "id_token":
-    //   "eyJhbGciOiJSUzI1NiIsImtpZCI6IjcyOTE4OTQ1MGQ0OTAyODU3MDQyNTI2NmYwM2U3MzdmNDVhZjI5MzIiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIxNTk1NzU3ODkwMzQtMjdsODFhZnFrOTI3ZWc3dXJ1cjJldG50ZzkxcnY4b24uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIxNTk1NzU3ODkwMzQtMjdsODFhZnFrOTI3ZWc3dXJ1cjJldG50ZzkxcnY4b24uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTA4MDkzOTM5MTA1OTMzOTQ3ODAiLCJhdF9oYXNoIjoiQmNkZDhqS0dGLWQzMTVuRWxZb0tFUSIsIm5vbmNlIjoia3NEVUN3ZnNpM2FJTkgtVlhpWEJ1UUNsTjA3MjR0YXlWQmVJMXJSVTdLRSIsImlhdCI6MTY0ODA2MDc1OSwiZXhwIjoxNjQ4MDY0MzU5fQ.fFQYoLQC4AyAGIpGtDlQJ3_1AsxWr6KEp3-uz8DA0Pte2NUwzDJjn6DyxC0Jd9UBT7EnW4Q3BhEfAOFxer9KPVY7sopKHBjiJ7BwngaJes06sklVOGSOXco2AJ0lA8gTkk_kie_u8gGReNUFMpmNhl-p7x-VtrgyTVoFj9rUZyegsq2IuLLtY31zyG70CxtlxkG9ntkemJYTbNZQynrVCFkeWWfcutKpnNmkvV2-AYcE_rndOfBl1PDZQmex7n2ElI6rtdDG9bCEzZOKx-djCA5GvlWui7mY44pTnSlwlNVN-_1hT5WtALSLAzX3EbpDT6qLb2Qz0zroHtODik6nmw"
-    //   }
-    // [2022-03-23 18:39:19.093] [console] [info] Post: adfs debug, returned
-    // from async_shutdown, ec stream truncated
     beast::http::async_read(stream, buffer, *res, yield);
 
-    spdlog::info(
-        "{}: adfs debug, returned from async_read, http response payload "
-        "{}",
-        __func__, res->body());
-
     // Gracefully close the socket.
-    // Receive an error code instead of throwing an exception if this fails,
-    // so we can ignore some expected not_connected errors.
-    boost::asio::steady_timer ssl_shutdown_timer(ioc);
-    auto ssl_shutdown_cb = [&](const boost::system::error_code error_code) {
-      spdlog::error("{}: adfs debug shutdown callback invoked, error {}",
-                    __func__, error_code.message());
-      // Already canceled, do nothing.
-      if (error_code == boost::asio::error::operation_aborted) {
-        return;
+    // Receive an error code instead of throwing an exception if this fails, so
+    // we can ignore some expected not_connected errors.
+    boost::system::error_code ec;
+    stream.async_shutdown(yield[ec]);
+
+    if (ec) {
+      // not_connected happens sometimes so don't bother reporting it.
+      // stream_truncated also happens sometime and we choose to ignore the
+      // stream_truncated error, as recommended by the github thread:
+      // https://github.com/boostorg/beast/issues/824
+      if (ec != beast::errc::not_connected &&
+          ec != boost::asio::ssl::error::stream_truncated) {
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
+        return response_t();
       }
-      ssl_shutdown_timer.cancel();
-      beast::get_lowest_layer(stream).cancel();
-      beast::get_lowest_layer(stream).close();
-    };
+    }
 
-    stream.async_shutdown(ssl_shutdown_cb);
-    ssl_shutdown_timer.expires_after(std::chrono::seconds(2));
-    ssl_shutdown_timer.async_wait(ssl_shutdown_cb);
-
-    spdlog::error("{}: adfs debug the response itself: {}", __func__,
-                  res->body());
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
@@ -656,28 +630,24 @@ response_t HttpImpl::Get(
     response_t res(new beast::http::response<beast::http::string_body>);
     beast::http::async_read(stream, buffer, *res, yield);
 
-    boost::asio::steady_timer ssl_shutdown_timer(ioc);
-    auto ssl_shutdown_cb = [&ssl_shutdown_timer, &stream](
-                               const boost::system::error_code error_code) {
-      spdlog::error("{}: adfs debug shutdown callback invoked, error {}",
-                    __func__, error_code.message());
-      // Already canceled, do nothing.
-      if (error_code == boost::asio::error::operation_aborted) {
-        return;
+    // Gracefully close the socket.
+    // Receive an error code instead of throwing an exception if this fails, so
+    // we can ignore some expected not_connected errors.
+    boost::system::error_code ec;
+    stream.async_shutdown(yield[ec]);
+
+    if (ec) {
+      // not_connected happens sometimes so don't bother reporting it.
+      // stream_truncated also happens sometime and we choose to ignore the
+      // stream_truncated error, as recommended by the github thread:
+      // https://github.com/boostorg/beast/issues/824
+      if (ec != beast::errc::not_connected &&
+          ec != boost::asio::ssl::error::stream_truncated) {
+        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
+        return response_t();
       }
-      ssl_shutdown_timer.cancel();
-      beast::get_lowest_layer(stream).cancel();
-      beast::get_lowest_layer(stream).close();
-    };
+    }
 
-    // seems like this can cause res returns invalid response.
-    stream.async_shutdown(ssl_shutdown_cb);
-    ssl_shutdown_timer.expires_after(std::chrono::seconds(2));
-    ssl_shutdown_timer.async_wait(ssl_shutdown_cb);
-    // ssl_shutdown_timer.async_wait(yield);
-
-    spdlog::error("{}: adfs debug the response itself: {}", __func__,
-                  res->body());
     return res;
     // If we get here then the connection is closed gracefully
   } catch (std::exception const &e) {
