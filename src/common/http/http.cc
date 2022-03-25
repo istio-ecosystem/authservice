@@ -503,23 +503,13 @@ response_t HttpImpl::Post(
     response_t res(new beast::http::response<beast::http::string_body>);
     beast::http::async_read(stream, buffer, *res, yield);
 
-    // Gracefully close the socket.
-    // Receive an error code instead of throwing an exception if this fails, so
-    // we can ignore some expected not_connected errors.
-    boost::system::error_code ec;
-    stream.async_shutdown(yield[ec]);
-
-    if (ec) {
-      // not_connected happens sometimes so don't bother reporting it.
-      // stream_truncated also happens sometime and we choose to ignore the
-      // stream_truncated error, as recommended by the github thread:
-      // https://github.com/boostorg/beast/issues/824
-      if (ec != beast::errc::not_connected &&
-          ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
-        return response_t();
-      }
-    }
+    spdlog::trace("{}: closing connection, response payload size {}", __func__,
+                  res->payload_size().value());
+    // Close the socket. We already got the response we need so close the socket
+    // directly. We choose not to use `ssl_stream::async_shutdown` since in some
+    // case, the HTTPS server does not participate with closing
+    // stream/connection. That would make the async_shutdown waiting forever.
+    beast::get_lowest_layer(stream).close();
 
     return res;
     // If we get here then the connection is closed gracefully
@@ -630,23 +620,13 @@ response_t HttpImpl::Get(
     response_t res(new beast::http::response<beast::http::string_body>);
     beast::http::async_read(stream, buffer, *res, yield);
 
-    // Gracefully close the socket.
-    // Receive an error code instead of throwing an exception if this fails, so
-    // we can ignore some expected not_connected errors.
-    boost::system::error_code ec;
-    stream.async_shutdown(yield[ec]);
-
-    if (ec) {
-      // not_connected happens sometimes so don't bother reporting it.
-      // stream_truncated also happens sometime and we choose to ignore the
-      // stream_truncated error, as recommended by the github thread:
-      // https://github.com/boostorg/beast/issues/824
-      if (ec != beast::errc::not_connected &&
-          ec != boost::asio::ssl::error::stream_truncated) {
-        spdlog::error("{}: HTTP error encountered: {}", __func__, ec.message());
-        return response_t();
-      }
-    }
+    spdlog::trace("{}: closing connection, response payload size {}", __func__,
+                  res->payload_size().value());
+    // Close the socket. We already got the response we need so close the socket
+    // directly. We choose not to use `ssl_stream::async_shutdown` since in some
+    // case, the HTTPS server does not participate with closing
+    // stream/connection. That would make the async_shutdown waiting forever.
+    beast::get_lowest_layer(stream).close();
 
     return res;
     // If we get here then the connection is closed gracefully
