@@ -1,37 +1,35 @@
 {
-    "listen_address": "0.0.0.0",
-    "listen_port": "10004",
-    "log_level": "trace",
-    "threads": 8,
-    "chains": [
-      {
-        "name": "idp_filter_chain",
-        "filters": [
+  "listen_address": "0.0.0.0",
+  "listen_port": "10004",
+  "log_level": "trace",
+  "threads": 8,
+  "chains": [
+    {
+      "name": "idp_filter_chain",
+      "filters": [
         {
-          "oidc":
-            {
-              "authorization_uri": "https://localhost:8443/auth/realms/master/protocol/openid-connect/auth",
-              "token_uri": "https://localhost:8443/auth/realms/master/protocol/openid-connect/token",
-              "client_id": "test-istio",
-              "client_secret": "01d4c175-e090-40ce-9182-a585cb19b0f5",
-              "callback_uri": "https://localhost:9000/oauth/callback",
-              "jwks_fetcher": {
-                "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
-                "periodic_fetch_interval_sec": 10
-              },
-              "scopes": [],
-              "id_token": {
-                "preamble": "Bearer",
-                "header": "Authorization"
-              },
-              "logout": {
-                "path": "/authservice_logout",
-                "redirect_uri": "https://google.com"
-              }
+          "oidc": {
+            "authorization_uri": "https://localhost:8443/auth/realms/master/protocol/openid-connect/auth",
+            "token_uri": "https://localhost:8443/auth/realms/master/protocol/openid-connect/token",
+            "client_id": "test-istio",
+            "client_secret": "01d4c175-e090-40ce-9182-a585cb19b0f5",
+            "callback_uri": "https://localhost:9000/oauth/callback",
+            "jwks_fetcher": {
+              "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+              "periodic_fetch_interval_sec": 10
+            },
+            "scopes": [],
+            "id_token": {
+              "preamble": "Bearer",
+              "header": "Authorization"
+            },
+            "logout": {
+              "path": "/authservice_logout",
+              "redirect_uri": "https://google.com"
             }
           }
-        ]
-      }
-    ]
-  }
-  
+        }
+      ]
+    }
+  ]
+}

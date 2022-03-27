@@ -29,3 +29,19 @@ To Build with FIPS compliant version, add `--define boringssl=fips`.
 make clang.bazelrc
 BAZEL_FLAGS="--config clang --define boringssl=fips" make build
 ```
+
+## Running using `docker-compose`
+
+Having an installed docker-compose binary in your local (with the Docker daemon running), you can
+bring up a quick setup of Envoy and Auth service on your local.
+
+```console
+make compose
+```
+
+To optionally build the image, within container (without building the `auth_server` binary "locally"),
+add the `--build` flag as the `COMPOSE_ARGS`.
+
+```console
+COMPOSE_ARGS=--build make compose
+```

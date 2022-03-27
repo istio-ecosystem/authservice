@@ -15,7 +15,7 @@ namespace authservice {
 namespace service {
 
 namespace {
-constexpr uint16_t kHealthCheckServerPort = 10004;
+constexpr uint16_t kHealthCheckServerPort = 9091;
 }
 
 ProcessingStateV2::ProcessingStateV2(

@@ -10,9 +10,9 @@ services:
       - ./run/envoy:/etc/envoy:ro
   auth:
     build:
-      dockerfile: build/Dockerfile.builder
+      dockerfile: build/Dockerfile.build
       context: ./
-    image: authservice:${USER}
+    image: ${IMAGE}
     command: ["-filter_config", "/etc/authservice/config.json"]
     ports:
       - "10004:10004"

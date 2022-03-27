@@ -5,8 +5,8 @@
 # cd /code
 # make
 #
-FROM ubuntu:xenial
-RUN apt-get update
-RUN apt-get install git build-essential wget -y
-COPY ./build/install-bazel.sh /tmp/install-bazel.sh
-RUN /tmp/install-bazel.sh
+FROM golang:1.17.8-buster
+
+RUN apt-get update && \
+  apt-get -y install curl make cmake ninja-build build-essential \
+    && rm -rf /var/lib/apt/lists/*

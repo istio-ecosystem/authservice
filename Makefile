@@ -110,6 +110,16 @@ image: $(stripped_binary) ## Build the docker image
 push: image ## Push docker image to registry
 	@docker push $(IMAGE)
 
+release: $(stripped_binary)
+
+# Add COMPOSE_ARGS=--build to for building the image. Also we can add:
+# --build-arg BAZEL_FLAG=--compilation_mode=opt
+COMPOSE_ARGS ?=
+export IMAGE
+compose: ## Run docker-compose. Set COMPOSE_ARGS=--build to (force) building the binary using container.
+	$(call compose-pre)
+	@docker-compose up $(COMPOSE_ARGS)
+
 $(current_binary):
 	bazel build $(BAZEL_FLAGS) //src/main:auth_server
 
@@ -193,6 +203,12 @@ endef
 # This makes sure the required directories are created.
 define bazel-dirs
 	@mkdir -p $(BAZELISK_HOME) $(bazel_cache_dir)
+endef
+
+define compose-pre
+	@docker-compose down
+	@openssl req -out run/envoy/tls.crt -new -keyout run/envoy/tls.pem -newkey rsa:2048 -batch -nodes -verbose -x509 -subj "/CN=localhost" -days 365
+	@chmod a+rw run/envoy/tls.crt run/envoy/tls.pem
 endef
 
 # Install clang from https://github.com/llvm/llvm-project. We don't support win32 yet as this script

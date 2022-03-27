@@ -1,35 +1,22 @@
+FROM golang:1.17.8-buster
 
-# The docker image for the actual build process.
-# Copy in only the necessary files for building.
-FROM ghcr.io/istio-ecosystem/authservice/authservice-build-env:2021-11-26 as auth-builder
+RUN apt-get update && \
+  apt-get -y install curl make cmake ninja-build build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY . /src/
 
 # Build auth binary.
-ARG bazel_flags=""
+ARG BAZEL_FLAGS=""
+ENV BAZEL_FLAGS=$BAZEL_FLAGS
 WORKDIR /src
-RUN bash ./bazel/setup_clang.sh /usr/lib/llvm-12/
-RUN BAZEL_FLAGS=$bazel_flags make bazel-bin/src/main/auth_server
+RUN make release
 
 # Create our final auth-server container image.
-FROM debian:buster
-RUN groupadd -r auth-server-grp && useradd -m -g auth-server-grp auth-server-usr
+FROM gcr.io/distroless/cc:nonroot
 
-# Install dependencies
-RUN apt update && apt upgrade -y && apt install -y --no-install-recommends \
-    ca-certificates  \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=auth-builder \
-     /src/bazel-bin/src/main/auth_server \
-     /src/bazel-bin/external/boost/libboost_chrono.so.1.70.0 \
-     /src/bazel-bin/external/boost/libboost_context.so.1.70.0 \
-     /src/bazel-bin/external/boost/libboost_coroutine.so.1.70.0 \
-     /src/bazel-bin/external/boost/libboost_thread.so.1.70.0 \
-     /app/
-
-ENV LD_LIBRARY_PATH=.
-RUN chgrp auth-server-grp /app/* && chown auth-server-usr /app/* && chmod u+x /app/*
-
-USER auth-server-usr
-WORKDIR /app
+COPY --from=0 /src/bazel-bin/src/main/auth_server.stripped /app/auth_server
+# We can't use nonroot:nonroot here since in K8s:
+# https://github.com/kubernetes/kubernetes/blob/98eff192802a87c613091223f774a6c789543e74/pkg/kubelet/kuberuntime/security_context_others.go#L49.
+USER 65532:65532
 ENTRYPOINT ["/app/auth_server"]
