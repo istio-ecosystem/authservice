@@ -1,4 +1,4 @@
-# To access the envoy proxy when using `docker-compose up`, point your browser at https://0.0.0.0:8443
+# To access the Envoy proxy when using `docker-compose up`, point your browser at https://0.0.0.0:9000
 version: '3.7'
 services:
   envoy:
@@ -12,7 +12,7 @@ services:
     build:
       dockerfile: build/Dockerfile.build
       context: ./
-    image: ${IMAGE}
+    image: ${IMAGE:-ghcr.io/istio-ecosystem/authservice:dev}
     command: ["-filter_config", "/etc/authservice/config.json"]
     ports:
       - "10004:10004"
