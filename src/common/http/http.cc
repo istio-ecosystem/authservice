@@ -509,6 +509,8 @@ response_t HttpImpl::Post(
     // directly. We choose not to use `ssl_stream::async_shutdown` since in some
     // case, the HTTPS server does not participate with closing
     // stream/connection. That would make the async_shutdown waiting forever.
+    // TODO(https://github.com/istio-ecosystem/authservice/issues/214): address
+    // this properly with a timer on `async_shutdown`.
     beast::get_lowest_layer(stream).close();
 
     return res;
