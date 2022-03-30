@@ -65,12 +65,12 @@ jobs:
         # This downloads the required clang tooling when it is not downloaded yet.
         run: |
           make clang.bazelrc
-          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+          echo "BAZEL_FLAGS=--config=libc++" >> $GITHUB_ENV
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
         if: matrix.mode == 'clang-fips'
-        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+        run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Create artifacts # We strip the "v"-prefix from the current tag.
         run: VERSION=${GITHUB_REF#refs/tags/v} MODE=${{ matrix.mode }} make dist
