@@ -102,10 +102,11 @@ docs: $(protodoc) ## Build docs
 	@$(protodoc) --directories=config=message --title="Configuration Options" --output="docs/README.md"
 	@grep -v '(validate.required)' docs/README.md > /tmp/README.md && mv /tmp/README.md docs/README.md
 
+PACKAGING ?= Dockerfile
 image: $(stripped_binary) ## Build the docker image
 	@mkdir -p build_release
 	@cp -f $(stripped_binary) build_release/$(binary_name)
-	@docker build . -t $(IMAGE)
+	@docker build . -t $(IMAGE) -f $(PACKAGING)
 
 push: image ## Push docker image to registry
 	@docker push $(IMAGE)
@@ -171,6 +172,10 @@ dep-graph.dot:
 # This renders configuration template to build main binary using clang as the compiler.
 clang.bazelrc: bazel/clang.bazelrc.tmpl $(llvm-config) $(envsubst)
 	@$(envsubst) < $< > $@
+
+# This builds the stripped binary, and checks if the binary is statically linked.
+requirestatic: $(stripped_binary)
+	@test/exe/require_static.sh $(stripped_binary)
 
 # Catch all rules for Go-based tools.
 $(go_tools_dir)/%:

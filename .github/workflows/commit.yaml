@@ -60,6 +60,7 @@ jobs:
           - "ubuntu-20.04"
         mode:
           - "default"
+          # On CI, by default, we use libc++.
           - "clang"
           - "clang-fips"
     steps:
@@ -103,12 +104,18 @@ jobs:
         # This downloads the required clang tooling when it is not downloaded yet.
         run: |
           make clang.bazelrc
-          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+          echo "BAZEL_FLAGS=--config=libc++" >> $GITHUB_ENV
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
         if: matrix.mode == 'clang-fips'
-        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+        run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Run all tests
         run: make test
+
+      # Make sure we have static binary on Linux
+      - name: Require static binary
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        run: |
+          make requirestatic
