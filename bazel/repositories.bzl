@@ -85,10 +85,10 @@ def com_github_sewenew_redis_plus_plus():
 def com_github_google_jwt_verify_lib():
     http_archive(
         name = "com_github_google_jwt_verify_lib",
-        sha256 = "7a5c35b7cbf633398503ae12cad8c2833e92b3a796eed68b6256d22d51ace5e1",
-        strip_prefix = "jwt_verify_lib-28efec2e4df1072db0ed03597591360ec9f80aac",
+        sha256 = "0d294dc8697049a0d7f2aaa81d08713fea581061c5359d6edb229b3e7c6cf58e",
+        strip_prefix = "jwt_verify_lib-e5d6cf7067495b0868787e1fd1e75cef3242a840",
         urls = [
-            "https://github.com/google/jwt_verify_lib/archive/28efec2e4df1072db0ed03597591360ec9f80aac.tar.gz",
+            "https://github.com/google/jwt_verify_lib/archive/e5d6cf7067495b0868787e1fd1e75cef3242a840.tar.gz",
         ],
     )
 
