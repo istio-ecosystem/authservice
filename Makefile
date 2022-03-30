@@ -102,10 +102,11 @@ docs: $(protodoc) ## Build docs
 	@$(protodoc) --directories=config=message --title="Configuration Options" --output="docs/README.md"
 	@grep -v '(validate.required)' docs/README.md > /tmp/README.md && mv /tmp/README.md docs/README.md
 
+PACKAGING ?= Dockerfile
 image: $(stripped_binary) ## Build the docker image
 	@mkdir -p build_release
 	@cp -f $(stripped_binary) build_release/$(binary_name)
-	@docker build . -t $(IMAGE)
+	@docker build . -t $(IMAGE) -f $(PACKAGING)
 
 push: image ## Push docker image to registry
 	@docker push $(IMAGE)
