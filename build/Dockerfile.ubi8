@@ -1,0 +1,26 @@
+FROM quay.io/polyglotsystems/golang-ubi:1.17
+
+RUN dnf update -y --disableplugin=subscription-manager \
+  && dnf install -y --disableplugin=subscription-manager curl unzip gnupg make git gcc gcc-c++ cmake cmake-data xz \
+  && dnf clean --disableplugin=subscription-manager all \
+  && rm -rf /var/cache/yum
+
+RUN wget https://github.com/ninja-build/ninja/releases/download/v1.10.2/ninja-linux.zip \
+  && unzip ninja-linux.zip -d /usr/local/bin \
+  && rm -f ninja-linux.zip
+
+COPY . /src/
+
+# Build auth binary.
+ENV BAZEL_FLAGS=$BAZEL_FLAGS
+WORKDIR /src
+RUN make release
+
+# Create our final auth-server container image.
+FROM registry.access.redhat.com/ubi8/ubi:8.4-213
+
+COPY --from=0 /src/bazel-bin/src/main/auth_server.stripped /app/auth_server
+# We can't use nonroot:nonroot here since in K8s:
+# https://github.com/kubernetes/kubernetes/blob/98eff192802a87c613091223f774a6c789543e74/pkg/kubelet/kuberuntime/security_context_others.go#L49.
+USER 65532:65532
+ENTRYPOINT ["/app/auth_server"]

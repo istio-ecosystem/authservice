@@ -9,6 +9,10 @@
 !src
 !test
 !Makefile
+!Tools.mk
 !WORKSPACE
-!BUILD
 !.bazelrc
+!.git
+!.bazelrc
+!.bazelversion
+!BUILD.bazel
