@@ -60,6 +60,7 @@ jobs:
           - "ubuntu-20.04"
         mode:
           - "default"
+          # On CI, by default, we use libc++.
           - "clang"
           - "clang-fips"
     steps:
@@ -112,3 +113,9 @@ jobs:
 
       - name: Run all tests
         run: make test
+
+      # Make sure we have static binary on Linux
+      - name: Require static binary
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        run: |
+          make requirestatic

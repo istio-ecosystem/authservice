@@ -172,6 +172,10 @@ dep-graph.dot:
 clang.bazelrc: bazel/clang.bazelrc.tmpl $(llvm-config) $(envsubst)
 	@$(envsubst) < $< > $@
 
+# This builds the stripped binary, and checks if the binary is statically linked.
+requirestatic: $(stripped_binary)
+	@test/exe/require_static.sh $(stripped_binary)
+
 # Catch all rules for Go-based tools.
 $(go_tools_dir)/%:
 	@printf "$(ansi_format_dark)" tools "installing $($(notdir $@)@v)..."
