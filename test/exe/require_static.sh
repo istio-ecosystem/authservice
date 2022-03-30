@@ -5,8 +5,6 @@ if [[ $(uname) == "Darwin" ]]; then
   exit 0
 fi
 
-echo "checking $1"
-
 # We can't rely on the exit code alone, since ldd fails for statically linked binaries.
 DYNLIBS=$(ldd "$1" 2>&1) || {
   if [[ ! "${DYNLIBS}" =~ 'not a dynamic executable' ]]; then
@@ -24,5 +22,3 @@ elif [[ "${DYNLIBS}" =~ libstdc\+\+ || "${DYNLIBS}" =~ libgcc ]]; then
   echo "${DYNLIBS}"
   exit 1
 fi
-
-echo "success"
