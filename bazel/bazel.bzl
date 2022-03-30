@@ -10,6 +10,7 @@ _DEFAULT_COPTS = ["-Wall", "-Wextra"]
 def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = [], visibility = None):
     cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs, visibility = visibility)
 
+# By default, we always do linkstatic: https://docs.bazel.build/versions/main/be/c-cpp.html#cc_binary.linkstatic.
 def authsvc_cc_binary(name, deps = [], srcs = [], copts = [], defines = []):
     cc_binary(name = name, deps = deps + envoy_stdlib_deps(), srcs = srcs, copts = _DEFAULT_COPTS + copts, defines = defines)
 
