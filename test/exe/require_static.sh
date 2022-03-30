@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Copied from https://github.com/envoyproxy/envoy/blob/a12869fa9e9add4301a700978d5489e6a0cc0526/test/exe/envoy_static_test.sh.
+
 if [[ $(uname) == "Darwin" ]]; then
   echo "macOS doesn't support statically linked binaries, skipping."
   exit 0
