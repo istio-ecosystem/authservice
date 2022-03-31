@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# This script checks if the given input binary file is static linked or not.
 # Copied from https://github.com/envoyproxy/envoy/blob/a12869fa9e9add4301a700978d5489e6a0cc0526/test/exe/envoy_static_test.sh.
 
 if [[ $(uname) == "Darwin" ]]; then
