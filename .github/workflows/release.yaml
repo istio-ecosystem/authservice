@@ -89,10 +89,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GH_REGISTRY_TOKEN_INCFLY }}
 
-      - name: Build and push image
+      # We build and push distroless and ubi8 flavors.
+      - name: Build and push images
         if: runner.os == 'Linux' && matrix.mode == 'clang'
         run: |
-          make image push
+          make push
+          make push-ubi8
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2

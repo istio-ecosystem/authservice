@@ -12,7 +12,6 @@ MODE ?= default
 BAZEL_FLAGS ?=
 REGISTRY    ?= ghcr.io/istio-ecosystem/authservice
 IMAGE       ?= $(REGISTRY)/authservice:$(VERSION)
-IMAGE_UBI8  ?= $(IMAGE)-ubi8
 
 # Root dir returns absolute path of current directory. It has a trailing "/".
 root_dir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -109,13 +108,17 @@ image: $(stripped_binary) ## Build the docker image
 	@cp -f $(stripped_binary) build_release/$(binary_name)
 	@docker build . -t $(IMAGE) -f $(PACKAGING)
 
+# TODO(dio): Cache bazel inside the container.
+image-ubi8:
+	@docker build . -t $(IMAGE)-$(subst image-,,$@) -f build/Dockerfile.ubi8
+
 push: image ## Push docker image to registry
 	@docker push $(IMAGE)
 
-release: $(stripped_binary)
+push-%: image-%
+	@docker push $(IMAGE)-$(subst push-,,$@)
 
-image-ubi8:
-	@docker build . -t $(IMAGE_UBI8) -f build/Dockerfile.ubi8
+release: $(stripped_binary)
 
 $(current_binary):
 	bazel build $(BAZEL_FLAGS) //src/main:auth_server
