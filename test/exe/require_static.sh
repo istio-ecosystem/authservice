@@ -26,4 +26,4 @@ elif [[ "${DYNLIBS}" =~ libstdc\+\+ || "${DYNLIBS}" =~ libgcc ]]; then
   exit 1
 fi
 
-objdump -T "$1" | grep GLIBC
+go run test/exe/require_glibc.go $1
