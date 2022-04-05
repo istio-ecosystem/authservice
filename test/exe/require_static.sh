@@ -25,3 +25,5 @@ elif [[ "${DYNLIBS}" =~ libstdc\+\+ || "${DYNLIBS}" =~ libgcc ]]; then
   echo "${DYNLIBS}"
   exit 1
 fi
+
+objdump -T "$1" | grep GLIBC
