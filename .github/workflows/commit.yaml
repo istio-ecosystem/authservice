@@ -57,7 +57,7 @@ jobs:
       matrix:
         os:
           - "macos-11"
-          - "ubuntu-20.04"
+          - "ubuntu-18.04"
         mode:
           - "default"
           # On CI, by default, we use libc++.

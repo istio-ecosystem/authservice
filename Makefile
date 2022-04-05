@@ -203,7 +203,7 @@ endef
 
 # Install clang from https://github.com/llvm/llvm-project. We don't support win32 yet as this script
 # will fail.
-clang-os                          = $(if $(findstring $(goos),darwin),apple-darwin,linux-gnu-ubuntu-20.04)
+clang-os                          = $(if $(findstring $(goos),darwin),apple-darwin,linux-gnu-ubuntu-16.04)
 clang-download-archive-url-prefix = https://$(subst llvmorg/clang+llvm@,releases/download/llvmorg-,$($(notdir $1)@v))
 $(clang):
 	@mkdir -p $(dir $@)
