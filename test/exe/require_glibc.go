@@ -12,7 +12,8 @@ import (
 )
 
 func main() {
-	currentGlibcVersion, _ := version.NewVersion("2.27")
+	required, _ := version.NewVersion("2.27")
+
 	args := os.Args[1:]
 	cmd := exec.Command("objdump", "-T", args[0])
 	var out bytes.Buffer
@@ -29,7 +30,7 @@ func main() {
 			line.Split(bufio.ScanWords)
 			for line.Scan() {
 				v, _ := version.NewVersion(line.Text())
-				if currentGlibcVersion.LessThan(v) {
+				if required.LessThan(v) {
 					log.Fatal("linked to a newer GLIBC: ", line.Text())
 				}
 				break
