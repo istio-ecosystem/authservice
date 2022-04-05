@@ -13,7 +13,6 @@ import (
 
 func main() {
 	required, _ := version.NewVersion("2.27")
-
 	args := os.Args[1:]
 	cmd := exec.Command("objdump", "-T", args[0])
 	var out bytes.Buffer
