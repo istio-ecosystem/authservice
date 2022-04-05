@@ -102,7 +102,7 @@ jobs:
 
   release:
     name: release
-    runs-on: 	ubuntu-18.04
+    runs-on: ubuntu-18.04
     needs: dist
     timeout-minutes: 90 # instead of 360 by default.
     steps:
