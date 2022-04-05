@@ -117,6 +117,7 @@ $(current_binary):
 ifeq ($(goos),linux)
 # Some -copt="-Wno-error=" is needed to suppress the error for gcc when compiling abseil and protobuf.
 gcc_w_no_error := --copt="-Wno-error=uninitialized" --copt="-Wno-error=deprecated-declarations" --copt="-Wno-error=maybe-uninitialized"
+clang_cxx      := --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=1" --cxxopt="-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 endif
 
 # Stripped binary is compiled using "--compilation_mode opt". "opt" means build with optimization
@@ -128,7 +129,7 @@ $(stripped_binary): $(main_cc_sources) $(bazel_files)
 ifeq (,$(wildcard clang.bazelrc)) # if no clang.bazelrc exists, we compile using default compiler.
 	$(call bazel-build,$(gcc_w_no_error) --compilation_mode opt,.stripped)
 else
-	$(call bazel-build,--compilation_mode opt,.stripped)
+	$(call bazel-build,$(clang_cxx) --compilation_mode opt,.stripped)
 endif
 
 run: ## Build the main target

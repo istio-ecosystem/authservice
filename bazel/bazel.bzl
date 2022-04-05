@@ -7,12 +7,18 @@ load("@envoy//bazel:envoy_internal.bzl", "envoy_stdlib_deps")
 
 _DEFAULT_COPTS = ["-Wall", "-Wextra"]
 
+def linkopts():
+    return select({
+        "@envoy//bazel:linux": ["-pie"],
+        "//conditions:default": [],
+    })
+
 def authsvc_cc_library(name, deps = [], srcs = [], hdrs = [], copts = [], defines = [], includes = [], textual_hdrs = [], visibility = None):
-    cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs, visibility = visibility)
+    cc_library(name = name, deps = deps, srcs = srcs, hdrs = hdrs, copts = _DEFAULT_COPTS + copts, defines = defines, includes = includes, textual_hdrs = textual_hdrs, visibility = visibility, linkopts = linkopts(), linkstatic = True)
 
 # By default, we always do linkstatic: https://docs.bazel.build/versions/main/be/c-cpp.html#cc_binary.linkstatic.
 def authsvc_cc_binary(name, deps = [], srcs = [], copts = [], defines = []):
-    cc_binary(name = name, deps = deps + envoy_stdlib_deps(), srcs = srcs, copts = _DEFAULT_COPTS + copts, defines = defines)
+    cc_binary(name = name, deps = deps + envoy_stdlib_deps(), srcs = srcs, copts = _DEFAULT_COPTS + copts, defines = defines, linkopts = linkopts())
 
 def authsvc_cc_test(name, deps = [], srcs = [], data = []):
     cc_test(

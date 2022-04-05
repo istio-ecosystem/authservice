@@ -1,3 +1,9 @@
+# Increasing reproducibility. Reference: https://bazel.build/reference/command-line-reference#flag--incompatible_strict_action_env.
+build --incompatible_strict_action_env
+
+# To pick up, e.g. build:linux. Reference: https://bazel.build/reference/command-line-reference#flag--enable_platform_specific_config.
+build --enable_platform_specific_config
+
 #
 # The grpc library currently does not compile on a Mac, which makes it hard to run unit tests during development.
 #
@@ -8,6 +14,29 @@
 #
 build --copt -DGRPC_BAZEL_BUILD
 build --cxxopt=-std=c++17
+
+# Enable position independent code (this is the default on macOS and Windows)
+# (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
+build:linux --copt=-fPIC
+build:linux --copt=-Wno-deprecated-declarations
+build:linux --cxxopt=-std=c++17
+build:linux --conlyopt=-fexceptions
+build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
+build:linux --action_env=BAZEL_LINKOPTS=-lm
+
+# We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
+build --define absl=1
+
+# Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
+build --action_env=CC
+build --action_env=CXX
+build --action_env=LLVM_CONFIG
+build --action_env=PATH
+
+# Common flags for Clang
+build:clang --action_env=BAZEL_COMPILER=clang
+build:clang --action_env=CC=clang --action_env=CXX=clang++
+build:clang --linkopt=-fuse-ld=lld
 
 # Clang with libc++
 build:libc++ --config=clang
