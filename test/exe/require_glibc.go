@@ -48,8 +48,8 @@ func main() {
 		entry := scanner.Text()
 		if strings.Contains(entry, glibCPrefix) {
 			line := bufio.NewScanner(strings.NewReader(entry[strings.Index(entry, glibCPrefix)+glibCPrefixLength:]))
+			// Here we have "line" value something like: "2.2.5 __libc_start_main" or "2.3   __ctype_b_loc".
 			line.Split(bufio.ScanWords)
-			// Here we have something like: "2.2.5 __libc_start_main" or "GLIBC_2.3   __ctype_b_loc".
 			for line.Scan() {
 				v, err := version.NewVersion(line.Text())
 				if err != nil {
