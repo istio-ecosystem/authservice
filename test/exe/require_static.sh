@@ -25,3 +25,6 @@ elif [[ "${DYNLIBS}" =~ libstdc\+\+ || "${DYNLIBS}" =~ libgcc ]]; then
   echo "${DYNLIBS}"
   exit 1
 fi
+
+# Check for GLIBC dynamic symbols in the binary, see if it matches the version we expect.
+go run test/exe/require_glibc.go $1

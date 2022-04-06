@@ -23,7 +23,7 @@ jobs:
   check:
     name: check
     timeout-minutes: 90 # instead of 360 by default.
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-18.04
     steps:
       - name: Cancel when duplicated
         uses: styfle/cancel-workflow-action@0.4.1
@@ -57,7 +57,7 @@ jobs:
       matrix:
         os:
           - "macos-11"
-          - "ubuntu-20.04"
+          - "ubuntu-18.04"
         mode:
           - "default"
           # On CI, by default, we use libc++.
@@ -119,3 +119,10 @@ jobs:
         if: runner.os == 'Linux' && matrix.mode == 'clang'
         run: |
           make requirestatic
+
+      # Upload the binary as an artifact.
+      - uses: actions/upload-artifact@v3
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        with:
+          name: auth_server
+          path: bazel-bin/src/main/auth_server.stripped

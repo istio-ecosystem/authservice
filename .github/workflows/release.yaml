@@ -19,7 +19,7 @@ jobs:
       matrix:
         os:
           - "macos-11"
-          - "ubuntu-20.04"
+          - "ubuntu-18.04"
         mode:
           - "default"
           # By default we use libc++.
@@ -102,7 +102,7 @@ jobs:
 
   release:
     name: release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-18.04
     needs: dist
     timeout-minutes: 90 # instead of 360 by default.
     steps:
