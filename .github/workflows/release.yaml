@@ -3,7 +3,7 @@ name: "release" # please read on RELEASE.md on how to trigger this workflow.
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+**"  # For example: v0.5.0 v0.5.1-rc2
+      - "[0-9]+.[0-9]+.[0-9]+**"  # For example: 0.5.0, 0.5.1-rc2.
 
 defaults:
   run: # use bash for all operating systems unless overridden.
@@ -73,8 +73,9 @@ jobs:
         if: matrix.mode == 'clang-fips'
         run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
-      - name: Create artifacts # We strip the "v"-prefix from the current tag.
-        run: VERSION=${GITHUB_REF#refs/tags/v} MODE=${{ matrix.mode }} make dist
+      - name: Create artifacts
+        # GITHUB_REF: refs/tags/0.5.1-rc1, resulted VERSION: "0.5.1".
+        run: VERSION=${GITHUB_REF#refs/tags/} MODE=${{ matrix.mode }} make dist
 
       - name: Require static binary
         if: runner.os == 'Linux' && matrix.mode == 'clang'
