@@ -64,9 +64,11 @@ jobs:
       - name: Setup clang
         if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
         # This downloads the required clang tooling when it is not downloaded yet.
+        # GITHUB_REF: refs/tags/0.5.1-rc1, resulted VERSION: "0.5.1".
         run: |
           make clang.bazelrc
           echo "BAZEL_FLAGS=--config=libc++" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
@@ -74,8 +76,7 @@ jobs:
         run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Create artifacts
-        # GITHUB_REF: refs/tags/0.5.1-rc1, resulted VERSION: "0.5.1".
-        run: VERSION=${GITHUB_REF#refs/tags/} MODE=${{ matrix.mode }} make dist
+        run: MODE=${{ matrix.mode }} make dist
 
       - name: Require static binary
         if: runner.os == 'Linux' && matrix.mode == 'clang'
