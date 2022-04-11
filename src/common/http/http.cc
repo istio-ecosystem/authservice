@@ -424,7 +424,13 @@ response_t HttpImpl::Post(
           boost::asio::buffer(options.ca_cert_.data(), options.ca_cert_.size()),
           ca_ec);
       if (ca_ec) {
-        throw boost::system::system_error{ca_ec};
+        auto err = ERR_get_error();
+        // We can ignore this error. Reference:
+        // https://github.com/facebook/folly/blob/d3354e2282303402e70d829d19bfecce051a5850/folly/ssl/OpenSSLCertUtils.cpp#L367-L368.
+        if (ERR_GET_LIB(err) != ERR_LIB_X509 ||
+            ERR_GET_REASON(err) != X509_R_CERT_ALREADY_IN_HASH_TABLE) {
+          throw boost::system::system_error{ca_ec};
+        }
       }
     }
 
