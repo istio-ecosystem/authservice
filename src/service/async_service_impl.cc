@@ -18,6 +18,33 @@ namespace {
 constexpr uint16_t kHealthCheckServerPort = 10004;
 }
 
+::grpc::Status convertGrpcStatus(const google::rpc::Code status)  {
+  // See src/filters/filter.h:filter::Process for a description of how
+  // status codes should be handled
+  switch (status) {
+    case google::rpc::Code::OK:                 // The request was successful
+    case google::rpc::Code::UNAUTHENTICATED:    // A filter indicated the
+                                                // request had no
+                                                // authentication but was
+                                                // processed correctly.
+    case google::rpc::Code::PERMISSION_DENIED:  // A filter indicated
+      // insufficient permissions
+      // for the authenticated
+      // requester but was processed
+      // correctly.
+      return ::grpc::Status::OK;
+    case google::rpc::Code::INVALID_ARGUMENT:  // The request was not well
+      // formed. Indicate a
+      // processing error to the
+      // caller.
+      return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
+                            "invalid request");
+    default:  // All other errors are treated as internal processing
+              // failures.
+      return ::grpc::Status(::grpc::StatusCode::INTERNAL, "internal error");
+  }
+}
+
 ProcessingStateV2::ProcessingStateV2(
     ProcessingStateFactory &parent,
     envoy::service::auth::v2::Authorization::AsyncService &service)
