@@ -18,7 +18,7 @@ namespace {
 constexpr uint16_t kHealthCheckServerPort = 10004;
 }
 
-::grpc::Status convertGrpcStatus(const google::rpc::Code status)  {
+::grpc::Status convertGrpcStatus(const google::rpc::Code status) {
   // See src/filters/filter.h:filter::Process for a description of how
   // status codes should be handled
   switch (status) {
