@@ -26,7 +26,7 @@ data:
           "name": "idp_filter_chain",
           "match": {
             "header": ":authority",
-            "prefix": "test.example.com",
+            "prefix": "localhost",
           },
           "filters": [
           {
