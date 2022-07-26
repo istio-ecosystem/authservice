@@ -20,9 +20,14 @@ data:
       "listen_port": "10003",
       "log_level": "trace",
       "threads": 8,
+      "allow_unmatched_requests": "false",
       "chains": [
         {
           "name": "idp_filter_chain",
+          "match": {
+            "header": ":authority",
+            "prefix": "test.example.com",
+          },
           "filters": [
           {
             "oidc":

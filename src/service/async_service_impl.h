@@ -12,6 +12,7 @@
 #include "common/config/version_converter.h"
 #include "config/config.pb.h"
 #include "envoy/common/exception.h"
+// #include "envoy/grpc/status.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/common/http/http.h"
@@ -66,6 +67,9 @@ template <class RequestType, class ResponseType>
             ? grpc::Status::OK
             : grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
                            "permission denied");
+    spdlog::debug("jianfeih debug allow unmatched or not: {}, foo {}, msg {}",
+                  allow_unmatched_requests, default_response_code.ok(),
+                  default_response_code.error_message());
 
     // Find a configured processing chain.
     for (auto &chain : chains) {
@@ -128,12 +132,22 @@ template <class RequestType, class ResponseType>
 
     // No matching filter chain found. Allow request to continue.
     spdlog::debug(
-        "{}: no matching filter chain for request to {}://{}{}, respond with: "
+        "{}: jianfeih here1, no matching filter chain for request to "
+        "{}://{}{}, respond with: "
         "{}",
         __func__, request.attributes().request().http().scheme(),
         request.attributes().request().http().host(),
         request.attributes().request().http().path(),
         default_response_code.error_code());
+    // TODO: not just here all the response code needs to be modified.
+    if constexpr (std::is_same_v<ResponseType,
+                                 ::envoy::service::auth::v3::CheckResponse>) {
+      spdlog::debug("jianfeih debug setting status happening.");
+      envoy::service::auth::v3::CheckResponse response_v3;
+      response_v3.mutable_status()->set_code(7);
+      // Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+      // response = response_v3;
+    }
     return default_response_code;
   } catch (const std::exception &exception) {
     spdlog::error("%s unexpected error: %s", __func__, exception.what());
