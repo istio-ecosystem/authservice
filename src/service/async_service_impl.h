@@ -12,7 +12,6 @@
 #include "common/config/version_converter.h"
 #include "config/config.pb.h"
 #include "envoy/common/exception.h"
-// #include "envoy/grpc/status.h"
 #include "envoy/service/auth/v2/external_auth.grpc.pb.h"
 #include "envoy/service/auth/v3/external_auth.grpc.pb.h"
 #include "src/common/http/http.h"
