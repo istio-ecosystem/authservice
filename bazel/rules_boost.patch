@@ -1,0 +1,14 @@
+# To make sure we use the provided @envoy//bazel:boringssl.
+diff --git a/BUILD.boost b/BUILD.boost
+index 4354973..1c11525 100644
+--- a/BUILD.boost
++++ b/BUILD.boost
+@@ -481,7 +481,7 @@ cc_library(
+     visibility = ["//visibility:public"],
+     deps = [
+         ":asio",
+-        "@openssl//:ssl",
++        "@envoy//bazel:boringssl",
+     ],
+ )
+

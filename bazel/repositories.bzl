@@ -60,6 +60,8 @@ def boost():
         urls = [
             "https://github.com/nelhage/rules_boost/archive/%s.tar.gz" % _RULES_BOOST_COMMIT,
         ],
+        patches = ["//bazel:rules_boost.patch"],
+        patch_args = ["-p1"],
     )
 
 def com_github_redis_hiredis():
