@@ -22,6 +22,8 @@
 namespace authservice {
 namespace service {
 
+::grpc::Status convertGrpcStatus(const google::rpc::Code status);
+
 template <class RequestType, class ResponseType>
 ::grpc::Status Check(
     const RequestType &request, ResponseType &response,
@@ -59,14 +61,6 @@ template <class RequestType, class ResponseType>
       return ::grpc::Status::OK;
     }
 
-    // TODO(incfly): Clean up trigger rule after checking the current Istio
-    // ExtAuthz API is sufficient.
-    const auto default_response_code =
-        allow_unmatched_requests
-            ? grpc::Status::OK
-            : grpc::Status(grpc::StatusCode::PERMISSION_DENIED,
-                           "permission denied");
-
     // Find a configured processing chain.
     for (auto &chain : chains) {
       if (chain->Matches(&request_v3)) {
@@ -80,7 +74,6 @@ template <class RequestType, class ResponseType>
         // Create a new instance of a processor.
         auto processor = chain->New();
         auto status = processor->Process(&request_v3, &response_v3, ioc, yield);
-
         // response v2/v3 conversion layer
         if constexpr (std::is_same_v<
                           ResponseType,
@@ -97,42 +90,44 @@ template <class RequestType, class ResponseType>
                                   ::envoy::service::auth::v3::CheckResponse>) {
           response = response_v3;
         }
-
-        // See src/filters/filter.h:filter::Process for a description of how
-        // status codes should be handled
-        switch (status) {
-          case google::rpc::Code::OK:  // The request was successful
-          case google::rpc::Code::UNAUTHENTICATED:    // A filter indicated the
-                                                      // request had no
-                                                      // authentication but was
-                                                      // processed correctly.
-          case google::rpc::Code::PERMISSION_DENIED:  // A filter indicated
-            // insufficient permissions
-            // for the authenticated
-            // requester but was processed
-            // correctly.
-            return ::grpc::Status::OK;
-          case google::rpc::Code::INVALID_ARGUMENT:  // The request was not well
-            // formed. Indicate a
-            // processing error to the
-            // caller.
-            return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT,
-                                  "invalid request");
-          default:  // All other errors are treated as internal processing
-                    // failures.
-            return ::grpc::Status(::grpc::StatusCode::INTERNAL,
-                                  "internal error");
-        }
+        return convertGrpcStatus(status);
       }
     }
+    // No matching filter chain found.
 
-    // No matching filter chain found. Allow request to continue.
+    // TODO(incfly): Clean up trigger rule after checking the current Istio
+    // ExtAuthz API is sufficient.
+    auto default_response_code =
+        grpc::Status(grpc::StatusCode::PERMISSION_DENIED, "permission denied");
+    google::rpc::Code code = google::rpc::Code::PERMISSION_DENIED;
+    if (allow_unmatched_requests) {
+      default_response_code = grpc::Status::OK;
+      code = google::rpc::Code::OK;
+    }
+    envoy::service::auth::v2::CheckResponse response_v2;
+    envoy::service::auth::v3::CheckResponse response_v3;
+    response_v2.mutable_status()->set_code(code);
+    response_v3.mutable_status()->set_code(code);
+    if constexpr (std::is_same_v<ResponseType,
+                                 ::envoy::service::auth::v2::CheckResponse>) {
+      response = response_v2;
+    } else if (std::is_same_v<ResponseType,
+                              ::envoy::service::auth::v3::CheckResponse>) {
+      response = response_v3;
+    }
+
+    if constexpr (std::is_same_v<ResponseType,
+                                 ::envoy::service::auth::v3::CheckResponse>) {
+      response = response_v3;
+    }
+
     spdlog::debug(
-        "{}: no matching filter chain for request to {}://{}{}, respond with: "
+        "{}: no matching filter chain for request to "
+        "{}://{}{}, allow_unmatched_requests {}, respond with: "
         "{}",
         __func__, request.attributes().request().http().scheme(),
         request.attributes().request().http().host(),
-        request.attributes().request().http().path(),
+        request.attributes().request().http().path(), allow_unmatched_requests,
         default_response_code.error_code());
     return default_response_code;
   } catch (const std::exception &exception) {

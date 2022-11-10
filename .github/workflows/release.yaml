@@ -3,7 +3,7 @@ name: "release" # please read on RELEASE.md on how to trigger this workflow.
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+**"  # For example: v0.5.0 v0.5.1-rc2
+      - "[0-9]+.[0-9]+.[0-9]+**"  # For example: 0.5.0, 0.5.1-rc2.
 
 defaults:
   run: # use bash for all operating systems unless overridden.
@@ -19,9 +19,10 @@ jobs:
       matrix:
         os:
           - "macos-11"
-          - "ubuntu-20.04"
+          - "ubuntu-18.04"
         mode:
           - "default"
+          # By default we use libc++.
           - "clang"
           - "clang-fips"
     steps:
@@ -63,17 +64,37 @@ jobs:
       - name: Setup clang
         if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
         # This downloads the required clang tooling when it is not downloaded yet.
+        # GITHUB_REF: refs/tags/0.5.1-rc1, resulted VERSION: "0.5.1".
         run: |
           make clang.bazelrc
-          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+          echo "BAZEL_FLAGS=--config=libc++" >> $GITHUB_ENV
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
         if: matrix.mode == 'clang-fips'
-        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+        run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
-      - name: Create artifacts # We strip the "v"-prefix from the current tag.
-        run: VERSION=${GITHUB_REF#refs/tags/v} MODE=${{ matrix.mode }} make dist
+      - name: Create artifacts
+        run: MODE=${{ matrix.mode }} make dist
+
+      - name: Require static binary
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        run: |
+          make requirestatic
+
+      - name: Login to GitHub Container Registry
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_REGISTRY_TOKEN_INCFLY }}
+
+      - name: Build and push image
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        run: |
+          make image push
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
@@ -83,7 +104,7 @@ jobs:
 
   release:
     name: release
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-18.04
     needs: dist
     timeout-minutes: 90 # instead of 360 by default.
     steps:

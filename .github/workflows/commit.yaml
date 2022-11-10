@@ -23,7 +23,7 @@ jobs:
   check:
     name: check
     timeout-minutes: 90 # instead of 360 by default.
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-18.04
     steps:
       - name: Cancel when duplicated
         uses: styfle/cancel-workflow-action@0.4.1
@@ -57,9 +57,10 @@ jobs:
       matrix:
         os:
           - "macos-11"
-          - "ubuntu-20.04"
+          - "ubuntu-18.04"
         mode:
           - "default"
+          # On CI, by default, we use libc++.
           - "clang"
           - "clang-fips"
     steps:
@@ -103,12 +104,25 @@ jobs:
         # This downloads the required clang tooling when it is not downloaded yet.
         run: |
           make clang.bazelrc
-          echo "BAZEL_FLAGS=--config=clang" >> $GITHUB_ENV
+          echo "BAZEL_FLAGS=--config=libc++" >> $GITHUB_ENV
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
         if: matrix.mode == 'clang-fips'
-        run: echo "BAZEL_FLAGS=--config=clang --define=boringssl=fips" >> $GITHUB_ENV
+        run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Run all tests
         run: make test
+
+      # Make sure we have static binary on Linux
+      - name: Require static binary
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        run: |
+          make requirestatic
+
+      # Upload the binary as an artifact.
+      - uses: actions/upload-artifact@v3
+        if: runner.os == 'Linux' && matrix.mode == 'clang'
+        with:
+          name: auth_server
+          path: bazel-bin/src/main/auth_server.stripped

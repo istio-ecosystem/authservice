@@ -102,10 +102,11 @@ docs: $(protodoc) ## Build docs
 	@$(protodoc) --directories=config=message --title="Configuration Options" --output="docs/README.md"
 	@grep -v '(validate.required)' docs/README.md > /tmp/README.md && mv /tmp/README.md docs/README.md
 
+PACKAGING ?= Dockerfile
 image: $(stripped_binary) ## Build the docker image
 	@mkdir -p build_release
 	@cp -f $(stripped_binary) build_release/$(binary_name)
-	@docker build . -t $(IMAGE)
+	@docker build . -t $(IMAGE) -f $(PACKAGING)
 
 push: image ## Push docker image to registry
 	@docker push $(IMAGE)
@@ -172,6 +173,10 @@ dep-graph.dot:
 clang.bazelrc: bazel/clang.bazelrc.tmpl $(llvm-config) $(envsubst)
 	@$(envsubst) < $< > $@
 
+# This builds the stripped binary, and checks if the binary is statically linked.
+requirestatic: $(stripped_binary)
+	@test/exe/require_static.sh $(stripped_binary)
+
 # Catch all rules for Go-based tools.
 $(go_tools_dir)/%:
 	@printf "$(ansi_format_dark)" tools "installing $($(notdir $@)@v)..."
@@ -197,7 +202,7 @@ endef
 
 # Install clang from https://github.com/llvm/llvm-project. We don't support win32 yet as this script
 # will fail.
-clang-os                          = $(if $(findstring $(goos),darwin),apple-darwin,linux-gnu-ubuntu-20.04)
+clang-os                          = $(if $(findstring $(goos),darwin),apple-darwin,linux-gnu-ubuntu-16.04)
 clang-download-archive-url-prefix = https://$(subst llvmorg/clang+llvm@,releases/download/llvmorg-,$($(notdir $1)@v))
 $(clang):
 	@mkdir -p $(dir $@)
