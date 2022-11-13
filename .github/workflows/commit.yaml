@@ -55,14 +55,13 @@ jobs:
     strategy:
       fail-fast: false # don't fail fast as sometimes failures are operating system specific.
       matrix:
-        os:
-          - "macos-11"
-          - "ubuntu-18.04"
-        mode:
-          - "default"
-          # On CI, by default, we use libc++.
-          - "clang"
-          - "clang-fips"
+        include:
+          - os: macos-11
+            mode: default
+          - os: ubuntu-18.04
+            mode: clang
+          - os: ubuntu-18.04
+            mode: clang-fips
     steps:
       - name: Cancel when duplicated
         uses: styfle/cancel-workflow-action@0.4.1
