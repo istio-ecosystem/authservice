@@ -119,7 +119,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist-Linux-default/**/*.tar.gz
             dist-Linux-clang/**/*.tar.gz
             dist-Linux-clang-fips/**/*.tar.gz
             dist-macOS-default/**/*.tar.gz
