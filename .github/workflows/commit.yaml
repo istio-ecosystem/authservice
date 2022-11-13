@@ -56,7 +56,7 @@ jobs:
       fail-fast: false # don't fail fast as sometimes failures are operating system specific.
       matrix:
         os:
-          - "macos-12"
+          - "macos-11"
           - "ubuntu-18.04"
         mode:
           - "default"
