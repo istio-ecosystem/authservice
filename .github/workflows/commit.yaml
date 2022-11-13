@@ -56,7 +56,7 @@ jobs:
       fail-fast: false # don't fail fast as sometimes failures are operating system specific.
       matrix:
         os:
-          - "macos-11"
+          - "macos-12"
           - "ubuntu-18.04"
         mode:
           - "default"
@@ -100,7 +100,7 @@ jobs:
 
       # Prepare clang tooling and config when it is required.
       - name: Setup clang
-        if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
+        if: runner.os == 'Linux' && (matrix.mode == 'clang' || matrix.mode == 'clang-fips')
         # This downloads the required clang tooling when it is not downloaded yet.
         run: |
           make clang.bazelrc
@@ -108,7 +108,7 @@ jobs:
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
-        if: matrix.mode == 'clang-fips'
+        if: runner.os == 'Linux' && matrix.mode == 'clang-fips'
         run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Run all tests

@@ -51,7 +51,7 @@ main_target     := //src/main:$(binary_name)
 # Always use amd64 for bazelisk for build and test rules below, since we don't support for macOS
 # arm64 (with --host_javabase=@local_jdk//:jdk) yet (especially the protoc-gen-validate project:
 # "no matching toolchains found for types @io_bazel_rules_go//go:toolchain").
-bazel        := GOARCH=amd64 $(go) run $(bazelisk@v) --output_user_root=$(bazel_cache_dir)
+bazel        := GOARCH=amd64 $(go) run $(bazelisk@v) $(if $(CI),--output_user_root=$(bazel_cache_dir),)
 buildifier   := $(go_tools_dir)/buildifier
 envsubst     := $(go_tools_dir)/envsubst
 protodoc     := $(go_tools_dir)/protodoc
@@ -90,7 +90,7 @@ build-%:
 dist: dist/$(binary_name)_$(goos)_amd64_$(MODE)_$(VERSION).tar.gz
 
 # Since we don't do cross-compilation yet (probably we can do it later via `zig cc`), we can only
-# build artifact for the current `os` and `mode` pair (e.g. {os: 'macOS', mode: 'clang-fips'}).
+# build artifact for the current `os` and `mode` pair (e.g. {os: 'linux', mode: 'clang-fips'}).
 dist/$(binary_name)_$(goos)_amd64_$(MODE)_$(VERSION).tar.gz: $(stripped_binary) ## Create build artifacts
 	@$(eval DIST_DIR := $(shell mktemp -d))
 	@cp -f LICENSE $(DIST_DIR)

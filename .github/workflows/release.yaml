@@ -62,7 +62,7 @@ jobs:
 
       # Prepare clang tooling and config when it is required.
       - name: Setup clang
-        if: matrix.mode == 'clang' || matrix.mode == 'clang-fips'
+        if: runner.os == 'Linux' && (matrix.mode == 'clang' || matrix.mode == 'clang-fips')
         # This downloads the required clang tooling when it is not downloaded yet.
         # GITHUB_REF: refs/tags/0.5.1-rc1, resulted VERSION: "0.5.1".
         run: |
@@ -72,7 +72,7 @@ jobs:
 
       # Set BAZEL_FLAGS to FIPS mode only when it is required.
       - name: Setup FIPS mode
-        if: matrix.mode == 'clang-fips'
+        if: runner.os == 'Linux' && matrix.mode == 'clang-fips'
         run: echo "BAZEL_FLAGS=--config=libc++ --define=boringssl=fips" >> $GITHUB_ENV
 
       - name: Create artifacts
@@ -124,5 +124,3 @@ jobs:
             dist-Linux-clang/**/*.tar.gz
             dist-Linux-clang-fips/**/*.tar.gz
             dist-macOS-default/**/*.tar.gz
-            dist-macOS-clang/**/*.tar.gz
-            dist-macOS-clang-fips/**/*.tar.gz
