@@ -93,6 +93,11 @@ message OIDCConfig {
         // true in any other cases.
         // Optional.
         bool skip_verify_peer_cert = 3;
+
+        // When specified, the Authservice will trust the specified Certificate Authority when performing HTTPS calls to
+        // the Token Endpoint of the OIDC Identity Provider.
+        // Optional.
+        string trusted_certificate_authority = 4;
     }
 
     oneof jwks_config {

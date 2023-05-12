@@ -77,7 +77,7 @@ class DynamicJwksResolverImpl : public JwksResolver {
     boost::asio::io_context& ioc_;
     std::chrono::seconds periodic_fetch_interval_sec_;
     boost::asio::steady_timer timer_;
-    bool verify_peer_cert_ = false;
+    const config::oidc::OIDCConfig::JwksFetcherConfig config_;
   };
 
   explicit DynamicJwksResolverImpl(
