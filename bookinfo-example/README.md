@@ -39,7 +39,7 @@ URI to be hosted on a protected endpoint.
    ```shell
    kubectl edit cm -n istio-system
    ```
-   
+
    Change the mesh config with the config below.
 
    ```yaml
@@ -53,15 +53,6 @@ URI to be hosted on a protected endpoint.
    ```
 
    Alternatively you can install Istio with a sample [operator.yaml](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/authservice/istio-operatory.yaml) we provide when using `istioctl install -f istio-operator.yaml`.
-
-1. Fetch the identity provider public key and populate into the configmap. In our example, run
-`scripts/google-jwks.sh`.
-
-      ```shell
-      bash scripts/google-jwks.sh
-      ```
-   Copy the output JWK (with escape) literally to the [templates/config.yaml](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/authservice/templates/config.yaml#L30)
-   to replace the JWK content.
 
 1. If you are using a Google account as your Identity Provider, you need to specify
 the following redirect URL for the client ID you are using. In this example,
