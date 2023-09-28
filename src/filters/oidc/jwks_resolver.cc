@@ -24,7 +24,7 @@ DynamicJwksResolverImpl::JwksFetcher::JwksFetcher(
                                    ? config.periodic_fetch_interval_sec()
                                    : kJwksPeriodicFetchIntervalSec)),
       timer_(ioc_, periodic_fetch_interval_sec_),
-      verify_peer_cert_(!config.skip_verify_peer_cert()) {
+      config_(config) {
   // Extract initial JWKs.
   // After timer callback sucessful, next timer invocation will be scheduled.
   timer_.expires_at(std::chrono::steady_clock::now() +
@@ -37,7 +37,8 @@ void DynamicJwksResolverImpl::JwksFetcher::request(
     const boost::system::error_code&) {
   boost::asio::spawn(ioc_, [this](boost::asio::yield_context yield) {
     common::http::TransportSocketOptions opt;
-    opt.verify_peer_ = verify_peer_cert_;
+    opt.ca_cert_ = config_.trusted_certificate_authority();
+    opt.verify_peer_ = ! config_.skip_verify_peer_cert();
     auto resp = http_ptr_->Get(jwks_uri_, {}, "", opt, "", ioc_, yield);
     auto next_schedule_interval = periodic_fetch_interval_sec_;
 
