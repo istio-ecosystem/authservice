@@ -1,0 +1,12 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  # port forward 80 on the host to 80 on this node
+  extraPortMappings:
+  - containerPort: 30001
+    hostPort: 9000
+    protocol: TCP
+  - containerPort: 30002
+    hostPort: 8443
+    protocol: TCP

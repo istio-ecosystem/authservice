@@ -1,0 +1,8 @@
+name: e2e-k8s/authservice-e2e
+description: A generated Helm Chart for e2e-k8s/authservice-e2e from Skippbox Kompose
+version: 0.0.1
+apiVersion: v1
+keywords:
+  - e2e-k8s/authservice-e2e
+sources:
+home:

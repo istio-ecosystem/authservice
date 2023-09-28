@@ -19,6 +19,11 @@ defaults:
   run: # use bash for all operating systems unless overridden.
     shell: bash
 
+env:
+  kind_version: v0.11.1
+  kind_config: .github/kind-config.yaml
+  repository_version: default
+
 jobs:
   check:
     name: check
@@ -46,6 +51,63 @@ jobs:
 
       - name: Check format
         run: make check
+
+  integration:
+    name: integration
+    needs: check
+    timeout-minutes: 90 # instead of 360 by default.
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2 # shallow checkout.
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Setup Go
+        uses: actions/setup-go@v2 # prepare Go. This is required for tools.
+        with:
+          go-version: 1.17.x
+
+      # - name: Log in to the Container registry
+      #   uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+      #   with:
+      #     registry: ghcr.io
+      #     # TODO(shikugawa): This is a workaround to support push image to ghcr.io
+      #     # because default GITHUB_TOKEN has only permissions to read packages.
+      #     username: Shikugawa
+      #     password: ${{ secrets.PAT }}
+
+      - name: Install Ubuntu prerequisites
+        run: sudo apt-get update && sudo apt-get -y install python3-pip cmake ninja-build
+
+      # - name: Build and push
+      #   run: |
+      #     VERSION=${{ env.repository_version }} GO111MODULE=on make push
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.2.0
+        with:
+          version: ${{ env.kind_version }}
+          config: ${{ env.kind_config }}
+
+      - name: Deploy pods
+        run: |
+          helm template test/integration/k8s-manifests/authservice-e2e \
+            --set authservice.image=ghcr.io/istio-ecosystem/authservice/authservice:0.4.1-66-gac335be-dirty | kubectl apply -f -
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8.3'
+      
+      - name: Run tests
+        run: |
+          pip3 install --upgrade pip
+          pip3 install setuptools
+          pip3 install -r test/integration/requirements.txt
+          kubectl wait --for=condition=Ready pods --all --timeout=10m
+          python3 test/integration/run.py
 
   test:
     needs: check

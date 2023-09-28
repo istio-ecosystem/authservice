@@ -1,0 +1,6 @@
+requests
+python-keycloak
+urllib3
+pyOpenSSL
+pyasn1
+ndg-httpsclient

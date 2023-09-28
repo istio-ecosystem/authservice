@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+    kompose.version: 1.26.1 (a9d05d509)
+  creationTimestamp: null
+  labels:
+    io.kompose.service: idp
+  name: idp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: idp
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert -f docker-compose.e2e.yml -c --out e2e-k8s/authservice-e2e
+        kompose.version: 1.26.1 (a9d05d509)
+      creationTimestamp: null
+      labels:
+        io.kompose.service: idp
+    spec:
+      containers:
+        - env:
+            - name: DB_ADDR
+              value: postgres
+            - name: DB_DATABASE
+              value: keycloak
+            - name: DB_PASSWORD
+              value: password
+            - name: DB_SCHEMA
+              value: public
+            - name: DB_VENDOR
+              value: POSTGRES
+            - name: KEYCLOAK_PASSWORD
+              value: password
+            - name: KEYCLOAK_USER
+              value: admin
+          image: quay.io/keycloak/keycloak:latest
+          livenessProbe:
+            exec:
+              command:
+                - curl
+                - https://0.0.0.0:8443/auth/realms/master
+                - -k
+            periodSeconds: 5
+            timeoutSeconds: 5
+          name: idp
+          ports:
+            - containerPort: 8443
+          resources: {}
+      restartPolicy: Always
+status: {}
