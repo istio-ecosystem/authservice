@@ -1,5 +1,5 @@
 authservice:
-  image: ghcr.io/istio-ecosystem/authservice/authservice:0.4.1
+  image: ghcr.io/istio-ecosystem/authservice/authservice:0.5.3
   # How the authservice will be enabled and enforced.
   # This can be at ingress (by default) or at application sidecar.
   enforcingMode: ingress
