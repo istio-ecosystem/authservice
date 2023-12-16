@@ -607,7 +607,19 @@ google::rpc::Code OidcFilter::RetrieveToken(
     return google::rpc::Code::INVALID_ARGUMENT;
   }
 
-  auto optional_authorization_state = GetAuthorizationState(session_id);
+  absl::StatusOr<absl::optional<AuthorizationState>> optional_authorization_state;
+  int maxRetries = 5;
+  int retries = 0;
+  while (retries < maxRetries) {
+    optional_authorization_state = GetAuthorizationState(session_id);
+    if (optional_authorization_state.ok() &&
+        optional_authorization_state->has_value()) {
+      break;
+    }
+    // Sleep for 100 milliseconds
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    retries++;
+  }
 
   if (!optional_authorization_state.ok()) {
     return SessionErrorResponse(
@@ -725,3 +737,4 @@ FilterPtr FilterFactory::create() {
 }  // namespace oidc
 }  // namespace filters
 }  // namespace authservice
+
