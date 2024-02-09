@@ -1,0 +1,9 @@
+*.txt
+.idea
+go.mod
+go.sum
+*.png
+*.lock
+config/**/*.go
+bin/
+.vimrc

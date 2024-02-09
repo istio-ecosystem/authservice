@@ -1,0 +1,87 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+run:
+  skip-files:
+    - ".*\\.pb.*\\.go"
+linters:
+  enable:
+    - errcheck
+    - goconst
+    - revive
+    - ineffassign
+    - lll
+    - misspell
+    - unconvert
+    - govet
+    - prealloc
+    - unused
+    - staticcheck
+    - gosimple
+    - megacheck
+  disable:
+    - interfacer # deprecated since it "is prone to bad suggestions"
+    - goimports # already run in `make format`
+    - deadcode # Deprecated. Author abandoned it.
+    - structcheck # Deprecated. Author abandoned it.
+    - varcheck # Deprecated. Author abandoned it.
+linters-settings:
+  lll:
+    line-length: 160
+  goconst:
+    min-occurrences: 4
+  govet:
+    check-shadowing: true
+  revive:
+    ignore-generated-header: false
+    severity: error
+    confidence: 0.8
+    rules:
+      - name: atomic
+      - name: blank-imports
+      # Problematic with DSL APIs, maybe we can target just that package?
+      #- name: confusing-naming
+      - name: get-return
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      # A true empty block is hard to recognize, see https://github.com/mgechev/revive/issues/386
+      #- name: empty-block
+      - name: error-naming
+      - name: error-return
+      - name: error-strings
+      - name: errorf
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: indent-error-flow
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: redefines-builtin-id
+      - name: superfluous-else
+      - name: struct-tag
+      - name: time-naming
+      - name: unexported-naming
+      - name: unexported-return
+      - name: unhandled-error
+        arguments: [
+            "fmt.Printf",
+            "fmt.Println",
+            "fmt.Fprintf",
+        ]
+      - name: unreachable-code
+      - name: unused-parameter
+      - name: var-declaration
+      - name: var-naming
