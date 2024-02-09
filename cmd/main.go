@@ -18,19 +18,27 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/tetrateio/authservice-go/internal"
+	"github.com/tetrateio/authservice-go/internal/server"
 	"github.com/tetratelabs/log"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/run/pkg/signal"
-
-	"github.com/tetrateio/authservice-go/internal"
 )
 
 func main() {
-	logging := internal.NewLogSystem(log.New())
+	var (
+		configFile  = &internal.LocalConfigFile{}
+		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
+		authz       = server.NewExtAuthZFilter(&configFile.Config)
+		authzServer = server.New(authz.Register)
+	)
 
 	g := run.Group{Logger: internal.Logger(internal.Default)}
+
 	g.Register(
+		configFile,        // load the configuration
 		logging,           // set up the logging system
+		authzServer,       // start the server
 		&signal.Handler{}, // handle graceful termination
 	)
 

@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package authservice.config.mock;
+package authservice.config.v1.mock;
 
 // Mock filter config. The only thing which can be defined is whether it
 // allows or rejects any request it matches.

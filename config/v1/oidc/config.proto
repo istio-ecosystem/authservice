@@ -14,7 +14,7 @@
 
 syntax = "proto3";
 
-package authservice.config.oidc;
+package authservice.config.v1.oidc;
 
 import "validate/validate.proto";
 

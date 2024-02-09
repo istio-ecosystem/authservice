@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"github.com/tetratelabs/telemetry/scope"
@@ -33,11 +34,18 @@ func TestLoggingSetup(t *testing.T) {
 		l2        telemetry.Level
 		expectErr bool
 	}{
+		// backwards compat log levels
+		{"trace", telemetry.LevelDebug, telemetry.LevelDebug, false},
+		{"critical", telemetry.LevelError, telemetry.LevelError, false},
+		{"all:trace", telemetry.LevelDebug, telemetry.LevelDebug, false},
+		{"all:critical", telemetry.LevelError, telemetry.LevelError, false},
+		{"l1:trace,l2:critical", telemetry.LevelDebug, telemetry.LevelError, false},
+		// telemetry log levels
 		{"l1:debug", telemetry.LevelDebug, telemetry.LevelInfo, false},
 		{"l1:debug,l2:debug", telemetry.LevelDebug, telemetry.LevelDebug, false},
 		{"invalid:debug,l2:error", telemetry.LevelInfo, telemetry.LevelError, false},
 		{"all:none,l1:debug", telemetry.LevelNone, telemetry.LevelNone, false},
-		{"", telemetry.LevelInfo, telemetry.LevelInfo, true},
+		{"", telemetry.LevelInfo, telemetry.LevelInfo, false},
 		{",", telemetry.LevelInfo, telemetry.LevelInfo, true},
 		{":", telemetry.LevelInfo, telemetry.LevelInfo, true},
 		{"invalid", telemetry.LevelInfo, telemetry.LevelInfo, true},
@@ -46,8 +54,8 @@ func TestLoggingSetup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.levels, func(t *testing.T) {
 			g := run.Group{Logger: telemetry.NoopLogger()}
-			g.Register(NewLogSystem(telemetry.NoopLogger()))
-			require.Equal(t, tt.expectErr, g.Run("", "--log-levels", tt.levels) != nil)
+			g.Register(NewLogSystem(telemetry.NoopLogger(), &configv1.Config{LogLevel: tt.levels}))
+			require.Equal(t, tt.expectErr, g.Run() != nil)
 
 			require.Equal(t, tt.l1, l1.Level())
 			require.Equal(t, tt.l2, l2.Level())

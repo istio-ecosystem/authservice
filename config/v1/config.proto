@@ -14,12 +14,12 @@
 
 syntax = "proto3";
 
-package authservice.config;
+package authservice.config.v1;
 
 import "validate/validate.proto";
 
-import "oidc/config.proto";
-import "mock/config.proto";
+import "v1/oidc/config.proto";
+import "v1/mock/config.proto";
 
 // Specifies how a request can be matched to a filter chain.
 message Match {

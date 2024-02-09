@@ -19,12 +19,14 @@ import (
 	"fmt"
 	"strings"
 
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"github.com/tetratelabs/telemetry/scope"
 )
 
 const (
+	Authz    = "authz"
 	Default  = "default"
 	Requests = "requests"
 	Server   = "server"
@@ -32,10 +34,14 @@ const (
 
 // scopes contains the list of all logging scopes
 var scopes = map[string]string{
+	Authz:    "Envoy ext-authz filter implementation messages",
 	Default:  "Default",
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",
 }
+
+// ErrInvalidLogLevel is returned when the configured log level is invalid.
+var ErrInvalidLogLevel = errors.New("invalid log level")
 
 // Logger gets the given logging scope, or return the Noop logger if no scope
 // has been registered with the given name.
@@ -47,20 +53,16 @@ func Logger(name string) telemetry.Logger {
 	return s
 }
 
-var (
-	_ run.Config    = (*setupLogging)(nil)
-	_ run.PreRunner = (*setupLogging)(nil)
-)
+var _ run.PreRunner = (*setupLogging)(nil)
 
 // setupLogging is a run.Config that sets up the logging system.
 type setupLogging struct {
-	logger      telemetry.Logger
-	logLevels   string
-	logLevelMap map[string]telemetry.Level
+	logger telemetry.Logger
+	cfg    *configv1.Config
 }
 
 // NewLogSystem returns a new run.Unit that sets up the logging system.
-func NewLogSystem(log telemetry.Logger) run.Unit {
+func NewLogSystem(log telemetry.Logger, cfg *configv1.Config) run.Unit {
 	// Set the defaults in the constructor to make sure this runs as early as possible,
 	// not even as part of hte run.Group phases
 	scope.UseLogger(log)
@@ -70,46 +72,47 @@ func NewLogSystem(log telemetry.Logger) run.Unit {
 	}
 	return &setupLogging{
 		logger: Logger(Server),
+		cfg:    cfg,
 	}
 }
 
 // Name returns the name of the run.Unit.
 func (s *setupLogging) Name() string { return "Logging" }
 
-// FlagSet returns a new flag.FlagSet configured with the flags for the run.Unit.
-func (s *setupLogging) FlagSet() *run.FlagSet {
-	flags := run.NewFlagSet("Logging flags")
-	flags.StringVar(&s.logLevels, "log-levels", "all:info", "log levels in the format: <logger>:<level>,<logger>:<level>,...")
-	return flags
-}
-
-// Validate the run.Unit's configuration.
-func (s *setupLogging) Validate() (err error) {
-	if s.logLevels == "" {
-		return errors.New("log levels must be specified")
-	}
-	s.logLevelMap, err = ParseLogLevels(s.logLevels)
-	return
-}
-
 // PreRun initializes the logging system.
 func (s *setupLogging) PreRun() error {
-	SetLogLevels(s.logger, s.logLevelMap)
+	if s.cfg.LogLevel == "" {
+		s.cfg.LogLevel = "info"
+	}
+	levels, err := parseLogLevels(s.cfg.LogLevel)
+	if err != nil {
+		return err
+	}
+	setLogLevels(s.logger, levels)
 	return nil
 }
 
-// ParseLogLevels reads the given string and configures the log levels accordingly.
+// parseLogLevels reads the given string and configures the log levels accordingly.
 // The string must have the format: "logger:level,logger,level,..." where "logger'
 // is the name of an existing logger, such as 'pdp', and level is one of the values
 // supported in the `log.Level` type.
 // In addition to specific logger names, the "all" keyword can be used to configure all
 // registered loggers to the configured level. For example: "all:debug".
-func ParseLogLevels(logLevels string) (map[string]telemetry.Level, error) {
+func parseLogLevels(logLevels string) (map[string]telemetry.Level, error) {
 	res := map[string]telemetry.Level{}
 	levels := strings.Split(logLevels, ",")
+	singleLevel := len(levels) == 1
 
 	for _, l := range levels {
 		parts := strings.Split(l, ":")
+		if len(parts) == 1 && singleLevel { // Assume we're setting the level globally
+			lvl, err := readLogLevel(parts[0])
+			if err != nil {
+				return nil, err
+			}
+			return map[string]telemetry.Level{"all": lvl}, nil
+		}
+
 		if len(parts) != 2 {
 			return res, errors.New("must be in the form of <logger>:<level>")
 		}
@@ -125,9 +128,9 @@ func ParseLogLevels(logLevels string) (map[string]telemetry.Level, error) {
 			return res, errors.New("level must be specified")
 		}
 
-		lvl, ok := telemetry.FromLevel(level)
-		if !ok {
-			return res, fmt.Errorf("%q is not a valid log level", level)
+		lvl, err := readLogLevel(parts[1])
+		if err != nil {
+			return nil, err
 		}
 
 		res[logger] = lvl
@@ -136,8 +139,8 @@ func ParseLogLevels(logLevels string) (map[string]telemetry.Level, error) {
 	return res, nil
 }
 
-// SetLogLevels sets the log levels for the given loggers.
-func SetLogLevels(log telemetry.Logger, logLevelMap map[string]telemetry.Level) {
+// setLogLevels sets the log levels for the given loggers.
+func setLogLevels(log telemetry.Logger, logLevelMap map[string]telemetry.Level) {
 	if level, ok := logLevelMap["all"]; ok {
 		for _, logger := range scope.List() {
 			logger.SetLevel(level)
@@ -151,5 +154,22 @@ func SetLogLevels(log telemetry.Logger, logLevelMap map[string]telemetry.Level) 
 				log.Info("invalid logger", "logger", k)
 			}
 		}
+	}
+}
+
+// readLogLevel parses the log level and adapts the legacy loggers from the original
+// auth service project to the new telemetry logger supported levels.
+func readLogLevel(level string) (telemetry.Level, error) {
+	switch level {
+	case "trace":
+		return telemetry.LevelDebug, nil
+	case "critical":
+		return telemetry.LevelError, nil
+	default:
+		l, ok := telemetry.FromLevel(level)
+		if !ok {
+			return telemetry.LevelNone, fmt.Errorf("%w: %s", ErrInvalidLogLevel, level)
+		}
+		return l, nil
 	}
 }
