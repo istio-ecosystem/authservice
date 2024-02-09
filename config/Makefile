@@ -14,8 +14,6 @@
 
 BUF ?= github.com/bufbuild/buf/cmd/buf@v1.17.0
 
-default: build
-
 PROTO_SOURCES := $(shell find . -name '*.proto')
 
 .PHONY: build

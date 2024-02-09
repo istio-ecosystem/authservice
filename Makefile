@@ -115,7 +115,7 @@ coverage:  ## Creates coverage report for all projects
 	@go tool cover -html="$(OUTDIR)/$@/coverage.out" -o "$(OUTDIR)/$@/coverage.html"
 
 .PHONY: e2e
-e2e:
+e2e:  ## Runt he e2e tests
 	@$(MAKE) -C e2e e2e
 
 
