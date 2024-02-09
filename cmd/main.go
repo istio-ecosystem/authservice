@@ -31,7 +31,7 @@ func main() {
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
 		authz       = server.NewExtAuthZFilter(&configFile.Config)
-		authzServer = server.New(authz.Register)
+		authzServer = server.New(&configFile.Config, authz.Register)
 	)
 
 	g := run.Group{Logger: internal.Logger(internal.Default)}

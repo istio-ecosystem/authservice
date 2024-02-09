@@ -112,10 +112,10 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			if !ok {
 				return deny(codes.PermissionDenied, fmt.Sprintf("%s[%d] filter denied the request", c.Name, i)), nil
 			}
-
-			// Use the first filter chain that matches
-			return allow, nil
 		}
+
+		// Return OK if the chain matched and all filters allowed the request
+		return allow, nil
 	}
 
 	if e.cfg.AllowUnmatchedRequests {

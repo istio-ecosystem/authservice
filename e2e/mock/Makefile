@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Force run of the e2e tests
+E2E_TEST_OPTS ?= -count=1
+
 
 .PHONY: e2e
 e2e: e2e-pre

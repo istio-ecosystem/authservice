@@ -23,6 +23,7 @@ import (
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc"
 
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	"github.com/tetrateio/authservice-go/internal"
 )
 
@@ -33,18 +34,16 @@ type RegisterGrpc interface {
 }
 
 var (
-	_ run.Initializer = (*Server)(nil)
-	_ run.Config      = (*Server)(nil)
-	_ run.PreRunner   = (*Server)(nil)
-	_ run.Service     = (*Server)(nil)
+	_ run.PreRunner = (*Server)(nil)
+	_ run.Service   = (*Server)(nil)
 )
 
 var ErrInvalidAddress = errors.New("invalid address")
 
 // Server that runs as a unit in a run.Group.
 type Server struct {
-	log  telemetry.Logger
-	addr string
+	log telemetry.Logger
+	cfg *configv1.Config
 
 	server           *grpc.Server
 	registerHandlers []func(s *grpc.Server)
@@ -55,9 +54,10 @@ type Server struct {
 }
 
 // New creates a new dual gRPC server.
-func New(registerHandlers ...func(s *grpc.Server)) *Server {
+func New(cfg *configv1.Config, registerHandlers ...func(s *grpc.Server)) *Server {
 	return &Server{
 		log:              internal.Logger(internal.Server),
+		cfg:              cfg,
 		registerHandlers: registerHandlers,
 	}
 }
@@ -65,32 +65,14 @@ func New(registerHandlers ...func(s *grpc.Server)) *Server {
 // Name returns the name of the unit in the run.Group.
 func (s *Server) Name() string { return "gRPC Server" }
 
-// FlagSet returns the flags used to customize the server.
-func (s *Server) FlagSet() *run.FlagSet {
-	flags := run.NewFlagSet("gRPC Server flags")
-	flags.StringVar(&s.addr, "listen-address", ":10004", "listen address")
-	return flags
-}
-
-// Validate the server configuration.
-func (s *Server) Validate() error {
-	if _, _, err := net.SplitHostPort(s.addr); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalidAddress, err)
-	}
-	return nil
-}
-
-// Initialize the server.
-func (s *Server) Initialize() {
-	if s.Listen == nil {
-		s.Listen = func() (net.Listener, error) {
-			return net.Listen("tcp", s.addr)
-		}
-	}
-}
-
 // PreRun registers the server registerHandlers
 func (s *Server) PreRun() error {
+	if s.Listen == nil {
+		s.Listen = func() (net.Listener, error) {
+			return net.Listen("tcp", fmt.Sprintf("%s:%d", s.cfg.ListenAddress, s.cfg.ListenPort))
+		}
+	}
+
 	logMiddleware := NewLogMiddleware()
 
 	// Initialize the gRPC server
@@ -112,7 +94,7 @@ func (s *Server) Serve() error {
 	if err != nil {
 		return err
 	}
-	s.log.Info("starting gRPC server", "addr", s.addr)
+	s.log.Info("starting gRPC server", "addr", l.Addr())
 	return s.server.Serve(l)
 }
 
