@@ -15,19 +15,19 @@
 
 .PHONY: e2e
 e2e: e2e-pre
-	@go test $(E2E_TEST_OPTS) ./... || ( $(MAKE) e2e-test-post-error; exit 1 )
-	@$(MAKE) e2e-test-post
+	@go test $(E2E_TEST_OPTS) ./... || ( $(MAKE) e2e-post-error; exit 1 )
+	@$(MAKE) e2e-post
 
 .PHONY: e2e-pre
 e2e-pre:
-	@docker compose up --detach --wait --force-recreate --remove-orphans || ($(MAKE) e2e-test-post-error; exit 1)
+	@docker compose up --detach --wait --force-recreate --remove-orphans || ($(MAKE) e2e-post-error; exit 1)
 
-.PHONY: e2e-test-post
-e2e-test-post:
+.PHONY: e2e-post
+e2e-post:
 	@docker compose down
 
-.PHONY: e2e-test-post-error
-e2e-test-post-error: capture-logs
+.PHONY: e2e-post-error
+e2e-post-error: capture-logs
 
 .PHONY: capture-logs
 capture-logs:
