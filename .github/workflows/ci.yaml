@@ -1,5 +1,3 @@
-# Copyright (c) Tetrate, Inc 2024 All Rights Reserved.
-
 name: CI
 
 on:
@@ -111,16 +109,9 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  docker:
+  e2e:
     needs: check
     runs-on: ubuntu-latest
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
-    env:
-      DOCKER_HUB: localhost:5000
     steps:
       - uses: actions/setup-go@v3
         with:
@@ -134,4 +125,4 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - run: make docker
+      - run: make docker e2e

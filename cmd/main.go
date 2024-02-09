@@ -18,11 +18,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tetrateio/authservice-go/internal"
-	"github.com/tetrateio/authservice-go/internal/server"
 	"github.com/tetratelabs/log"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/run/pkg/signal"
+
+	"github.com/tetrateio/authservice-go/internal"
+	"github.com/tetrateio/authservice-go/internal/server"
 )
 
 func main() {

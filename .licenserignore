@@ -7,3 +7,5 @@ go.sum
 config/**/*.go
 bin/
 .vimrc
+*.json
+LICENSE

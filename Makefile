@@ -16,7 +16,7 @@ NAME       ?= authservice
 PKG	   	   ?= ./cmd
 BUILD_OPTS ?=
 TEST_OPTS  ?=
-TEST_PKGS  ?= ./...
+TEST_PKGS  ?= $(shell go list ./... | grep -v /e2e)
 OUTDIR     ?= bin
 TARGETS    ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 
@@ -65,7 +65,7 @@ $(OUTDIR)/$(NAME)-static-%: $(OUTDIR)
 		-o $@ $(PKG)
 
 .PHONY: clean
-clean:  ## Clean the build artifacts
+clean: clean/e2e  ## Clean the build artifacts
 	@rm -rf $(OUTDIR)
 
 .PHONY: clean/coverage
@@ -73,8 +73,12 @@ clean/coverage:  ## Clean the coverage report
 	@rm -rf $(OUTDIR)/coverage
 
 .PHONY: clean/all
-clean/all: clean config/clean  ## Clean everything
+clean/all: clean config/clean   ## Clean everything
 	@rm -rf $(OUTDIR)
+
+.PHONY: clean/e2e
+clean/e2e:  ## Clean the e2e test artifacts
+	@$(MAKE) -C $(@F) $(@D)
 
 
 ##@ Config Proto targets
@@ -111,11 +115,15 @@ coverage:  ## Creates coverage report for all projects
 		$(COVERAGE_PACKAGES)
 	@go tool cover -html="$(OUTDIR)/$@/coverage.out" -o "$(OUTDIR)/$@/coverage.html"
 
+.PHONY: e2e
+e2e:
+	@$(MAKE) -C e2e e2e
+
 
 ##@ Docker targets
 
 .PHONY: docker-pre
-docker-pre:
+docker-pre: $(DOCKER_TARGETS:%=$(OUTDIR)/$(NAME)-static-%)
 	@docker buildx inspect $(DOCKER_BUILDER_NAME) || \
 		docker buildx create --name $(DOCKER_BUILDER_NAME) \
 			--driver docker-container --driver-opt network=host \
@@ -125,10 +133,29 @@ comma     := ,
 space     := $(empty) $(empty)
 PLATFORMS := $(subst -,/,$(subst $(space),$(comma),$(DOCKER_TARGETS)))
 INSECURE_REGISTRY_ARG := --output=type=registry,registry.insecure=true
+
 .PHONY: docker
-docker: $(DOCKER_TARGETS:%=$(OUTDIR)/$(NAME)-static-%) docker-pre  ## Build and push the multi-arch Docker images
+docker: $(DOCKER_TARGETS:%=docker-%)  ## Build the docker images
+
+docker-%: PLATFORM=$(subst -,/,$(*))
+docker-%: ARCH=$(notdir $(subst -,/,$(PLATFORM)))
+docker-%: docker-pre $(OUTDIR)/$(NAME)-static-%
+	@echo "Building Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)"
+	@docker buildx build \
+		$(DOCKER_BUILD_ARGS) \
+		--builder $(DOCKER_BUILDER_NAME) \
+		--load \
+		-f Dockerfile \
+		--platform $(PLATFORM) \
+		-t $(DOCKER_HUB)/$(NAME):latest-$(ARCH) \
+		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH) \
+		.
+
+.PHONY: docker-push
+docker-push: docker-pre  ## Build and push the multi-arch Docker images
 	@echo "Pushing Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)"
-	@docker buildx build $(DOCKER_BUILD_ARGS) \
+	@docker buildx build \
+		$(DOCKER_BUILD_ARGS) \
 		--builder $(DOCKER_BUILDER_NAME) \
 		$(if $(USE_INSECURE_REGISTRY),$(INSECURE_REGISTRY_ARG),--push) \
 		-f Dockerfile \

@@ -1,0 +1,15 @@
+{
+  "log_level": "debug",
+  "chains": [
+    {
+      "name": "mock",
+      "filters": [
+        {
+          "mock": {
+            "allow": true
+          }
+        }
+      ]
+    }
+  ]
+}

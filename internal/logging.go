@@ -19,10 +19,11 @@ import (
 	"fmt"
 	"strings"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"github.com/tetratelabs/telemetry/scope"
+
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 )
 
 const (

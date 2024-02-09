@@ -21,13 +21,15 @@
 package configv1
 
 import (
-	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	mock "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
-	oidc "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	_ "github.com/envoyproxy/protoc-gen-validate/validate"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+
+	mock "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
+	oidc "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
 
 const (

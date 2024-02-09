@@ -1,4 +1,16 @@
-// Copyright (c) Tetrate, Inc 2024 All Rights Reserved.
+// Copyright 2024 Tetrate
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package server
 
@@ -7,10 +19,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/tetrateio/authservice-go/internal"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc"
+
+	"github.com/tetrateio/authservice-go/internal"
 )
 
 // RegisterGrpc is an interface for registering gRPC registerHandlers.
@@ -55,7 +68,7 @@ func (s *Server) Name() string { return "gRPC Server" }
 // FlagSet returns the flags used to customize the server.
 func (s *Server) FlagSet() *run.FlagSet {
 	flags := run.NewFlagSet("gRPC Server flags")
-	flags.StringVar(&s.addr, "listen-address", ":9090", "listen address")
+	flags.StringVar(&s.addr, "listen-address", ":10004", "listen address")
 	return flags
 }
 

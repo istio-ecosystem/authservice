@@ -1,0 +1,43 @@
+{
+  "log_level": "debug",
+  "chains": [
+    {
+      "name": "mock-allow",
+      "match": {
+        "header": "X-Authz-Decision",
+        "equality": "allow"
+      },
+      "filters": [
+        {
+          "mock": {
+            "allow": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "mock-allow-prefix",
+      "match": {
+        "header": "X-Authz-Decision",
+        "prefix": "ok"
+      },
+      "filters": [
+        {
+          "mock": {
+            "allow": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "mock-deny",
+      "filters": [
+        {
+          "mock": {
+            "allow": false
+          }
+        }
+      ]
+    }
+  ]
+}
