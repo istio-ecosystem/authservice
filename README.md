@@ -1,7 +1,7 @@
 # authservice
 
 [![CI](https://github.com/tetrateio/authzervice-go/actions/workflows/ci.yaml/badge.svg)](https://github.com/tetrateio/authzervice-go/actions/workflows/ci.yaml)
-[![codecov](https://codecov.io/gh/tetrateio/authzervice-go/graph/badge.svg?token=LAmdH59zeK)](https://codecov.io/gh/tetrateio/authzervice-go)
+[![codecov](https://codecov.io/gh/tetrateio/authservice-go/graph/badge.svg?token=JTLsQloZo9)](https://codecov.io/gh/tetrateio/authservice-go)
 
 An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
 focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).

@@ -102,7 +102,6 @@ config/lint:  ## Lint the Config Proto generated code
 test:  ## Run all the tests
 	@go test $(TEST_OPTS) $(TEST_PKGS)
 
-COVERAGE_PACKAGES ?= $(shell go list ./...)
 COVERAGE_OPTS     ?=
 .PHONY: coverage
 coverage:  ## Creates coverage report for all projects
@@ -112,7 +111,7 @@ coverage:  ## Creates coverage report for all projects
 		-timeout 30s \
 		-coverprofile $(OUTDIR)/$@/coverage.out \
 		-covermode atomic \
-		$(COVERAGE_PACKAGES)
+		$(TEST_PKGS)
 	@go tool cover -html="$(OUTDIR)/$@/coverage.out" -o "$(OUTDIR)/$@/coverage.html"
 
 .PHONY: e2e

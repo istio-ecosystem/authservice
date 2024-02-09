@@ -20,10 +20,10 @@ jobs:
           # Set the RELEASE_TAG to force the version of the Docker images
           echo "DOCKER_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GOVERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_INTERNAL_CONTAINERS_SERVICE_ACCOUNT_KEY }}
