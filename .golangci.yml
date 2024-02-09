@@ -50,8 +50,7 @@ linters-settings:
     rules:
       - name: atomic
       - name: blank-imports
-      # Problematic with DSL APIs, maybe we can target just that package?
-      #- name: confusing-naming
+      - name: confusing-naming
       - name: get-return
       - name: context-as-argument
       - name: context-keys-type
