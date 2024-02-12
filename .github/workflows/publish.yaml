@@ -7,7 +7,6 @@ on:
 
 env:
   GOPROXY: https://proxy.golang.org
-  GOVERSION: 1.21.6
 
 jobs:
   publish:
@@ -20,10 +19,10 @@ jobs:
           # Set the RELEASE_TAG to force the version of the Docker images
           echo "DOCKER_TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GOVERSION }}
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_INTERNAL_CONTAINERS_SERVICE_ACCOUNT_KEY }}
