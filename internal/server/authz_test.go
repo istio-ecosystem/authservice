@@ -20,6 +20,7 @@ import (
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/codes"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
@@ -134,6 +135,162 @@ func TestGrpcNoChainsMatched(t *testing.T) {
 	require.Equal(t, int32(codes.PermissionDenied), ok.Status.Code)
 }
 
+func TestStringMatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		match *configv1.StringMatch
+		path  string
+		want  bool
+	}{
+		{"no-match", nil, "", false},
+		{"equality-match", stringExact("test"), "test", true},
+		{"equality-no-match", stringExact("test"), "no-match", false},
+		{"prefix-match", stringPrefix("test"), "test-123", true},
+		{"prefix-no-match", stringPrefix("test"), "no-match", false},
+		{"suffix-match", stringSuffix("test"), "123-test", true},
+		{"suffix-no-match", stringSuffix("test"), "no-match", false},
+		{"regex-match", stringRegex(".*st"), "test", true},
+		{"regex-no-match", stringRegex(".*st"), "no-match", false},
+		{"regex-invalid", stringRegex("["), "no-match", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, stringMatch(telemetry.NoopLogger(), tt.match, tt.path))
+		})
+	}
+}
+
+func TestMatchTriggerRule(t *testing.T) {
+	tests := []struct {
+		name string
+		rule *configv1.TriggerRule
+		path string
+		want bool
+	}{
+		{"no-rule", nil, "/path", false},
+		{"no-path", &configv1.TriggerRule{}, "", true},
+		{"empty-rule", &configv1.TriggerRule{}, "/path", true},
+		{"excluded-path-match", &configv1.TriggerRule{ExcludedPaths: []*configv1.StringMatch{stringExact("/path")}}, "/path", false},
+		{"excluded-path-no-match", &configv1.TriggerRule{ExcludedPaths: []*configv1.StringMatch{stringExact("/path")}}, "/no-match", true},
+		{"included-path-match", &configv1.TriggerRule{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}}, "/path", true},
+		{"included-path-no-match", &configv1.TriggerRule{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}}, "/no-match", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, matchTriggerRule(telemetry.NoopLogger(), tt.rule, tt.path))
+		})
+	}
+
+}
+
+func TestMustTriggerCheck(t *testing.T) {
+	test := []struct {
+		name  string
+		rules []*configv1.TriggerRule
+		path  string
+		want  bool
+	}{
+		{"no-rules", nil, "/path", true},
+		{"no-path", nil, "", true},
+		{"empty-rules", []*configv1.TriggerRule{}, "/path", true},
+		{"inclusions-match", []*configv1.TriggerRule{{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}}}, "/path", true},
+		{"inclusions-no-match", []*configv1.TriggerRule{{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}}}, "/no-match", false},
+		{"exclusions-match", []*configv1.TriggerRule{{ExcludedPaths: []*configv1.StringMatch{stringExact("/path")}}}, "/path", false},
+		{"exclusions-no-match", []*configv1.TriggerRule{{ExcludedPaths: []*configv1.StringMatch{stringExact("/path")}}}, "/no-match", true},
+		{"multiple-rules-no-match", []*configv1.TriggerRule{
+			{ExcludedPaths: []*configv1.StringMatch{stringExact("/ex-path")}},
+			{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}},
+		}, "/ex-path", false},
+		{"multiple-rules-match", []*configv1.TriggerRule{
+			{ExcludedPaths: []*configv1.StringMatch{stringExact("/no-path")}},
+			{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}},
+		}, "/path", true},
+		{"inverse-order-multiple-rules-no-match", []*configv1.TriggerRule{
+			{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}},
+			{ExcludedPaths: []*configv1.StringMatch{stringExact("/ex-path")}},
+		}, "/ex-path", false},
+		{"inverse-order-multiple-rules-match", []*configv1.TriggerRule{
+			{IncludedPaths: []*configv1.StringMatch{stringExact("/path")}},
+			{ExcludedPaths: []*configv1.StringMatch{stringExact("/no-path")}},
+		}, "/path", true},
+	}
+
+	for _, tt := range test {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &envoy.CheckRequest{
+				Attributes: &envoy.AttributeContext{
+					Request: &envoy.AttributeContext_Request{
+						Http: &envoy.AttributeContext_HttpRequest{
+							Path: tt.path,
+						},
+					},
+				},
+			}
+			require.Equal(t, tt.want, mustTriggerCheck(telemetry.NoopLogger(), tt.rules, req))
+		})
+	}
+}
+
+func TestCheckTriggerRules(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *configv1.Config
+		path   string
+		want   codes.Code
+	}{
+		{
+			"no-rules-triggers-check",
+			&configv1.Config{
+				Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{mock(false)}}},
+			},
+			"/path", codes.PermissionDenied,
+		},
+		{
+			"rules-inclusions-matching-triggers-check",
+			&configv1.Config{
+				Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{mock(false)}}},
+				TriggerRules: []*configv1.TriggerRule{
+					{
+						IncludedPaths: []*configv1.StringMatch{stringExact("/path")},
+					},
+				},
+			},
+			"/path", codes.PermissionDenied},
+		{
+			"rules-inclusions-no-match-does-not-trigger-check",
+			&configv1.Config{
+				Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{mock(false)}}},
+				TriggerRules: []*configv1.TriggerRule{
+					{
+						IncludedPaths: []*configv1.StringMatch{stringExact("/path")},
+					},
+				},
+			},
+			"/no-path", codes.OK, // it does not reach mock(allow=false), so it returns OK
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			e := NewExtAuthZFilter(tt.config)
+			req := &envoy.CheckRequest{
+				Attributes: &envoy.AttributeContext{
+					Request: &envoy.AttributeContext_Request{
+						Http: &envoy.AttributeContext_HttpRequest{
+							Path: tt.path,
+						},
+					},
+				},
+			}
+			got, err := e.Check(context.Background(), req)
+			require.NoError(t, err)
+			require.Equal(t, int32(tt.want), got.Status.Code)
+		})
+	}
+}
+
 func mock(allow bool) *configv1.Filter {
 	return &configv1.Filter{
 		Type: &configv1.Filter_Mock{
@@ -172,6 +329,38 @@ func header(value string) *envoy.CheckRequest {
 					},
 				},
 			},
+		},
+	}
+}
+
+func stringExact(s string) *configv1.StringMatch {
+	return &configv1.StringMatch{
+		MatchType: &configv1.StringMatch_Exact{
+			Exact: s,
+		},
+	}
+}
+
+func stringPrefix(s string) *configv1.StringMatch {
+	return &configv1.StringMatch{
+		MatchType: &configv1.StringMatch_Prefix{
+			Prefix: s,
+		},
+	}
+}
+
+func stringSuffix(s string) *configv1.StringMatch {
+	return &configv1.StringMatch{
+		MatchType: &configv1.StringMatch_Suffix{
+			Suffix: s,
+		},
+	}
+}
+
+func stringRegex(s string) *configv1.StringMatch {
+	return &configv1.StringMatch{
+		MatchType: &configv1.StringMatch_Regex{
+			Regex: s,
 		},
 	}
 }

@@ -41,5 +41,15 @@
         }
       ]
     }
+  ],
+  "triggerRules": [
+    {
+      "excludedPaths": [
+        { "prefix": "/excluded" }
+      ],
+      "includedPaths": [
+        { "prefix": "/included" }
+      ]
+    }
   ]
 }

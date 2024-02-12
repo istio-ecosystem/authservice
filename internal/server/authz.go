@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -73,10 +74,21 @@ func (e *ExtAuthZFilter) Register(server *grpc.Server) {
 
 // Check is the implementation of the Envoy AuthorizationServer interface.
 func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (response *envoy.CheckResponse, err error) {
+	// If there are no trigger rules, allow the request with no check executions.
+	// TriggerRules are used to determine which request should be checked by the filter and which don't.
+	log := e.log.Context(ctx)
+	if !mustTriggerCheck(log, e.cfg.TriggerRules, req) {
+		log.Debug(fmt.Sprintf("no matching trigger rule, so allowing request to proceed without any authservice functionality %s://%s%s",
+			req.GetAttributes().GetRequest().GetHttp().GetScheme(),
+			req.GetAttributes().GetRequest().GetHttp().GetHost(),
+			req.GetAttributes().GetRequest().GetHttp().GetPath()))
+		return allow, nil
+	}
+
 	for _, c := range e.cfg.Chains {
 		match := matches(c.Match, req)
 
-		log := e.log.Context(ctx).With("chain", c.Name)
+		log = log.With("chain", c.Name)
 		log.Debug("evaluate filter chain", "match", match)
 
 		if !match {
@@ -149,4 +161,71 @@ func matches(m *configv1.Match, req *envoy.CheckRequest) bool {
 		return headerValue == m.GetEquality()
 	}
 	return strings.HasPrefix(headerValue, m.GetPrefix())
+}
+
+// mustTriggerCheck returns true if the request must be checked by the authservice filters.
+// If any of the TriggerRules match the request path, then the request must be checked.
+func mustTriggerCheck(log telemetry.Logger, rules []*configv1.TriggerRule, req *envoy.CheckRequest) bool {
+	// If there are no trigger rules, authservice checks should be triggered for all requests.
+	// If the request path is empty, (unlikely, but the piece used to match the rules) then trigger the checks.
+	if len(rules) == 0 || len(req.GetAttributes().GetRequest().GetHttp().GetPath()) == 0 {
+		return true
+	}
+
+	for i, rule := range rules {
+		l := log.With("rule-index", i)
+		if matchTriggerRule(l, rule, req.GetAttributes().GetRequest().GetHttp().GetPath()) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchTriggerRule(log telemetry.Logger, rule *configv1.TriggerRule, path string) bool {
+	if rule == nil {
+		return false
+	}
+
+	// if any of the excluded paths match, this rule doesn't match
+	for i, match := range rule.GetExcludedPaths() {
+		l := log.With("excluded-match-index", i)
+		if stringMatch(l, match, path) {
+			return false
+		}
+	}
+
+	// if no excluded paths match, and there are no included paths, this rule matches
+	if len(rule.GetIncludedPaths()) == 0 {
+		return true
+	}
+
+	for i, match := range rule.GetIncludedPaths() {
+		// if any of the included paths match, this rule matches
+		l := log.With("included-match-index", i)
+		if stringMatch(l, match, path) {
+			return true
+		}
+	}
+
+	// if none of the included paths match, this rule doesn't match
+	return false
+}
+
+func stringMatch(log telemetry.Logger, match *configv1.StringMatch, path string) bool {
+	switch m := match.GetMatchType().(type) {
+	case *configv1.StringMatch_Exact:
+		return m.Exact == path
+	case *configv1.StringMatch_Prefix:
+		return strings.HasPrefix(path, m.Prefix)
+	case *configv1.StringMatch_Suffix:
+		return strings.HasSuffix(path, m.Suffix)
+	case *configv1.StringMatch_Regex:
+		b, err := regexp.MatchString(m.Regex, path)
+		if err != nil {
+			log.Error("error matching regex", err, "regex", m.Regex, "match", false)
+		}
+		return b
+	default:
+		return false
+	}
 }

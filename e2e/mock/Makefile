@@ -18,8 +18,11 @@ E2E_TEST_OPTS ?= -count=1
 
 .PHONY: e2e
 e2e: e2e-pre
+	@$(MAKE) e2e-test e2e-post
+
+.PHONY: e2e-test
+e2e-test:
 	@go test $(E2E_TEST_OPTS) ./... || ( $(MAKE) e2e-post-error; exit 1 )
-	@$(MAKE) e2e-post
 
 .PHONY: e2e-pre
 e2e-pre:
