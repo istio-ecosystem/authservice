@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Copyright (c) Tetrate, Inc 2024 All Rights Reserved.
-
 package server
 
 import (
@@ -97,31 +95,6 @@ func TestUseFirstMatchingChain(t *testing.T) {
 	got, err := e.Check(context.Background(), header("match"))
 	require.NoError(t, err)
 	require.Equal(t, int32(codes.OK), got.Status.Code)
-}
-
-func TestCheckMock(t *testing.T) {
-	tests := []struct {
-		name  string
-		allow bool
-		want  bool
-	}{
-		{"allow", true, true},
-		{"deny", false, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &ExtAuthZFilter{}
-			got, err := e.checkMock(
-				context.Background(),
-				&envoy.CheckRequest{},
-				&mockv1.MockConfig{Allow: tt.allow},
-			)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
-		})
-	}
-
 }
 
 func TestMatch(t *testing.T) {

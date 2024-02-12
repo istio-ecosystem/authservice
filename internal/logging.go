@@ -31,6 +31,7 @@ const (
 	Default  = "default"
 	Requests = "requests"
 	Server   = "server"
+	Session  = "session"
 )
 
 // scopes contains the list of all logging scopes
@@ -39,6 +40,7 @@ var scopes = map[string]string{
 	Default:  "Default",
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",
+	Session:  "Session store messages",
 }
 
 // ErrInvalidLogLevel is returned when the configured log level is invalid.

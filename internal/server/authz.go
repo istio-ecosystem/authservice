@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/tetratelabs/telemetry"
@@ -26,9 +27,9 @@ import (
 	"google.golang.org/grpc/codes"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 	"github.com/tetrateio/authservice-go/internal"
+	"github.com/tetrateio/authservice-go/internal/authz"
+	"github.com/tetrateio/authservice-go/internal/authz/oidc"
 )
 
 var (
@@ -85,32 +86,45 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 		// Inside a filter chain, all filters must match
 		for i, f := range c.Filters {
 			var (
-				ok  bool
-				err error
+				h    authz.Authz
+				resp = &envoy.CheckResponse{}
 			)
+
+			log.Debug("applying filter", "type", fmt.Sprintf("%T", f.Type), "index", i)
 
 			switch ft := f.Type.(type) {
 			case *configv1.Filter_Mock:
-				e.log.Debug("applying filter", "type", "mock", "index", i)
-				ok, err = e.checkMock(context.Background(), req, ft.Mock)
+				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
-				e.log.Debug("applying filter", "type", "oidc", "index", i)
-				ok, err = e.checkOidc(context.Background(), req, ft.Oidc)
+				// TODO(nacx): Read the redis store config to configure the redi store
+				store := oidc.NewMemoryStore(
+					oidc.Clock{},
+					time.Duration(ft.Oidc.AbsoluteSessionTimeout),
+					time.Duration(ft.Oidc.IdleSessionTimeout),
+				)
+				// TODO(nacx): Check if the Oidc setting is enough or we have to pull the default Oidc settings
+				h = authz.NewOIDCHandler(ft.Oidc, store)
 			case *configv1.Filter_OidcOverride:
-				e.log.Debug("applying filter", "type", "oidc_override", "index", i)
-				ok, err = e.checkOidc(context.Background(), req, ft.OidcOverride)
+				// TODO(nacx): Read the redis store config to configure the redi store
+				store := oidc.NewMemoryStore(
+					oidc.Clock{},
+					time.Duration(ft.OidcOverride.AbsoluteSessionTimeout),
+					time.Duration(ft.OidcOverride.IdleSessionTimeout),
+				)
+				// TODO(nacx): Check if the OidcOverride is enough or we have to pull the default Oidc settings
+				h = authz.NewOIDCHandler(ft.OidcOverride, store)
 			}
 
-			// If there is an error just return it without a verdict, and let the Envoy ext_authz
-			// failure policy decide if the request can continue or not.
-			if err != nil {
+			if err = h.Process(ctx, req, resp); err != nil {
+				// If there is an error just return it without a verdict, and let the Envoy ext_authz
+				// failure policy decide if the request can continue or not.
 				return nil, err
 			}
 
-			log.Debug("filter evaluation", "index", i, "result", ok, "error", err)
-
-			if !ok {
-				return deny(codes.PermissionDenied, fmt.Sprintf("%s[%d] filter denied the request", c.Name, i)), nil
+			allow := codes.Code(resp.Status.Code) == codes.OK
+			log.Debug("filter result", "index", i, "allow", allow, "error", err)
+			if !allow {
+				return resp, nil
 			}
 		}
 
@@ -123,17 +137,6 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 	}
 
 	return deny(codes.PermissionDenied, "no chains matched"), nil
-}
-
-// checkMock checks the given request against the given mock configuration.
-func (e *ExtAuthZFilter) checkMock(_ context.Context, _ *envoy.CheckRequest, mock *mockv1.MockConfig) (bool, error) {
-	return mock.Allow, nil
-}
-
-// checkOidc checks the given request against the given oidc configuration.
-func (e *ExtAuthZFilter) checkOidc(_ context.Context, _ *envoy.CheckRequest, _ *oidcv1.OIDCConfig) (bool, error) {
-	// TODO
-	return false, nil
 }
 
 // matches returns true if the given request matches the given match configuration
