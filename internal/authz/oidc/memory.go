@@ -139,7 +139,7 @@ func (m *memoryStore) set(sessionID string, setter func(s *session)) {
 	}
 }
 
-// session holds the data of a session stored int he in-memory cache
+// session holds the data of a session stored in the in-memory cache
 type session struct {
 	tokenResponse      *TokenResponse
 	authorizationState *AuthorizationState

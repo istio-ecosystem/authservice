@@ -75,7 +75,6 @@ func (s *Server) PreRun() error {
 	// Initialize the gRPC server
 	s.server = grpc.NewServer( // TODO(nacx): Expose the right flags for secure connections
 		grpc.ChainUnaryInterceptor(logMiddleware.UnaryServerInterceptor),
-		grpc.ChainStreamInterceptor(logMiddleware.StreamInterceptor),
 	)
 
 	for _, h := range s.registerHandlers {

@@ -33,6 +33,9 @@ import (
 	"github.com/tetrateio/authservice-go/internal/authz/oidc"
 )
 
+// EnvoyXRequestID is the header name for the request id
+const EnvoyXRequestID = "x-request-id"
+
 var (
 	// allow a request
 	allow = &envoy.CheckResponse{
@@ -74,9 +77,11 @@ func (e *ExtAuthZFilter) Register(server *grpc.Server) {
 
 // Check is the implementation of the Envoy AuthorizationServer interface.
 func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (response *envoy.CheckResponse, err error) {
+	ctx = propagateRequestID(ctx, req) // Push the original request id tot eh context to include it in all logs
+	log := e.log.Context(ctx)
+
 	// If there are no trigger rules, allow the request with no check executions.
 	// TriggerRules are used to determine which request should be checked by the filter and which don't.
-	log := e.log.Context(ctx)
 	if !mustTriggerCheck(log, e.cfg.TriggerRules, req) {
 		log.Debug(fmt.Sprintf("no matching trigger rule, so allowing request to proceed without any authservice functionality %s://%s%s",
 			req.GetAttributes().GetRequest().GetHttp().GetScheme(),
@@ -149,6 +154,15 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 	}
 
 	return deny(codes.PermissionDenied, "no chains matched"), nil
+}
+
+// propagateRequestID propagates the request id from the request headers to the context.
+func propagateRequestID(ctx context.Context, req *envoy.CheckRequest) context.Context {
+	headers := req.GetAttributes().GetRequest().GetHttp().GetHeaders()
+	if headers == nil || headers[EnvoyXRequestID] == "" {
+		return ctx
+	}
+	return telemetry.KeyValuesToContext(ctx, EnvoyXRequestID, headers[EnvoyXRequestID])
 }
 
 // matches returns true if the given request matches the given match configuration

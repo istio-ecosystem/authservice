@@ -27,7 +27,7 @@ import (
 
 var _ Authz = (*oidcHandler)(nil)
 
-// oidc handler is a mockHandler implementation of the Authz interface that implements
+// oidc handler is an implementation of the Authz interface that implements
 // the OpenID connect protocol.
 type oidcHandler struct {
 	log    telemetry.Logger
