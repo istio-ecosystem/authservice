@@ -57,5 +57,12 @@ func (l *LocalConfigFile) Validate() error {
 		return err
 	}
 
-	return protojson.Unmarshal(content, &l.Config)
+	if err = protojson.Unmarshal(content, &l.Config); err != nil {
+		return err
+	}
+
+	// Set reasonable defaults for non-supported values
+	l.Config.Threads = 1
+
+	return l.Config.ValidateAll()
 }

@@ -102,7 +102,7 @@ config/lint:  ## Lint the Config Proto generated code
 test:  ## Run all the tests
 	@go test $(TEST_OPTS) $(TEST_PKGS)
 
-COVERAGE_OPTS     ?=
+COVERAGE_OPTS ?=
 .PHONY: coverage
 coverage:  ## Creates coverage report for all projects
 	@echo "Running test coverage"

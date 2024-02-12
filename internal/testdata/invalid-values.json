@@ -1,6 +1,6 @@
 {
-  "listen_address":  "0.0.0.0",
-  "listen_port": 8080,
+  "listen_address":  "INVALID",
+  "listen_port": 999999999,
   "log_level": "debug",
   "chains": [
     {

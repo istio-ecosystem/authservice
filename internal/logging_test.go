@@ -25,6 +25,15 @@ import (
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 )
 
+func TestGetLogger(t *testing.T) {
+	l1 := scope.Register("l1", "test logger one")
+
+	NewLogSystem(telemetry.NoopLogger(), nil)
+
+	require.Equal(t, l1, Logger("l1"))
+	require.Equal(t, telemetry.NoopLogger(), Logger("l2"))
+}
+
 func TestLoggingSetup(t *testing.T) {
 	l1 := scope.Register("l1", "test logger one")
 	l2 := scope.Register("l2", "test logger two")
@@ -50,6 +59,8 @@ func TestLoggingSetup(t *testing.T) {
 		{",", telemetry.LevelInfo, telemetry.LevelInfo, true},
 		{":", telemetry.LevelInfo, telemetry.LevelInfo, true},
 		{"invalid", telemetry.LevelInfo, telemetry.LevelInfo, true},
+		{"l1:,l2:info", telemetry.LevelInfo, telemetry.LevelInfo, true},
+		{"l1:debug,l2:invalid", telemetry.LevelInfo, telemetry.LevelInfo, true},
 	}
 
 	for _, tt := range tests {

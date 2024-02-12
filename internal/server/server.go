@@ -15,7 +15,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net"
 
@@ -37,8 +36,6 @@ var (
 	_ run.PreRunner = (*Server)(nil)
 	_ run.Service   = (*Server)(nil)
 )
-
-var ErrInvalidAddress = errors.New("invalid address")
 
 // Server that runs as a unit in a run.Group.
 type Server struct {

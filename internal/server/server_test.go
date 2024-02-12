@@ -16,8 +16,8 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,40 +31,71 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func TestServer(t *testing.T) {
-	var (
-		g   = run.Group{Logger: telemetry.NoopLogger()}
-		irq = test.NewIRQService(func() {})
-		l   = bufconn.Listen(1024)
-		s   = New(nil, func(s *grpc.Server) {
-			testgrpc.RegisterTestServiceServer(s, interop.NewTestServer())
-		})
-	)
-	s.log = telemetry.NoopLogger()
-	s.Listen = func() (net.Listener, error) { return l, nil }
-	g.Register(s, irq)
+func TestGrpcServer(t *testing.T) {
+	s := NewTestServer(func(s *grpc.Server) {
+		testgrpc.RegisterTestServiceServer(s, interop.NewTestServer())
+	})
+	go func() { require.NoError(t, s.Start()) }()
+	t.Cleanup(s.Stop)
 
-	// Start the server
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		require.NoError(t, g.Run())
-		wg.Done()
-	}()
-
-	conn, err := grpc.Dial("bufnet",
-		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return l.Dial() }),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	conn, err := s.GRPCConn()
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, conn.Close()) })
 
 	client := testgrpc.NewTestServiceClient(conn)
 	interop.DoEmptyUnaryCall(client) // this method will panic if fails
+}
 
-	// Signal server termination
-	require.NoError(t, irq.Close())
+func TestListenFails(t *testing.T) {
+	err := errors.New("listen failed")
+	s := New(nil)
+	s.Listen = func() (net.Listener, error) { return nil, err }
+	require.ErrorIs(t, s.Serve(), err)
+}
 
-	// Wait for the server to stop
-	wg.Wait()
+// TestServer that uses an in-memory listener for connections.
+type TestServer struct {
+	g        run.Group
+	l        *bufconn.Listener
+	dialOpts []grpc.DialOption
+	shutdown func()
+}
+
+// NewTestServer creates a new test server.
+func NewTestServer(handlers ...func(s *grpc.Server)) *TestServer {
+	var (
+		g        = run.Group{Logger: telemetry.NoopLogger()}
+		irq      = test.NewIRQService(func() {})
+		l        = bufconn.Listen(1024)
+		dialOpts = []grpc.DialOption{
+			grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return l.Dial() }),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		}
+
+		s = New(nil, handlers...)
+	)
+
+	s.Listen = func() (net.Listener, error) { return l, nil }
+	g.Register(s, irq)
+
+	return &TestServer{
+		g:        g,
+		l:        l,
+		dialOpts: dialOpts,
+		shutdown: func() { _ = irq.Close() },
+	}
+}
+
+// GRPCConn returns a gRPC connection that connects to the test server.
+func (s *TestServer) GRPCConn() (*grpc.ClientConn, error) {
+	return grpc.Dial("bufnet", s.dialOpts...)
+}
+
+// Start starts the server. This blocks until the server is stopped.
+func (s *TestServer) Start() error {
+	return s.g.Run()
+}
+
+// Stop the test server.
+func (s *TestServer) Stop() {
+	s.shutdown()
 }

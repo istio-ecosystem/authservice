@@ -19,33 +19,79 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/run"
+	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/proto"
+
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
+	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
 )
+
+type errCheck struct {
+	is  error
+	as  error
+	msg string
+}
+
+func (e errCheck) Check(t *testing.T, err error) {
+	switch {
+	case e.as != nil:
+		require.ErrorAs(t, err, &e.as)
+	case e.msg != "":
+		require.ErrorContains(t, err, e.msg)
+	default:
+		require.ErrorIs(t, err, e.is)
+	}
+}
 
 func TestLoadConfig(t *testing.T) {
 	tests := []struct {
-		name string
-		path string
-		err  error
+		name  string
+		path  string
+		check errCheck
 	}{
-		{"empty", "", ErrInvalidPath},
-		{"invalid", "unexisting", os.ErrNotExist},
-		{"valid", "testdata/mock.json", nil},
+		{"empty", "", errCheck{is: ErrInvalidPath}},
+		{"unexisting", "unexisting", errCheck{is: os.ErrNotExist}},
+		{"invalid-config", "testdata/invalid-config.json", errCheck{msg: `unknown field "foo"`}},
+		{"invalid-values", "testdata/invalid-values.json", errCheck{as: &configv1.ConfigMultiError{}}},
+		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := LocalConfigFile{path: tt.path}
-			require.ErrorIs(t, cfg.Validate(), tt.err)
+			err := (&LocalConfigFile{path: tt.path}).Validate()
+			tt.check.Check(t, err)
 		})
 	}
 }
 
 func TestLoadMock(t *testing.T) {
-	cfg := LocalConfigFile{path: "testdata/mock.json"}
+	want := &configv1.Config{
+		ListenAddress: "0.0.0.0",
+		ListenPort:    8080,
+		LogLevel:      "debug",
+		Threads:       1,
+		Chains: []*configv1.FilterChain{
+			{
+				Name: "mock",
+				Filters: []*configv1.Filter{
+					{
+						Type: &configv1.Filter_Mock{
+							Mock: &mockv1.MockConfig{
+								Allow: true,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 
-	require.NoError(t, cfg.Validate())
-	require.Len(t, cfg.Config.Chains, 1)
-	require.Equal(t, "mock", cfg.Config.Chains[0].Name)
-	require.Len(t, cfg.Config.Chains[0].Filters, 1)
-	require.True(t, cfg.Config.Chains[0].Filters[0].GetMock().Allow)
+	var cfg LocalConfigFile
+	g := run.Group{Logger: telemetry.NoopLogger()}
+	g.Register(&cfg)
+	err := g.Run("", "--config-path", "testdata/mock.json")
+
+	require.NoError(t, err)
+	require.True(t, proto.Equal(want, &cfg.Config))
 }
