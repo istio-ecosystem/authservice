@@ -28,6 +28,7 @@ import (
 
 const (
 	Authz    = "authz"
+	Config   = "config"
 	Default  = "default"
 	Requests = "requests"
 	Server   = "server"
@@ -37,6 +38,7 @@ const (
 // scopes contains the list of all logging scopes
 var scopes = map[string]string{
 	Authz:    "Envoy ext-authz filter implementation messages",
+	Config:   "Configuration messages",
 	Default:  "Default",
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",

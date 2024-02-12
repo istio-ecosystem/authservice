@@ -21,6 +21,7 @@ import (
 	"github.com/tetratelabs/log"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/run/pkg/signal"
+	"github.com/tetratelabs/telemetry"
 
 	"github.com/tetrateio/authservice-go/internal"
 	"github.com/tetrateio/authservice-go/internal/server"
@@ -34,11 +35,20 @@ func main() {
 		authzServer = server.New(&configFile.Config, authz.Register)
 	)
 
+	configLog := run.NewPreRunner("config-log", func() error {
+		cfgLog := internal.Logger(internal.Config)
+		if cfgLog.Level() == telemetry.LevelDebug {
+			cfgLog.Debug("configuration loaded", "config", internal.ConfigToJSONString(&configFile.Config))
+		}
+		return nil
+	})
+
 	g := run.Group{Logger: internal.Logger(internal.Default)}
 
 	g.Register(
 		configFile,        // load the configuration
 		logging,           // set up the logging system
+		configLog,         // log the configuration
 		authzServer,       // start the server
 		&signal.Handler{}, // handle graceful termination
 	)

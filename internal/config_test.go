@@ -95,3 +95,23 @@ func TestLoadMock(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, proto.Equal(want, &cfg.Config))
 }
+
+func TestConfigToJSONString(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *configv1.Config
+		want   string
+	}{
+		{"nil", nil, "{}"},
+		{"empty", &configv1.Config{}, "{}"},
+		{"simple", &configv1.Config{ListenPort: 8080}, `{"listenPort":8080}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ConfigToJSONString(tt.config)
+			require.JSONEq(t, tt.want, got)
+		})
+	}
+
+}

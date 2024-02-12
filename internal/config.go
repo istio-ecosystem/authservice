@@ -66,3 +66,8 @@ func (l *LocalConfigFile) Validate() error {
 
 	return l.Config.ValidateAll()
 }
+
+func ConfigToJSONString(c *configv1.Config) string {
+	b, _ := protojson.Marshal(c)
+	return string(b)
+}
