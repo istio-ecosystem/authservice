@@ -30,6 +30,7 @@ const (
 	Authz    = "authz"
 	Config   = "config"
 	Default  = "default"
+	JWKS     = "jwks"
 	Requests = "requests"
 	Server   = "server"
 	Session  = "session"
@@ -40,6 +41,7 @@ var scopes = map[string]string{
 	Authz:    "Envoy ext-authz filter implementation messages",
 	Config:   "Configuration messages",
 	Default:  "Default",
+	JWKS:     "JWKS update and parse messages",
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",
 	Session:  "Session store messages",

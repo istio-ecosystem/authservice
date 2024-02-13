@@ -26,16 +26,16 @@ import (
 	"github.com/tetrateio/authservice-go/internal"
 )
 
-var _ Authz = (*mockHandler)(nil)
+var _ Handler = (*mockHandler)(nil)
 
-// mockHandler handler is an implementation of the Authz interface.
+// mockHandler handler is an implementation of the Handler interface.
 type mockHandler struct {
 	log    telemetry.Logger
 	config *mockv1.MockConfig
 }
 
-// NewMockHandler creates a new Mock implementation of the Authz interface.
-func NewMockHandler(cfg *mockv1.MockConfig) Authz {
+// NewMockHandler creates a new Mock implementation of the Handler interface.
+func NewMockHandler(cfg *mockv1.MockConfig) Handler {
 	return &mockHandler{
 		log:    internal.Logger(internal.Authz).With("type", "mockHandler"),
 		config: cfg,

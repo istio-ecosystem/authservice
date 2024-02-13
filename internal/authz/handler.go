@@ -20,8 +20,8 @@ import (
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 )
 
-// Authz is an interface for handling authorization requests.
-type Authz interface {
+// Handler is an interface for handling authorization requests.
+type Handler interface {
 	// Process a CheckRequest and populate a CheckResponse.
 	Process(ctx context.Context, req *envoy.CheckRequest, resp *envoy.CheckResponse) error
 }

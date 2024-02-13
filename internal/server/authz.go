@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/tetratelabs/telemetry"
@@ -30,7 +29,7 @@ import (
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	"github.com/tetrateio/authservice-go/internal"
 	"github.com/tetrateio/authservice-go/internal/authz"
-	"github.com/tetrateio/authservice-go/internal/authz/oidc"
+	"github.com/tetrateio/authservice-go/internal/oidc"
 )
 
 // EnvoyXRequestID is the header name for the request id
@@ -58,15 +57,17 @@ var (
 
 // ExtAuthZFilter is an implementation of the Envoy AuthZ filter.
 type ExtAuthZFilter struct {
-	log telemetry.Logger
-	cfg *configv1.Config
+	log  telemetry.Logger
+	cfg  *configv1.Config
+	jwks oidc.JWKSProvider
 }
 
 // NewExtAuthZFilter creates a new ExtAuthZFilter.
-func NewExtAuthZFilter(cfg *configv1.Config) *ExtAuthZFilter {
+func NewExtAuthZFilter(cfg *configv1.Config, jwks oidc.JWKSProvider) *ExtAuthZFilter {
 	return &ExtAuthZFilter{
-		log: internal.Logger(internal.Authz),
-		cfg: cfg,
+		log:  internal.Logger(internal.Authz),
+		cfg:  cfg,
+		jwks: jwks,
 	}
 }
 
@@ -103,7 +104,7 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 		// Inside a filter chain, all filters must match
 		for i, f := range c.Filters {
 			var (
-				h    authz.Authz
+				h    authz.Handler
 				resp = &envoy.CheckResponse{}
 			)
 
@@ -113,23 +114,15 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
-				// TODO(nacx): Read the redis store config to configure the redi store
-				store := oidc.NewMemoryStore(
-					oidc.Clock{},
-					time.Duration(ft.Oidc.AbsoluteSessionTimeout),
-					time.Duration(ft.Oidc.IdleSessionTimeout),
-				)
 				// TODO(nacx): Check if the Oidc setting is enough or we have to pull the default Oidc settings
-				h = authz.NewOIDCHandler(ft.Oidc, store)
+				h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks)
 			case *configv1.Filter_OidcOverride:
-				// TODO(nacx): Read the redis store config to configure the redi store
-				store := oidc.NewMemoryStore(
-					oidc.Clock{},
-					time.Duration(ft.OidcOverride.AbsoluteSessionTimeout),
-					time.Duration(ft.OidcOverride.IdleSessionTimeout),
-				)
 				// TODO(nacx): Check if the OidcOverride is enough or we have to pull the default Oidc settings
-				h = authz.NewOIDCHandler(ft.OidcOverride, store)
+				h, err = authz.NewOIDCHandler(ft.OidcOverride, e.jwks)
+			}
+
+			if err != nil {
+				return nil, err
 			}
 
 			if err = h.Process(ctx, req, resp); err != nil {

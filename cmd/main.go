@@ -24,6 +24,7 @@ import (
 	"github.com/tetratelabs/telemetry"
 
 	"github.com/tetrateio/authservice-go/internal"
+	"github.com/tetrateio/authservice-go/internal/oidc"
 	"github.com/tetrateio/authservice-go/internal/server"
 )
 
@@ -31,8 +32,9 @@ func main() {
 	var (
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
-		authz       = server.NewExtAuthZFilter(&configFile.Config)
-		authzServer = server.New(&configFile.Config, authz.Register)
+		jwks        = oidc.NewJWKSProvider()
+		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks)
+		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 	)
 
 	configLog := run.NewPreRunner("config-log", func() error {
@@ -49,6 +51,7 @@ func main() {
 		configFile,        // load the configuration
 		logging,           // set up the logging system
 		configLog,         // log the configuration
+		jwks,              // start the JWKS provider
 		authzServer,       // start the server
 		&signal.Handler{}, // handle graceful termination
 	)
