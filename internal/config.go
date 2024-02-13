@@ -16,18 +16,29 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/tetratelabs/run"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
+	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
 
-var _ run.Config = (*LocalConfigFile)(nil)
+var (
+	_ run.Config = (*LocalConfigFile)(nil)
 
-// ErrInvalidPath is returned when the configuration file path is invalid.
-var ErrInvalidPath = errors.New("invalid path")
+	// ErrInvalidPath is returned when the configuration file path is invalid.
+	ErrInvalidPath = errors.New("invalid path")
+	// ErrInvalidOIDCOverride is returned when the OIDC override is invalid.
+	ErrInvalidOIDCOverride = errors.New("invalid OIDC override")
+	// ErrDuplicateOIDCConfig is returned when the OIDC configuration is duplicated.
+	ErrDuplicateOIDCConfig = errors.New("duplicate OIDC configuration")
+	// ErrMultipleOIDCConfig is returned  ultiple OIDC configurations are set in the same filter chain.
+	ErrMultipleOIDCConfig = errors.New("multiple OIDC configurations")
+)
 
 // LocalConfigFile is a run.Config that loads the configuration file.
 type LocalConfigFile struct {
@@ -61,10 +72,56 @@ func (l *LocalConfigFile) Validate() error {
 		return err
 	}
 
-	// Set reasonable defaults for non-supported values
+	// Validate OIDC configuration overrides
+	for _, fc := range l.Config.Chains {
+		hasOidc := false
+		for _, f := range fc.Filters {
+			if l.Config.DefaultOidcConfig != nil && f.GetOidc() != nil {
+				return fmt.Errorf("%w: in chain %q OIDC filter and default OIDC configuration cannot be used together",
+					ErrDuplicateOIDCConfig, fc.Name)
+			}
+			if l.Config.DefaultOidcConfig == nil && f.GetOidcOverride() != nil {
+				return fmt.Errorf("%w: in chain %q OIDC override filter requires a default OIDC configuration",
+					ErrInvalidOIDCOverride, fc.Name)
+			}
+			if f.GetOidc() != nil || f.GetOidcOverride() != nil {
+				if hasOidc {
+					return fmt.Errorf("%w: ionly one OIDC configuration is allowed in a chain", ErrMultipleOIDCConfig)
+				}
+				hasOidc = true
+			}
+		}
+	}
+
+	// Overrides for non-supported values
 	l.Config.Threads = 1
 
+	// Merge the OIDC overrides with the default OIDC configuration so that
+	// we can properly validate the settings and  all filters have only one
+	// location where the OIDC configuration is defined.
+	mergeOIDCConfigs(&l.Config)
+
+	// Now that all defaults are set and configurations are merged, validate all final settings
 	return l.Config.ValidateAll()
+}
+
+// mergeOIDCConfigs merges the OIDC overrides with the default OIDC configuration so that
+// all filters have only one location where the OIDC configuration is defined.
+func mergeOIDCConfigs(cfg *configv1.Config) {
+	for _, fc := range cfg.Chains {
+		for _, f := range fc.Filters {
+			// Merge the OIDC overrides and populate the normal OIDC field instead so that
+			// consumers of the config always have an up-to-date object
+			if f.GetOidcOverride() != nil {
+				oidc := proto.Clone(cfg.DefaultOidcConfig).(*oidcv1.OIDCConfig)
+				proto.Merge(oidc, f.GetOidcOverride())
+				f.Type = &configv1.Filter_Oidc{Oidc: oidc}
+			}
+		}
+	}
+	// Clear the default config as it has already been merged. This way there is only one
+	// location for the OIDC settings.
+	cfg.DefaultOidcConfig = nil
 }
 
 func ConfigToJSONString(c *configv1.Config) string {

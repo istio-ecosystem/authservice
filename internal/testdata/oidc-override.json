@@ -1,0 +1,31 @@
+{
+  "listen_address": "0.0.0.0",
+  "listen_port": 8080,
+  "log_level": "debug",
+  "default_oidc_config": {
+    "authorization_uri": "http://default",
+    "token_uri": "http://default",
+    "callback_uri": "http://fake",
+    "proxy_uri": "http://fake"
+  },
+  "chains": [
+    {
+      "name": "oidc",
+      "filters": [
+        {
+          "oidc_override": {
+            "authorization_uri": "http://fake",
+            "token_uri": "http://fake",
+            "jwks": "fake-jwks",
+            "client_id": "fake-client-id",
+            "client_secret": "fake-client-secret",
+            "id_token": {
+              "preamble": "Bearer",
+              "header": "authorization"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

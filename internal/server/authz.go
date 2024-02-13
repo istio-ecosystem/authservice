@@ -110,19 +110,16 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 
 			log.Debug("applying filter", "type", fmt.Sprintf("%T", f.Type), "index", i)
 
+			// Note that the  Default_Oidc or the Oidc_Override types can't reach this point. The configurations have
+			// already been merged when loaded from the configuration file and populated accordingly in the Oidc settings.
 			switch ft := f.Type.(type) {
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
 				// TODO(nacx): Check if the Oidc setting is enough or we have to pull the default Oidc settings
-				h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks)
-			case *configv1.Filter_OidcOverride:
-				// TODO(nacx): Check if the OidcOverride is enough or we have to pull the default Oidc settings
-				h, err = authz.NewOIDCHandler(ft.OidcOverride, e.jwks)
-			}
-
-			if err != nil {
-				return nil, err
+				if h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks); err != nil {
+					return nil, err
+				}
 			}
 
 			if err = h.Process(ctx, req, resp); err != nil {

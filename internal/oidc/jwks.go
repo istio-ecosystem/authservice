@@ -39,6 +39,9 @@ var (
 	_ run.Service = (*DefaultJWKSProvider)(nil)
 )
 
+// DefaultFetchInterval is the default interval to use when none is set.
+const DefaultFetchInterval = 1200 * time.Second
+
 // JWKSProvider provides a JWKS set for a given OIDC configuration.
 type JWKSProvider interface {
 	// Get the JWKS for the given OIDC configuration
@@ -105,6 +108,9 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.SkipVerifyPeerCert}
 		client := &http.Client{Transport: transport}
 		refreshInterval := time.Duration(config.PeriodicFetchIntervalSec) * time.Second
+		if refreshInterval == 0 {
+			refreshInterval = DefaultFetchInterval
+		}
 
 		j.cache.Configure(config.JwksUri,
 			jwk.WithHTTPClient(client),

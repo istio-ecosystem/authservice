@@ -15,6 +15,7 @@
 package internal
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -25,6 +26,7 @@ import (
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
+	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
 
 type errCheck struct {
@@ -44,7 +46,7 @@ func (e errCheck) Check(t *testing.T, err error) {
 	}
 }
 
-func TestLoadConfig(t *testing.T) {
+func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name  string
 		path  string
@@ -54,6 +56,9 @@ func TestLoadConfig(t *testing.T) {
 		{"unexisting", "unexisting", errCheck{is: os.ErrNotExist}},
 		{"invalid-config", "testdata/invalid-config.json", errCheck{msg: `unknown field "foo"`}},
 		{"invalid-values", "testdata/invalid-values.json", errCheck{as: &configv1.ConfigMultiError{}}},
+		{"duplicate-oidc", "testdata/duplicate-oidc.json", errCheck{is: ErrDuplicateOIDCConfig}},
+		{"invalid-oidc-override", "testdata/invalid-oidc-override.json", errCheck{is: ErrInvalidOIDCOverride}},
+		{"multiple-oidc", "testdata/multiple-oidc.json", errCheck{is: ErrMultipleOIDCConfig}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}
 
@@ -96,6 +101,49 @@ func TestLoadMock(t *testing.T) {
 	require.True(t, proto.Equal(want, &cfg.Config))
 }
 
+func TestLoadOIDC(t *testing.T) {
+	want := &configv1.Config{
+		ListenAddress: "0.0.0.0",
+		ListenPort:    8080,
+		LogLevel:      "debug",
+		Threads:       1,
+		Chains: []*configv1.FilterChain{
+			{
+				Name: "oidc",
+				Filters: []*configv1.Filter{
+					{
+						Type: &configv1.Filter_Oidc{
+							Oidc: &oidcv1.OIDCConfig{
+								AuthorizationUri: "http://fake",
+								TokenUri:         "http://fake",
+								CallbackUri:      "http://fake",
+								JwksConfig:       &oidcv1.OIDCConfig_Jwks{Jwks: "fake-jwks"},
+								ClientId:         "fake-client-id",
+								ClientSecret:     "fake-client-secret",
+								CookieNamePrefix: "",
+								IdToken:          &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
+								ProxyUri:         "http://fake",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range []string{"oidc", "oidc-override"} {
+		t.Run(tc, func(t *testing.T) {
+			var cfg LocalConfigFile
+			g := run.Group{Logger: telemetry.NoopLogger()}
+			g.Register(&cfg)
+			err := g.Run("", "--config-path", fmt.Sprintf("testdata/%s.json", tc))
+
+			require.NoError(t, err)
+			require.True(t, proto.Equal(want, &cfg.Config))
+		})
+	}
+}
+
 func TestConfigToJSONString(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -113,5 +161,4 @@ func TestConfigToJSONString(t *testing.T) {
 			require.JSONEq(t, tt.want, got)
 		})
 	}
-
 }
