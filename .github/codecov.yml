@@ -10,7 +10,7 @@ comment:
   layout: "diff,files"
 
 ignore:
-  - "api/**/*"
+  - "config/gen/**/*"
 
 coverage:
   status:
@@ -20,3 +20,8 @@ coverage:
         target: auto
         # allow a potential drop of up to 5%
         threshold: 5%
+    patch:
+      default:
+        target: auto
+        only_pulls: true
+        threshold: 0%

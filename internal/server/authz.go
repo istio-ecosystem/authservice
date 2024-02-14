@@ -57,17 +57,19 @@ var (
 
 // ExtAuthZFilter is an implementation of the Envoy AuthZ filter.
 type ExtAuthZFilter struct {
-	log  telemetry.Logger
-	cfg  *configv1.Config
-	jwks oidc.JWKSProvider
+	log      telemetry.Logger
+	cfg      *configv1.Config
+	jwks     oidc.JWKSProvider
+	sessions *oidc.SessionStoreFactory
 }
 
 // NewExtAuthZFilter creates a new ExtAuthZFilter.
-func NewExtAuthZFilter(cfg *configv1.Config, jwks oidc.JWKSProvider) *ExtAuthZFilter {
+func NewExtAuthZFilter(cfg *configv1.Config, jwks oidc.JWKSProvider, sessions *oidc.SessionStoreFactory) *ExtAuthZFilter {
 	return &ExtAuthZFilter{
-		log:  internal.Logger(internal.Authz),
-		cfg:  cfg,
-		jwks: jwks,
+		log:      internal.Logger(internal.Authz),
+		cfg:      cfg,
+		jwks:     jwks,
+		sessions: sessions,
 	}
 }
 
@@ -117,7 +119,7 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
 				// TODO(nacx): Check if the Oidc setting is enough or we have to pull the default Oidc settings
-				if h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks); err != nil {
+				if h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks, e.sessions); err != nil {
 					return nil, err
 				}
 			}

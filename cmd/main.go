@@ -33,7 +33,8 @@ func main() {
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
 		jwks        = oidc.NewJWKSProvider()
-		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks)
+		sessions    = &oidc.SessionStoreFactory{Config: &configFile.Config}
+		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 	)
 
@@ -52,6 +53,7 @@ func main() {
 		logging,           // set up the logging system
 		configLog,         // log the configuration
 		jwks,              // start the JWKS provider
+		sessions,          // start the session store
 		authzServer,       // start the server
 		&signal.Handler{}, // handle graceful termination
 	)

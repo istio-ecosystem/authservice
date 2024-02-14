@@ -28,6 +28,8 @@ import (
 	"github.com/lestrrat-go/jwx/jwa"
 	"github.com/lestrrat-go/jwx/jwk"
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/run"
+	"github.com/tetratelabs/telemetry"
 
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
@@ -143,8 +145,11 @@ func TestDynamicJWKSProvider(t *testing.T) {
 
 		newCache = func(t *testing.T) JWKSProvider {
 			cache := NewJWKSProvider()
-			go func() { require.NoError(t, cache.Serve()) }()
+			g := run.Group{Logger: telemetry.NoopLogger()}
+			g.Register(cache)
+			go func() { _ = g.Run() }()
 			t.Cleanup(cache.GracefulStop)
+
 			// Block until the cache is initialized
 			require.Eventually(t, func() bool {
 				return cache.cache != nil
@@ -160,8 +165,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		config := &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
-					JwksUri:                  server.URL + "/not-found",
-					PeriodicFetchIntervalSec: 1,
+					JwksUri: server.URL + "/not-found",
 				},
 			},
 		}

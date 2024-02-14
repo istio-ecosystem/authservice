@@ -16,7 +16,6 @@ package authz
 
 import (
 	"context"
-	"time"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/tetratelabs/telemetry"
@@ -31,27 +30,19 @@ var _ Handler = (*oidcHandler)(nil)
 // oidc handler is an implementation of the Handler interface that implements
 // the OpenID connect protocol.
 type oidcHandler struct {
-	log    telemetry.Logger
-	config *oidcv1.OIDCConfig
-	store  oidc.SessionStore
-	jwks   oidc.JWKSProvider
+	log      telemetry.Logger
+	config   *oidcv1.OIDCConfig
+	jwks     oidc.JWKSProvider
+	sessions *oidc.SessionStoreFactory
 }
 
 // NewOIDCHandler creates a new OIDC implementation of the Handler interface.
-func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider) (Handler, error) {
-	// TODO(nacx): Read the redis store config to configure the redi store
-	// TODO(nacx): Properly lifecycle the session store
-	store := oidc.NewMemoryStore(
-		oidc.Clock{},
-		time.Duration(cfg.AbsoluteSessionTimeout),
-		time.Duration(cfg.IdleSessionTimeout),
-	)
-
+func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider, sessions *oidc.SessionStoreFactory) (Handler, error) {
 	return &oidcHandler{
-		log:    internal.Logger(internal.Authz).With("type", "oidc"),
-		config: cfg,
-		store:  store,
-		jwks:   jwks,
+		log:      internal.Logger(internal.Authz).With("type", "oidc"),
+		config:   cfg,
+		jwks:     jwks,
+		sessions: sessions,
 	}, nil
 }
 
