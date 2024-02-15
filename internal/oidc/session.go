@@ -15,8 +15,10 @@
 package oidc
 
 import (
+	"context"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
@@ -25,13 +27,13 @@ import (
 
 // SessionStore is an interface for storing session data.
 type SessionStore interface {
-	SetTokenResponse(sessionID string, tokenResponse *TokenResponse)
-	GetTokenResponse(sessionID string) *TokenResponse
-	SetAuthorizationState(sessionID string, authorizationState *AuthorizationState)
-	GetAuthorizationState(sessionID string) *AuthorizationState
-	ClearAuthorizationState(sessionID string)
-	RemoveSession(sessionID string)
-	RemoveAllExpired()
+	SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error
+	GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error)
+	SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error
+	GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error)
+	ClearAuthorizationState(ctx context.Context, sessionID string) error
+	RemoveSession(ctx context.Context, sessionID string) error
+	RemoveAllExpired(ctx context.Context) error
 }
 
 var _ run.PreRunner = (*SessionStoreFactory)(nil)
@@ -51,6 +53,7 @@ func (s *SessionStoreFactory) Name() string { return "OIDC session store factory
 // PreRun initializes the stores that are defined in the configuration
 func (s *SessionStoreFactory) PreRun() error {
 	s.redis = make(map[string]SessionStore)
+	clock := &Clock{}
 
 	for _, fc := range s.Config.Chains {
 		for _, f := range fc.Filters {
@@ -59,11 +62,19 @@ func (s *SessionStoreFactory) PreRun() error {
 			}
 
 			if redisServer := f.GetOidc().GetRedisSessionStoreConfig().GetServerUri(); redisServer != "" {
-				// TODO(nacx): Initialize the Redis store
-				s.redis[redisServer] = &redisStore{url: redisServer}
+				// No need to check the errors here as it has already been validated when loading the configuration
+				opts, _ := redis.ParseURL(redisServer)
+				client := redis.NewClient(opts)
+				r, err := NewRedisStore(clock, client,
+					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout()),
+					time.Duration(f.GetOidc().GetIdleSessionTimeout()),
+				)
+				if err != nil {
+					return err
+				}
+				s.redis[redisServer] = r
 			} else if s.memory == nil { // Use a shared in-memory store for all OIDC configurations
-				s.memory = NewMemoryStore(
-					Clock{},
+				s.memory = NewMemoryStore(clock,
 					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout()),
 					time.Duration(f.GetOidc().GetIdleSessionTimeout()),
 				)

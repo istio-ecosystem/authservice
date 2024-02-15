@@ -12,24 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package oidc
+package authz
 
 import (
-	"time"
+	"context"
+	"testing"
 
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/stretchr/testify/require"
 )
 
-// TokenResponse contains information about the tokens returned by the Identity Provider.
-type TokenResponse struct {
-	IDToken              string
-	AccessToken          string
-	AccessTokenExpiresAt time.Time
-	RefreshToken         string
-}
-
-func (t *TokenResponse) ParseIDToken() (jwt.Token, error) { return parse(t.IDToken) }
-
-func parse(token string) (jwt.Token, error) {
-	return jwt.Parse([]byte(token), jwt.WithValidate(false))
+func TestProcessOIDC(t *testing.T) {
+	h, err := NewOIDCHandler(nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, h.Process(context.Background(), nil, nil))
 }

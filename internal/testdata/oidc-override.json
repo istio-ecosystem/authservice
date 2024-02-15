@@ -22,6 +22,9 @@
             "id_token": {
               "preamble": "Bearer",
               "header": "authorization"
+            },
+            "redis_session_store_config": {
+              "server_uri": "redis://localhost:6379/0"
             }
           }
         }

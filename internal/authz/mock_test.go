@@ -20,7 +20,6 @@ import (
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/stretchr/testify/require"
-	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/codes"
 
 	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
@@ -39,7 +38,7 @@ func TestProcessMock(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
-				m    = &mockHandler{log: telemetry.NoopLogger(), config: &mockv1.MockConfig{Allow: tt.allow}}
+				m    = NewMockHandler(&mockv1.MockConfig{Allow: tt.allow})
 				req  = &envoy.CheckRequest{}
 				resp = &envoy.CheckResponse{}
 			)

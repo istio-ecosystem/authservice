@@ -17,10 +17,10 @@ version: "3.9"
 services:
   envoy:
     image: envoyproxy/envoy:v1.29-latest
-    platform: linux/arm64
+    platform: linux/${ARCH:-amd64}
     command: -c /etc/envoy/envoy-config.yaml --log-level warning
     ports:
-      - "8080:80"  # Make it accessible from the host (HTTP traffic)
+      - "8080:80"
     volumes:
       - type: bind
         source: envoy-config.yaml

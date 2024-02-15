@@ -59,6 +59,7 @@ func TestValidateConfig(t *testing.T) {
 		{"duplicate-oidc", "testdata/duplicate-oidc.json", errCheck{is: ErrDuplicateOIDCConfig}},
 		{"invalid-oidc-override", "testdata/invalid-oidc-override.json", errCheck{is: ErrInvalidOIDCOverride}},
 		{"multiple-oidc", "testdata/multiple-oidc.json", errCheck{is: ErrMultipleOIDCConfig}},
+		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidRedisURL}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}
 
@@ -114,15 +115,16 @@ func TestLoadOIDC(t *testing.T) {
 					{
 						Type: &configv1.Filter_Oidc{
 							Oidc: &oidcv1.OIDCConfig{
-								AuthorizationUri: "http://fake",
-								TokenUri:         "http://fake",
-								CallbackUri:      "http://fake",
-								JwksConfig:       &oidcv1.OIDCConfig_Jwks{Jwks: "fake-jwks"},
-								ClientId:         "fake-client-id",
-								ClientSecret:     "fake-client-secret",
-								CookieNamePrefix: "",
-								IdToken:          &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
-								ProxyUri:         "http://fake",
+								AuthorizationUri:        "http://fake",
+								TokenUri:                "http://fake",
+								CallbackUri:             "http://fake",
+								JwksConfig:              &oidcv1.OIDCConfig_Jwks{Jwks: "fake-jwks"},
+								ClientId:                "fake-client-id",
+								ClientSecret:            "fake-client-secret",
+								CookieNamePrefix:        "",
+								IdToken:                 &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
+								ProxyUri:                "http://fake",
+								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
 							},
 						},
 					},

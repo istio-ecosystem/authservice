@@ -15,83 +15,97 @@
 package oidc
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenResponse(t *testing.T) {
-	m := NewMemoryStore(Clock{}, 0, 0).(*memoryStore)
+func TestMemoryTokenResponse(t *testing.T) {
+	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
+	ctx := context.Background()
 
-	require.Nil(t, m.GetTokenResponse("s1"))
+	tr, err := m.GetTokenResponse(ctx, "s1")
+	require.NoError(t, err)
+	require.Nil(t, tr)
 
 	// Create a session and verify it's added and accessed time
-	tr := &TokenResponse{}
-	m.SetTokenResponse("s1", &TokenResponse{})
+	tr = &TokenResponse{}
+	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
 	require.Greater(t, m.sessions["s1"].added.Unix(), int64(0))
 	require.Equal(t, m.sessions["s1"].added, m.sessions["s1"].accessed)
 
 	// Verify that the right token response is returned and the accessed time is updated
-	require.Equal(t, tr, m.GetTokenResponse("s1"))
+	got, err := m.GetTokenResponse(ctx, "s1")
+	require.NoError(t, err)
+	require.Equal(t, tr, got)
 	require.True(t, m.sessions["s1"].accessed.After(m.sessions["s1"].added))
 	lastAccessed := m.sessions["s1"].accessed
 
 	// Verify that updating the token response also updates the session access timestamp
-	m.SetTokenResponse("s1", &TokenResponse{})
+	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
 	require.True(t, m.sessions["s1"].accessed.After(lastAccessed))
 }
 
-func TestAuthorizationState(t *testing.T) {
-	m := NewMemoryStore(Clock{}, 0, 0).(*memoryStore)
+func TestMemoryAuthorizationState(t *testing.T) {
+	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
+	ctx := context.Background()
 
-	as := m.GetAuthorizationState("s1")
+	as, err := m.GetAuthorizationState(ctx, "s1")
+	require.NoError(t, err)
 	require.Nil(t, as)
 
 	// Create a session and verify it's added and accessed time
 	as = &AuthorizationState{}
-	m.SetAuthorizationState("s1", as)
+	require.NoError(t, m.SetAuthorizationState(ctx, "s1", as))
 	require.Greater(t, m.sessions["s1"].added.Unix(), int64(0))
 	require.Equal(t, m.sessions["s1"].added, m.sessions["s1"].accessed)
 
 	// Verify that the right state is returned and the accessed time is updated
-	require.Equal(t, as, m.GetAuthorizationState("s1"))
+	got, err := m.GetAuthorizationState(ctx, "s1")
+	require.NoError(t, err)
+	require.Equal(t, as, got)
 	lastAccessed := m.sessions["s1"].accessed
 	require.True(t, lastAccessed.After(m.sessions["s1"].added))
 
 	// Verify that updating the authz state also updates the session access timestamp
-	m.SetAuthorizationState("s1", &AuthorizationState{})
+	require.NoError(t, m.SetAuthorizationState(ctx, "s1", &AuthorizationState{}))
 	require.True(t, m.sessions["s1"].accessed.After(lastAccessed))
 
 	// Verify that clearing the authz state also updates the session access timestamp
-	m.ClearAuthorizationState("s1")
-	require.Nil(t, m.GetAuthorizationState("s1"))
+	require.NoError(t, m.ClearAuthorizationState(ctx, "s1"))
+	got, err = m.GetAuthorizationState(ctx, "s1")
+	require.NoError(t, err)
+	require.Nil(t, got)
 	require.True(t, m.sessions["s1"].accessed.After(lastAccessed))
 }
 
-func TestRemoveResponse(t *testing.T) {
-	m := NewMemoryStore(Clock{}, 0, 0).(*memoryStore)
+func TestMemoryRemoveResponse(t *testing.T) {
+	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
+	ctx := context.Background()
 
-	m.SetTokenResponse("s1", &TokenResponse{})
+	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
 	require.NotNil(t, m.sessions["s1"])
 
-	m.RemoveSession("s1")
+	require.NoError(t, m.RemoveSession(ctx, "s1"))
 	require.Nil(t, m.sessions["s1"])
 }
 
-func TestRemoveAllExpired(t *testing.T) {
-	m := NewMemoryStore(Clock{}, 0, 0).(*memoryStore)
+func TestMemoryRemoveAllExpired(t *testing.T) {
+	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
+	ctx := context.Background()
 
-	m.SetTokenResponse("s1", &TokenResponse{})
-	m.SetTokenResponse("s2", &TokenResponse{})
-	m.SetTokenResponse("abs-expired", &TokenResponse{})
-	m.SetTokenResponse("idle-expired", &TokenResponse{})
+	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
+	require.NoError(t, m.SetTokenResponse(ctx, "s2", &TokenResponse{}))
+	require.NoError(t, m.SetTokenResponse(ctx, "abs-expired", &TokenResponse{}))
+	require.NoError(t, m.SetTokenResponse(ctx, "idle-expired", &TokenResponse{}))
 
 	m.sessions["abs-expired"].added = time.Now().Add(-time.Hour)
 	m.sessions["idle-expired"].accessed = time.Now().Add(-time.Hour)
 
 	t.Run("no-expiration", func(t *testing.T) {
-		m.RemoveAllExpired()
+		require.NoError(t, m.RemoveAllExpired(ctx))
 
 		require.Len(t, m.sessions, 4)
 		require.NotNil(t, m.sessions["s1"])
@@ -103,7 +117,7 @@ func TestRemoveAllExpired(t *testing.T) {
 	t.Run("expiration", func(t *testing.T) {
 		m.absoluteSessionTimeout = time.Minute
 		m.idleSessionTimeout = time.Minute
-		m.RemoveAllExpired()
+		require.NoError(t, m.RemoveAllExpired(ctx))
 
 		require.Len(t, m.sessions, 2)
 		require.NotNil(t, m.sessions["s1"])

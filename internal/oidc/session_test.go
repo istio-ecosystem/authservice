@@ -17,6 +17,8 @@ package oidc
 import (
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
@@ -27,6 +29,9 @@ import (
 )
 
 func TestSessionStoreFactory(t *testing.T) {
+	redis1 := miniredis.RunT(t)
+	redis2 := miniredis.RunT(t)
+
 	config := &configv1.Config{
 		ListenAddress: "0.0.0.0",
 		ListenPort:    8080,
@@ -52,7 +57,7 @@ func TestSessionStoreFactory(t *testing.T) {
 					{
 						Type: &configv1.Filter_Oidc{
 							Oidc: &oidcv1.OIDCConfig{
-								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "http://redis1:6379"},
+								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://" + redis1.Addr()},
 							},
 						},
 					},
@@ -64,7 +69,7 @@ func TestSessionStoreFactory(t *testing.T) {
 					{
 						Type: &configv1.Filter_Oidc{
 							Oidc: &oidcv1.OIDCConfig{
-								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "http://redis2:6379"},
+								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://" + redis2.Addr()},
 							},
 						},
 					},
@@ -85,6 +90,37 @@ func TestSessionStoreFactory(t *testing.T) {
 	require.IsType(t, &memoryStore{}, store.Get(&oidcv1.OIDCConfig{}))
 	require.IsType(t, &memoryStore{}, store.Get(config.Chains[0].Filters[1].GetOidc()))
 	require.IsType(t, &memoryStore{}, store.Get(config.Chains[1].Filters[0].GetOidc()))
-	require.Equal(t, "http://redis1:6379", store.Get(config.Chains[2].Filters[0].GetOidc()).(*redisStore).url)
-	require.Equal(t, "http://redis2:6379", store.Get(config.Chains[3].Filters[0].GetOidc()).(*redisStore).url)
+	require.Equal(t, redis1.Addr(), store.Get(config.Chains[2].Filters[0].GetOidc()).(*redisStore).client.(*redis.Client).Options().Addr)
+	require.Equal(t, redis2.Addr(), store.Get(config.Chains[3].Filters[0].GetOidc()).(*redisStore).client.(*redis.Client).Options().Addr)
+}
+
+func TestSessionStoreFactoryRedisFails(t *testing.T) {
+	mr := miniredis.RunT(t)
+	config := &configv1.Config{
+		ListenAddress: "0.0.0.0",
+		ListenPort:    8080,
+		LogLevel:      "debug",
+		Threads:       1,
+		Chains: []*configv1.FilterChain{
+			{
+				Name: "redis",
+				Filters: []*configv1.Filter{
+					{
+						Type: &configv1.Filter_Oidc{
+							Oidc: &oidcv1.OIDCConfig{
+								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://" + mr.Addr()},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	store := SessionStoreFactory{Config: config}
+	g := run.Group{Logger: telemetry.NoopLogger()}
+	g.Register(&store)
+
+	mr.SetError("server error")
+	require.ErrorContains(t, g.Run(), "server error")
 }

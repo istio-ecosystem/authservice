@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -30,14 +31,11 @@ import (
 var (
 	_ run.Config = (*LocalConfigFile)(nil)
 
-	// ErrInvalidPath is returned when the configuration file path is invalid.
-	ErrInvalidPath = errors.New("invalid path")
-	// ErrInvalidOIDCOverride is returned when the OIDC override is invalid.
+	ErrInvalidPath         = errors.New("invalid path")
 	ErrInvalidOIDCOverride = errors.New("invalid OIDC override")
-	// ErrDuplicateOIDCConfig is returned when the OIDC configuration is duplicated.
 	ErrDuplicateOIDCConfig = errors.New("duplicate OIDC configuration")
-	// ErrMultipleOIDCConfig is returned  ultiple OIDC configurations are set in the same filter chain.
-	ErrMultipleOIDCConfig = errors.New("multiple OIDC configurations")
+	ErrMultipleOIDCConfig  = errors.New("multiple OIDC configurations")
+	ErrInvalidRedisURL     = errors.New("invalid Redis URL")
 )
 
 // LocalConfigFile is a run.Config that loads the configuration file.
@@ -99,15 +97,17 @@ func (l *LocalConfigFile) Validate() error {
 	// Merge the OIDC overrides with the default OIDC configuration so that
 	// we can properly validate the settings and  all filters have only one
 	// location where the OIDC configuration is defined.
-	mergeOIDCConfigs(&l.Config)
+	if err = mergeAndValidateOIDCConfigs(&l.Config); err != nil {
+		return err
+	}
 
 	// Now that all defaults are set and configurations are merged, validate all final settings
 	return l.Config.ValidateAll()
 }
 
-// mergeOIDCConfigs merges the OIDC overrides with the default OIDC configuration so that
+// mergeAndValidateOIDCConfigs merges the OIDC overrides with the default OIDC configuration so that
 // all filters have only one location where the OIDC configuration is defined.
-func mergeOIDCConfigs(cfg *configv1.Config) {
+func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 	for _, fc := range cfg.Chains {
 		for _, f := range fc.Filters {
 			// Merge the OIDC overrides and populate the normal OIDC field instead so that
@@ -117,11 +117,19 @@ func mergeOIDCConfigs(cfg *configv1.Config) {
 				proto.Merge(oidc, f.GetOidcOverride())
 				f.Type = &configv1.Filter_Oidc{Oidc: oidc}
 			}
+
+			if redisURL := f.GetOidc().GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
+				if _, err := redis.ParseURL(redisURL); err != nil {
+					return fmt.Errorf("%w: invalid redis URL in chain %q", ErrInvalidRedisURL, fc.Name)
+				}
+			}
 		}
 	}
 	// Clear the default config as it has already been merged. This way there is only one
 	// location for the OIDC settings.
 	cfg.DefaultOidcConfig = nil
+
+	return nil
 }
 
 func ConfigToJSONString(c *configv1.Config) string {

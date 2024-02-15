@@ -15,6 +15,7 @@
 package oidc
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -28,7 +29,7 @@ var _ SessionStore = (*memoryStore)(nil)
 // memoryStore is an in-memory implementation of the SessionStore interface.
 type memoryStore struct {
 	log                    telemetry.Logger
-	clock                  Clock
+	clock                  *Clock
 	absoluteSessionTimeout time.Duration
 	idleSessionTimeout     time.Duration
 
@@ -37,7 +38,7 @@ type memoryStore struct {
 }
 
 // NewMemoryStore creates a new in-memory session store.
-func NewMemoryStore(clock Clock, absoluteSessionTimeout, idleSessionTimeout time.Duration) SessionStore {
+func NewMemoryStore(clock *Clock, absoluteSessionTimeout, idleSessionTimeout time.Duration) SessionStore {
 	return &memoryStore{
 		log:                    internal.Logger(internal.Session).With("type", "memory"),
 		clock:                  clock,
@@ -47,45 +48,47 @@ func NewMemoryStore(clock Clock, absoluteSessionTimeout, idleSessionTimeout time
 	}
 }
 
-func (m *memoryStore) SetTokenResponse(sessionID string, tokenResponse *TokenResponse) {
+func (m *memoryStore) SetTokenResponse(_ context.Context, sessionID string, tokenResponse *TokenResponse) error {
 	m.set(sessionID, func(s *session) {
 		s.tokenResponse = tokenResponse
 	})
+	return nil
 }
 
-func (m *memoryStore) GetTokenResponse(sessionID string) *TokenResponse {
+func (m *memoryStore) GetTokenResponse(_ context.Context, sessionID string) (*TokenResponse, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	s := m.sessions[sessionID]
 	if s == nil {
-		return nil
+		return nil, nil
 	}
 
 	s.accessed = m.clock.Now()
-	return s.tokenResponse
+	return s.tokenResponse, nil
 }
 
-func (m *memoryStore) SetAuthorizationState(sessionID string, authorizationState *AuthorizationState) {
+func (m *memoryStore) SetAuthorizationState(_ context.Context, sessionID string, authorizationState *AuthorizationState) error {
 	m.set(sessionID, func(s *session) {
 		s.authorizationState = authorizationState
 	})
+	return nil
 }
 
-func (m *memoryStore) GetAuthorizationState(sessionID string) *AuthorizationState {
+func (m *memoryStore) GetAuthorizationState(_ context.Context, sessionID string) (*AuthorizationState, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	s := m.sessions[sessionID]
 	if s == nil {
-		return nil
+		return nil, nil
 	}
 
 	s.accessed = m.clock.Now()
-	return s.authorizationState
+	return s.authorizationState, nil
 }
 
-func (m *memoryStore) ClearAuthorizationState(sessionID string) {
+func (m *memoryStore) ClearAuthorizationState(_ context.Context, sessionID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -93,16 +96,20 @@ func (m *memoryStore) ClearAuthorizationState(sessionID string) {
 		s.accessed = m.clock.Now()
 		s.authorizationState = nil
 	}
+
+	return nil
 }
 
-func (m *memoryStore) RemoveSession(sessionID string) {
+func (m *memoryStore) RemoveSession(_ context.Context, sessionID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	delete(m.sessions, sessionID)
+
+	return nil
 }
 
-func (m *memoryStore) RemoveAllExpired() {
+func (m *memoryStore) RemoveAllExpired(context.Context) error {
 	var (
 		earliestTimeAddedToKeep    = m.clock.Now().Add(-m.absoluteSessionTimeout)
 		earliestTimeIdleToKeep     = m.clock.Now().Add(-m.idleSessionTimeout)
@@ -121,6 +128,8 @@ func (m *memoryStore) RemoveAllExpired() {
 			delete(m.sessions, sessionID)
 		}
 	}
+
+	return nil
 }
 
 // set the given session with the given setter function and record the access time.

@@ -12,17 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+version: "3.9"
 
-SUITES := mock redis
-
-.PHONY: e2e
-e2e: $(SUITES:%=e2e/%)  ## Run all e2e tests
-
-e2e/%:
-	@$(MAKE) -C $(@F) $(@D)
-
-.PHONY: clean
-clean: $(SUITES:%=clean/%)
-
-clean/%:
-	@$(MAKE) -C $(@F) $(@D)
+services:
+  redis:
+    image: redis:7.2.4
+    platform: linux/${ARCH:-amd64}
+    ports:
+      - "6379:6379"

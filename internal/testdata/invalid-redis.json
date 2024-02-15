@@ -20,7 +20,7 @@
               "header": "authorization"
             },
             "redis_session_store_config": {
-              "server_uri": "redis://localhost:6379/0"
+              "server_uri": "http://fake"
             }
           }
         }

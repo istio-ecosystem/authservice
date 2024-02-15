@@ -14,11 +14,9 @@ ignore:
 
 coverage:
   status:
-    # require coverage to not be worse than previously
     project:
       default:
         target: auto
-        # allow a potential drop of up to 5%
         threshold: 5%
     patch:
       default:
