@@ -20,9 +20,11 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
+	"github.com/tetratelabs/telemetry"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	"github.com/tetrateio/authservice-go/internal"
 )
 
 // SessionStore is an interface for storing session data.
@@ -43,6 +45,7 @@ var _ run.PreRunner = (*SessionStoreFactory)(nil)
 type SessionStoreFactory struct {
 	Config *configv1.Config
 
+	log    telemetry.Logger
 	redis  map[string]SessionStore
 	memory SessionStore
 }
@@ -52,16 +55,21 @@ func (s *SessionStoreFactory) Name() string { return "OIDC session store factory
 
 // PreRun initializes the stores that are defined in the configuration
 func (s *SessionStoreFactory) PreRun() error {
+	s.log = internal.Logger(internal.Session)
+
 	s.redis = make(map[string]SessionStore)
 	clock := &Clock{}
 
 	for _, fc := range s.Config.Chains {
+		log := s.log.With("chain", fc.Name)
+
 		for _, f := range fc.Filters {
 			if f.GetOidc() == nil {
 				continue
 			}
 
 			if redisServer := f.GetOidc().GetRedisSessionStoreConfig().GetServerUri(); redisServer != "" {
+				log.Info("initializing redis session store", "redis-url", redisServer)
 				// No need to check the errors here as it has already been validated when loading the configuration
 				opts, _ := redis.ParseURL(redisServer)
 				client := redis.NewClient(opts)
@@ -74,6 +82,7 @@ func (s *SessionStoreFactory) PreRun() error {
 				}
 				s.redis[redisServer] = r
 			} else if s.memory == nil { // Use a shared in-memory store for all OIDC configurations
+				log.Info("initializing in-memory session store")
 				s.memory = NewMemoryStore(clock,
 					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout()),
 					time.Duration(f.GetOidc().GetIdleSessionTimeout()),

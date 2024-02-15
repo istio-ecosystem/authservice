@@ -48,14 +48,20 @@ func NewMemoryStore(clock *Clock, absoluteSessionTimeout, idleSessionTimeout tim
 	}
 }
 
-func (m *memoryStore) SetTokenResponse(_ context.Context, sessionID string, tokenResponse *TokenResponse) error {
-	m.set(sessionID, func(s *session) {
+func (m *memoryStore) SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("setting token response", "token_response", tokenResponse)
+
+	m.set(ctx, sessionID, func(s *session) {
 		s.tokenResponse = tokenResponse
 	})
 	return nil
 }
 
-func (m *memoryStore) GetTokenResponse(_ context.Context, sessionID string) (*TokenResponse, error) {
+func (m *memoryStore) GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error) {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("getting token response")
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -68,14 +74,20 @@ func (m *memoryStore) GetTokenResponse(_ context.Context, sessionID string) (*To
 	return s.tokenResponse, nil
 }
 
-func (m *memoryStore) SetAuthorizationState(_ context.Context, sessionID string, authorizationState *AuthorizationState) error {
-	m.set(sessionID, func(s *session) {
+func (m *memoryStore) SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("setting authorization state", "state", authorizationState)
+
+	m.set(ctx, sessionID, func(s *session) {
 		s.authorizationState = authorizationState
 	})
 	return nil
 }
 
-func (m *memoryStore) GetAuthorizationState(_ context.Context, sessionID string) (*AuthorizationState, error) {
+func (m *memoryStore) GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error) {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("getting authorization state")
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -88,7 +100,10 @@ func (m *memoryStore) GetAuthorizationState(_ context.Context, sessionID string)
 	return s.authorizationState, nil
 }
 
-func (m *memoryStore) ClearAuthorizationState(_ context.Context, sessionID string) error {
+func (m *memoryStore) ClearAuthorizationState(ctx context.Context, sessionID string) error {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("clearing authorization state")
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -100,7 +115,10 @@ func (m *memoryStore) ClearAuthorizationState(_ context.Context, sessionID strin
 	return nil
 }
 
-func (m *memoryStore) RemoveSession(_ context.Context, sessionID string) error {
+func (m *memoryStore) RemoveSession(ctx context.Context, sessionID string) error {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("removing session")
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -109,7 +127,10 @@ func (m *memoryStore) RemoveSession(_ context.Context, sessionID string) error {
 	return nil
 }
 
-func (m *memoryStore) RemoveAllExpired(context.Context) error {
+func (m *memoryStore) RemoveAllExpired(ctx context.Context) error {
+	log := m.log.Context(ctx)
+	log.Debug("removing expired sessions")
+
 	var (
 		earliestTimeAddedToKeep    = m.clock.Now().Add(-m.absoluteSessionTimeout)
 		earliestTimeIdleToKeep     = m.clock.Now().Add(-m.idleSessionTimeout)
@@ -125,6 +146,7 @@ func (m *memoryStore) RemoveAllExpired(context.Context) error {
 		expiredBasedOnIdleTime := shouldCheckIdleTimeout && s.accessed.Before(earliestTimeIdleToKeep)
 
 		if expiredBasedOnTimeAdded || expiredBasedOnIdleTime {
+			log.Debug("removing expired session", "session-id", sessionID)
 			delete(m.sessions, sessionID)
 		}
 	}
@@ -133,7 +155,9 @@ func (m *memoryStore) RemoveAllExpired(context.Context) error {
 }
 
 // set the given session with the given setter function and record the access time.
-func (m *memoryStore) set(sessionID string, setter func(s *session)) {
+func (m *memoryStore) set(ctx context.Context, sessionID string, setter func(s *session)) {
+	log := m.log.Context(ctx).With("session-id", sessionID)
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -146,6 +170,8 @@ func (m *memoryStore) set(sessionID string, setter func(s *session)) {
 		setter(s)
 		m.sessions[sessionID] = s
 	}
+
+	log.Debug("updating last access", "accessed", s.accessed)
 }
 
 // session holds the data of a session stored in the in-memory cache

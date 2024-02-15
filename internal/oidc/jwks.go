@@ -103,6 +103,8 @@ func (j *DefaultJWKSProvider) Get(ctx context.Context, config *oidcv1.OIDCConfig
 // the cache. Otherwise, the JWKS will be fetched from the URI and the cache will be configured to periodically
 // refresh the JWKS.
 func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.OIDCConfig_JwksFetcherConfig) (jwk.Set, error) {
+	log := j.log.Context(ctx)
+
 	if !j.cache.IsRegistered(config.JwksUri) {
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.SkipVerifyPeerCert}
@@ -112,11 +114,15 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 			refreshInterval = DefaultFetchInterval
 		}
 
+		log.Info("configuring JWKS auto refresh", "jwks", config.JwksUri, "interval", refreshInterval, "skip_verify", config.SkipVerifyPeerCert)
+
 		j.cache.Configure(config.JwksUri,
 			jwk.WithHTTPClient(client),
 			jwk.WithRefreshInterval(refreshInterval),
 		)
 	}
+
+	log.Debug("fetching JWKS", "jwks", config.JwksUri)
 
 	jwks, err := j.cache.Fetch(ctx, config.JwksUri)
 	if err != nil {
@@ -126,7 +132,9 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 }
 
 // fetchStatic parses the given raw JWKS document.
-func (*DefaultJWKSProvider) fetchStatic(raw string) (jwk.Set, error) {
+func (j *DefaultJWKSProvider) fetchStatic(raw string) (jwk.Set, error) {
+	j.log.Debug("parsing static JWKS", "jwks", raw)
+
 	jwks, err := jwk.Parse([]byte(raw))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrJWKSParse, err)

@@ -44,15 +44,13 @@ const (
 )
 
 var (
-	tokenResponseKeys = []string{keyIDToken, keyAccessToken, keyRefreshToken, keyAccessTokenExpiry, keyTimeAdded}
-	// authorizationStateKeys = []string{keyState, keyNonce, keyRequestedURL, keyTimeAdded}
+	tokenResponseKeys      = []string{keyIDToken, keyAccessToken, keyRefreshToken, keyAccessTokenExpiry, keyTimeAdded}
+	authorizationStateKeys = []string{keyState, keyNonce, keyRequestedURL, keyTimeAdded}
 )
 
 // redisStore is an in-memory implementation of the SessionStore interface that stores
 // the session data in a given Redis server.
 type redisStore struct {
-	//TODO(nacx): Remove this interface embedding when the interface is fully implemented
-	SessionStore
 	log                    telemetry.Logger
 	clock                  *Clock
 	client                 redis.Cmdable
@@ -76,6 +74,9 @@ func NewRedisStore(clock *Clock, client redis.Cmdable, absoluteSessionTimeout, i
 }
 
 func (r *redisStore) SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error {
+	log := r.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("setting token response", "token_response", tokenResponse)
+
 	if err := r.client.HSet(ctx, sessionID, keyIDToken, tokenResponse.IDToken).Err(); err != nil {
 		return err
 	}
@@ -107,6 +108,8 @@ func (r *redisStore) SetTokenResponse(ctx context.Context, sessionID string, tok
 	}
 
 	if len(keysToDelete) > 0 {
+		log.Debug("deleting stale keys", "keys", keysToDelete)
+
 		if err := r.client.HDel(ctx, sessionID, keysToDelete...).Err(); err != nil {
 			return err
 		}
@@ -121,7 +124,8 @@ func (r *redisStore) SetTokenResponse(ctx context.Context, sessionID string, tok
 }
 
 func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error) {
-	log := r.log.Context(ctx)
+	log := r.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("getting token response")
 
 	res := r.client.HMGet(ctx, sessionID, tokenResponseKeys...)
 	if res.Err() != nil {
@@ -134,13 +138,13 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 	}
 
 	if token.IDToken == "" {
-		log.Debug("id token not found", "session_id", sessionID)
+		log.Debug("id token not found")
 		return nil, nil
 	}
 
 	tokenResponse := token.TokenResponse()
 	if _, err := tokenResponse.ParseIDToken(); err != nil {
-		log.Error("failed to parse id token", err, "session_id", sessionID, "token", token)
+		log.Error("failed to parse id token", err, "token", token)
 		return nil, nil
 	}
 
@@ -148,10 +152,80 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 		return nil, err
 	}
 
-	return &tokenResponse, nil
+	return tokenResponse, nil
+}
+
+func (r *redisStore) SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error {
+	log := r.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("setting authorization state", "state", authorizationState)
+
+	state := map[string]any{
+		keyState:        authorizationState.State,
+		keyNonce:        authorizationState.Nonce,
+		keyRequestedURL: authorizationState.RequestedURL,
+	}
+
+	if err := r.client.HMSet(ctx, sessionID, state).Err(); err != nil {
+		return err
+	}
+
+	now := r.clock.Now()
+	if err := r.client.HSetNX(ctx, sessionID, keyTimeAdded, now).Err(); err != nil {
+		return err
+	}
+
+	return r.refreshExpiration(ctx, sessionID, now)
+}
+
+func (r *redisStore) GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error) {
+	log := r.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("getting authorization state")
+
+	res := r.client.HMGet(ctx, sessionID, authorizationStateKeys...)
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
+
+	var state redisAuthState
+	if err := res.Scan(&state); err != nil {
+		return nil, err
+	}
+
+	if state.State == "" || state.Nonce == "" || state.RequestedURL == "" {
+		return nil, nil
+	}
+
+	if err := r.refreshExpiration(ctx, sessionID, state.TimeAdded); err != nil {
+		return nil, err
+	}
+
+	return state.AuthorizationState(), nil
+}
+
+func (r *redisStore) ClearAuthorizationState(ctx context.Context, sessionID string) error {
+	log := r.log.Context(ctx).With("session-id", sessionID)
+	log.Debug("clearing authorization state")
+
+	if err := r.client.HDel(ctx, sessionID, keyState, keyNonce, keyRequestedURL).Err(); err != nil {
+		return err
+	}
+
+	return r.refreshExpiration(ctx, sessionID, time.Time{})
+}
+
+func (r *redisStore) RemoveSession(ctx context.Context, sessionID string) error {
+	r.log.Context(ctx).With("session-id", sessionID).Debug("removing session")
+	return r.client.Del(ctx, sessionID).Err()
+}
+
+func (r *redisStore) RemoveAllExpired(context.Context) error {
+	// Sessions are automatically expired by Redis
+	return nil
 }
 
 func (r *redisStore) refreshExpiration(ctx context.Context, sessionID string, timeAdded time.Time) error {
+	log := r.log.Context(ctx).With("session-id", sessionID)
+
 	if timeAdded.IsZero() {
 		timeAdded, _ = r.client.HGet(ctx, sessionID, keyTimeAdded).Time()
 	}
@@ -185,22 +259,41 @@ func (r *redisStore) refreshExpiration(ctx context.Context, sessionID string, ti
 		}
 	}
 
+	log.Debug("updating session expiration", "expire_at", expireAt)
+
 	return r.client.ExpireAt(ctx, sessionID, expireAt).Err()
 }
 
-type redisToken struct {
-	IDToken              string    `redis:"id_token"`
-	AccessToken          string    `redis:"access_token"`
-	AccessTokenExpiresAt time.Time `redis:"access_token_expiry"`
-	RefreshToken         string    `redis:"refresh_token"`
-	TimeAdded            time.Time `redis:"time_added"`
-}
+type (
+	redisToken struct {
+		IDToken              string    `redis:"id_token"`
+		AccessToken          string    `redis:"access_token"`
+		AccessTokenExpiresAt time.Time `redis:"access_token_expiry"`
+		RefreshToken         string    `redis:"refresh_token"`
+		TimeAdded            time.Time `redis:"time_added"`
+	}
 
-func (r redisToken) TokenResponse() TokenResponse {
-	return TokenResponse{
+	redisAuthState struct {
+		State        string    `redis:"state"`
+		Nonce        string    `redis:"nonce"`
+		RequestedURL string    `redis:"requested_url"`
+		TimeAdded    time.Time `redis:"time_added"`
+	}
+)
+
+func (r redisToken) TokenResponse() *TokenResponse {
+	return &TokenResponse{
 		IDToken:              r.IDToken,
 		AccessToken:          r.AccessToken,
 		AccessTokenExpiresAt: r.AccessTokenExpiresAt,
 		RefreshToken:         r.RefreshToken,
+	}
+}
+
+func (r redisAuthState) AuthorizationState() *AuthorizationState {
+	return &AuthorizationState{
+		State:        r.State,
+		Nonce:        r.Nonce,
+		RequestedURL: r.RequestedURL,
 	}
 }
