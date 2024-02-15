@@ -78,9 +78,9 @@ func TestSessionStoreFactory(t *testing.T) {
 		},
 	}
 
-	store := SessionStoreFactory{Config: config}
+	store := &sessionStoreFactory{Config: config}
 	g := run.Group{Logger: telemetry.NoopLogger()}
-	g.Register(&store)
+	g.Register(store)
 	require.NoError(t, g.Run())
 
 	require.NotNil(t, store.memory)
@@ -117,9 +117,9 @@ func TestSessionStoreFactoryRedisFails(t *testing.T) {
 		},
 	}
 
-	store := SessionStoreFactory{Config: config}
+	store := &sessionStoreFactory{Config: config}
 	g := run.Group{Logger: telemetry.NoopLogger()}
-	g.Register(&store)
+	g.Register(store)
 
 	mr.SetError("server error")
 	require.ErrorContains(t, g.Run(), "server error")

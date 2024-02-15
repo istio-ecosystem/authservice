@@ -16,6 +16,7 @@ package oidc
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -27,22 +28,38 @@ import (
 	"github.com/tetrateio/authservice-go/internal"
 )
 
-// SessionStore is an interface for storing session data.
-type SessionStore interface {
-	SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error
-	GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error)
-	SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error
-	GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error)
-	ClearAuthorizationState(ctx context.Context, sessionID string) error
-	RemoveSession(ctx context.Context, sessionID string) error
-	RemoveAllExpired(ctx context.Context) error
-}
+type (
+	// SessionStore is an interface for storing session data.
+	SessionStore interface {
+		SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error
+		GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error)
+		SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error
+		GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error)
+		ClearAuthorizationState(ctx context.Context, sessionID string) error
+		RemoveSession(ctx context.Context, sessionID string) error
+		RemoveAllExpired(ctx context.Context) error
+	}
 
-var _ run.PreRunner = (*SessionStoreFactory)(nil)
+	// SessionStoreFactory is a factory for managing multiple SessionStores.
+	// It uses the OIDC configuration to determine which store to use.
+	SessionStoreFactory interface {
+		Get(cfg *oidcv1.OIDCConfig) SessionStore
+	}
+
+	// SessionStoreFactoryUnit is a combination of a run.PreRunner and a SessionStoreFactory.
+	SessionStoreFactoryUnit interface {
+		run.PreRunner
+		SessionStoreFactory
+	}
+)
+
+var (
+	_ SessionStoreFactoryUnit = (*sessionStoreFactory)(nil)
+)
 
 // SessionStoreFactory is a factory for creating session stores.
 // It uses the OIDC configuration to determine which store to use.
-type SessionStoreFactory struct {
+type sessionStoreFactory struct {
 	Config *configv1.Config
 
 	log    telemetry.Logger
@@ -50,11 +67,19 @@ type SessionStoreFactory struct {
 	memory SessionStore
 }
 
+// NewSessionStoreFactory creates a factory for managing session stores.
+// It uses the OIDC configuration to determine which store to use.
+func NewSessionStoreFactory(cfg *configv1.Config) SessionStoreFactoryUnit {
+	return &sessionStoreFactory{
+		Config: cfg,
+	}
+}
+
 // Name implements run.Unit.
-func (s *SessionStoreFactory) Name() string { return "OIDC session store factory" }
+func (s *sessionStoreFactory) Name() string { return "OIDC session store factory" }
 
 // PreRun initializes the stores that are defined in the configuration
-func (s *SessionStoreFactory) PreRun() error {
+func (s *sessionStoreFactory) PreRun() error {
 	s.log = internal.Logger(internal.Session)
 
 	s.redis = make(map[string]SessionStore)
@@ -95,7 +120,7 @@ func (s *SessionStoreFactory) PreRun() error {
 }
 
 // Get returns the appropriate session store for the given OIDC configuration.
-func (s *SessionStoreFactory) Get(cfg *oidcv1.OIDCConfig) SessionStore {
+func (s *sessionStoreFactory) Get(cfg *oidcv1.OIDCConfig) SessionStore {
 	if cfg == nil {
 		return nil
 	}
@@ -104,4 +129,79 @@ func (s *SessionStoreFactory) Get(cfg *oidcv1.OIDCConfig) SessionStore {
 		store = s.memory
 	}
 	return store
+}
+
+// SessionGenerator is an interface for generating session data.
+type SessionGenerator interface {
+	GenerateSessionID() string
+	GenerateNonce() string
+	GenerateState() string
+}
+
+var (
+	_ SessionGenerator = (*randomGenerator)(nil)
+	_ SessionGenerator = (*staticGenerator)(nil)
+)
+
+type (
+	// randomGenerator is a session generator that uses random strings.
+	randomGenerator struct {
+		rand *rand.Rand
+	}
+
+	// staticGenerator is a session generator that uses static strings.
+	staticGenerator struct {
+		sessionID string
+		nonce     string
+		state     string
+	}
+)
+
+// NewRandomGenerator creates a new random session generator.
+func NewRandomGenerator() SessionGenerator {
+	return &randomGenerator{
+		rand: rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (r randomGenerator) GenerateSessionID() string {
+	return r.generate(64)
+}
+
+func (r randomGenerator) GenerateNonce() string {
+	return r.generate(32)
+}
+
+func (r randomGenerator) GenerateState() string {
+	return r.generate(32)
+}
+
+func (r *randomGenerator) generate(n int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = charset[r.rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
+// NewStaticGenerator creates a new static session generator.
+func NewStaticGenerator(sessionID, nonce, state string) SessionGenerator {
+	return &staticGenerator{
+		sessionID: sessionID,
+		nonce:     nonce,
+		state:     state,
+	}
+}
+
+func (s staticGenerator) GenerateSessionID() string {
+	return s.sessionID
+}
+
+func (s staticGenerator) GenerateNonce() string {
+	return s.nonce
+}
+
+func (s staticGenerator) GenerateState() string {
+	return s.state
 }

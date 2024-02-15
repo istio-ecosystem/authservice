@@ -50,3 +50,7 @@ func newToken() string {
 	signed, _ := jwt.Sign(token, jwa.HS256, []byte("key"))
 	return string(signed)
 }
+
+func TestEncodeToken(t *testing.T) {
+	require.Equal(t, "dGVzdA==", EncodeToken("test"))
+}

@@ -49,7 +49,7 @@ func (l LogMiddleware) UnaryServerInterceptor(
 
 	log.Debug("request", "method", info.FullMethod, "data", toJSON(req))
 	resp, err := handler(ctx, req)
-	log.Debug("response", "method", info.FullMethod, "data", toJSON(req), "error", err)
+	log.Debug("response", "method", info.FullMethod, "data", toJSON(resp), "error", err)
 
 	return resp, err
 }

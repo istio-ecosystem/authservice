@@ -15,6 +15,7 @@
 package oidc
 
 import (
+	"encoding/base64"
 	"time"
 
 	"github.com/lestrrat-go/jwx/jwt"
@@ -28,8 +29,15 @@ type TokenResponse struct {
 	RefreshToken         string
 }
 
-func (t *TokenResponse) ParseIDToken() (jwt.Token, error) { return parse(t.IDToken) }
+// ParseIDToken parses the ID token string and returns the token and an error if any.
+func (t *TokenResponse) ParseIDToken() (jwt.Token, error) { return ParseToken(t.IDToken) }
 
-func parse(token string) (jwt.Token, error) {
+// ParseToken parses the token string and returns the token and an error if any.
+func ParseToken(token string) (jwt.Token, error) {
 	return jwt.Parse([]byte(token), jwt.WithValidate(false))
+}
+
+// EncodeToken returns the base64 encoded string representation of the token. Compatible with HTTP headers.
+func EncodeToken(token string) string {
+	return base64.URLEncoding.EncodeToString([]byte(token))
 }
