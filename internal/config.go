@@ -211,8 +211,6 @@ func validateURL(u string) error {
 	if u == "" {
 		return nil
 	}
-	fmt.Println("u: ", u)
 	_, err := url.Parse(u)
-	fmt.Println("err: ", err)
 	return err
 }
