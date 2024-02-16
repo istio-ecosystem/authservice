@@ -76,6 +76,10 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 
 	client := &http.Client{Transport: transport}
 
+	if err := loadWellKnownConfig(client, cfg); err != nil {
+		return nil, err
+	}
+
 	return &oidcHandler{
 		log:        internal.Logger(internal.Authz).With("type", "oidc"),
 		config:     cfg,
@@ -588,4 +592,27 @@ func getCookieName(config *oidcv1.OIDCConfig) string {
 		return prefixCookieName + prefix + suffixCookieName
 	}
 	return defaultCookieName
+}
+
+// loadWellKnownConfig loads the OIDC well-known configuration into the given OIDCConfig.
+func loadWellKnownConfig(client *http.Client, cfg *oidcv1.OIDCConfig) error {
+	if cfg.GetConfigurationUri() == "" {
+		return nil
+	}
+
+	wellKnownConfig, err := oidc.GetWellKnownConfig(client, cfg.GetConfigurationUri())
+	if err != nil {
+		return err
+	}
+
+	cfg.AuthorizationUri = wellKnownConfig.AuthorizationEndpoint
+	cfg.TokenUri = wellKnownConfig.TokenEndpoint
+	if cfg.GetJwksFetcher() == nil {
+		cfg.JwksConfig = &oidcv1.OIDCConfig_JwksFetcher{
+			JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{},
+		}
+	}
+	cfg.GetJwksFetcher().JwksUri = wellKnownConfig.JWKSURL
+
+	return nil
 }

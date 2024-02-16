@@ -400,27 +400,11 @@ func (m *OIDCConfig) validate(all bool) error {
 
 	var errors []error
 
-	if utf8.RuneCountInString(m.GetAuthorizationUri()) < 1 {
-		err := OIDCConfigValidationError{
-			field:  "AuthorizationUri",
-			reason: "value length must be at least 1 runes",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for ConfigurationUri
 
-	if utf8.RuneCountInString(m.GetTokenUri()) < 1 {
-		err := OIDCConfigValidationError{
-			field:  "TokenUri",
-			reason: "value length must be at least 1 runes",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
-	}
+	// no validation rules for AuthorizationUri
+
+	// no validation rules for TokenUri
 
 	if utf8.RuneCountInString(m.GetCallbackUri()) < 1 {
 		err := OIDCConfigValidationError{

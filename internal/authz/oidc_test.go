@@ -114,6 +114,30 @@ var (
 		ClientSecret:     "test-client-secret",
 		Scopes:           []string{"openid", "email"},
 	}
+
+	dynamicOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		ConfigurationUri: "http://idp-test-server/.well-known/openid-configuration",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecret:     "test-client-secret",
+		Scopes:           []string{"openid", "email"},
+	}
+
+	wellKnownURIs = `
+{
+	"issuer": "http://idp-test-server",
+	"authorization_endpoint": "http://idp-test-server/authorize",
+	"token_endpoint": "http://idp-test-server/token",
+	"jwks_uri": "http://idp-test-server/jwks"
+}`
 )
 
 func TestOIDCProcess(t *testing.T) {
@@ -755,6 +779,24 @@ func TestAreTokensExpired(t *testing.T) {
 	}
 }
 
+func TestLoadWellKnownConfig(t *testing.T) {
+	idpServer := newServer()
+	idpServer.Start()
+	t.Cleanup(idpServer.Stop)
+
+	require.NoError(t, loadWellKnownConfig(idpServer.newHTTPClient(), dynamicOIDCConfig))
+	require.Equal(t, dynamicOIDCConfig.AuthorizationUri, "http://idp-test-server/authorize")
+	require.Equal(t, dynamicOIDCConfig.TokenUri, "http://idp-test-server/token")
+	require.Equal(t, dynamicOIDCConfig.GetJwksFetcher().GetJwksUri(), "http://idp-test-server/jwks")
+}
+
+func TestLoadWellKnownConfigError(t *testing.T) {
+	clock := oidc.Clock{}
+	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
+	_, err := NewOIDCHandler(dynamicOIDCConfig, oidc.NewJWKSProvider(), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
+}
+
 func modifyCallbackRequestPath(path string) *envoy.CheckRequest {
 	return &envoy.CheckRequest{
 		Attributes: &envoy.AttributeContext{
@@ -900,6 +942,11 @@ func newServer() *idpServer {
 				http.Error(w, fmt.Errorf("cannot json encode id_token: %w", err).Error(), http.StatusInternalServerError)
 			}
 		}
+	})
+	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(wellKnownURIs))
 	})
 	s.Handler = handler
 	return idpServer

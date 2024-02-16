@@ -71,14 +71,17 @@ message LogoutConfig {
 // The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens
 // via the standard authorization code grant flow from an OIDC Provider.
 message OIDCConfig {
+  // The OIDC Provider's [issuer identifier](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig).
+  // If this is set, the endpoints will be dynamically retrieved from the OIDC Provider's configuration endpoint.
+  string configuration_uri = 19;
 
   // The OIDC Provider's [authorization endpoint](https://openid.net/specs/openid-connect-core-1_0.html#AuthorizationEndpoint).
-  // Required.
-  string authorization_uri = 1 [(validate.rules).string.min_len = 1];
+  // Required if `configuration_uri` is not set.
+  string authorization_uri = 1;
 
   // The OIDC Provider's [token endpoint](https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint).
-  // Required.
-  string token_uri = 2 [(validate.rules).string.min_len = 1];
+  // Required if `configuration_uri` is not set.
+  string token_uri = 2;
 
   // This value will be used as the `redirect_uri` param of the authorization code grant
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
@@ -93,7 +96,7 @@ message OIDCConfig {
   // JWT validation at regular intervals.
   message JwksFetcherConfig {
     // Request URI that has the JWKs.
-    // Required.
+    // Required if `configuration_uri` is not set.
     string jwks_uri = 1;
 
     // Request interval to check whether new JWKs are available. If not specified,

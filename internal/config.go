@@ -37,12 +37,12 @@ var (
 	ErrDuplicateOIDCConfig = errors.New("duplicate OIDC configuration")
 	ErrMultipleOIDCConfig  = errors.New("multiple OIDC configurations")
 	ErrInvalidURL          = errors.New("invalid URL")
+	ErrRequiredURL         = errors.New("required URL")
 )
 
 // LocalConfigFile is a run.Config that loads the configuration file.
 type LocalConfigFile struct {
-	path string
-	// Config is the loaded configuration.
+	path   string
 	Config configv1.Config
 }
 
@@ -114,8 +114,14 @@ func (l *LocalConfigFile) Validate() error {
 // mergeAndValidateOIDCConfigs merges the OIDC overrides with the default OIDC configuration so that
 // all filters have only one location where the OIDC configuration is defined.
 func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
+	var errs []error
+
 	for _, fc := range cfg.Chains {
 		for _, f := range fc.Filters {
+			if _, ok := f.Type.(*configv1.Filter_Mock); ok {
+				continue
+			}
+
 			// Merge the OIDC overrides and populate the normal OIDC field instead so that
 			// consumers of the config always have an up-to-date object
 			if f.GetOidcOverride() != nil {
@@ -123,13 +129,25 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 				proto.Merge(oidc, f.GetOidcOverride())
 				f.Type = &configv1.Filter_Oidc{Oidc: oidc}
 			}
+
+			if f.GetOidc().GetConfigurationUri() == "" {
+				if f.GetOidc().GetAuthorizationUri() == "" {
+					errs = append(errs, fmt.Errorf("%w: missing authorization URI in chain %q", ErrRequiredURL, fc.Name))
+				}
+				if f.GetOidc().GetTokenUri() == "" {
+					errs = append(errs, fmt.Errorf("%w: missing token URI in chain %q", ErrRequiredURL, fc.Name))
+				}
+				if f.GetOidc().GetJwks() == "" && f.GetOidc().GetJwksFetcher().GetJwksUri() == "" {
+					errs = append(errs, fmt.Errorf("%w: missing JWKS URI  in chain %q", ErrRequiredURL, fc.Name))
+				}
+			}
 		}
 	}
 	// Clear the default config as it has already been merged. This way there is only one
 	// location for the OIDC settings.
 	cfg.DefaultOidcConfig = nil
 
-	return nil
+	return errors.Join(errs...)
 }
 
 func ConfigToJSONString(c *configv1.Config) string {
@@ -168,6 +186,9 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 	}
 	if err := validateURL(c.GetTokenUri()); err != nil {
 		return fmt.Errorf("%w: invalid token URL: %w", ErrInvalidURL, err)
+	}
+	if err := validateURL(c.GetConfigurationUri()); err != nil {
+		return fmt.Errorf("%w: invalid configuration URL: %w", ErrInvalidURL, err)
 	}
 	if err := validateURL(c.GetAuthorizationUri()); err != nil {
 		return fmt.Errorf("%w: invalid authorization URL: %w", ErrInvalidURL, err)
