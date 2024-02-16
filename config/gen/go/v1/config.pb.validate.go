@@ -807,6 +807,21 @@ func (m *Config) validate(all bool) error {
 
 	// no validation rules for AllowUnmatchedRequests
 
+	// no validation rules for HealthListenAddress
+
+	if m.GetHealthListenPort() >= 65536 {
+		err := ConfigValidationError{
+			field:  "HealthListenPort",
+			reason: "value must be less than 65536",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for HealthListenPath
+
 	if len(errors) > 0 {
 		return ConfigMultiError(errors)
 	}

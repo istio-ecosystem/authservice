@@ -36,6 +36,7 @@ func main() {
 		sessions    = oidc.NewSessionStoreFactory(&configFile.Config)
 		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
+		healthz     = server.NewHealthServer(&configFile.Config)
 	)
 
 	configLog := run.NewPreRunner("config-log", func() error {
@@ -55,6 +56,7 @@ func main() {
 		jwks,              // start the JWKS provider
 		sessions,          // start the session store
 		authzServer,       // start the server
+		healthz,           // start the health server
 		&signal.Handler{}, // handle graceful termination
 	)
 

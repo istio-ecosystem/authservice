@@ -38,6 +38,7 @@ var (
 	ErrMultipleOIDCConfig  = errors.New("multiple OIDC configurations")
 	ErrInvalidURL          = errors.New("invalid URL")
 	ErrRequiredURL         = errors.New("required URL")
+	ErrHealthPortInUse     = errors.New("health port is already in use by listen port")
 )
 
 // LocalConfigFile is a run.Config that loads the configuration file.
@@ -69,6 +70,10 @@ func (l *LocalConfigFile) Validate() error {
 
 	if err = protojson.Unmarshal(content, &l.Config); err != nil {
 		return err
+	}
+
+	if l.Config.GetListenPort() == l.Config.GetHealthListenPort() {
+		return ErrHealthPortInUse
 	}
 
 	// Validate the URLs before merging the OIDC configurations

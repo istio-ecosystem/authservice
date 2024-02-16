@@ -61,6 +61,7 @@ func TestValidateConfig(t *testing.T) {
 		{"multiple-oidc", "testdata/multiple-oidc.json", errCheck{is: ErrMultipleOIDCConfig}},
 		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"invalid-oidc-uris", "testdata/invalid-oidc-uris.json", errCheck{is: ErrRequiredURL}},
+		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
 		{"oidc-dynamic", "testdata/oidc-dynamic.json", errCheck{is: nil}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}

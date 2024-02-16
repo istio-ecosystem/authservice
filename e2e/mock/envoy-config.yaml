@@ -68,4 +68,4 @@ static_resources:
                   address:
                     socket_address:
                       address: ext-authz
-                      port_value: 10004
+                      port_value: 10003
