@@ -59,7 +59,7 @@ func TestValidateConfig(t *testing.T) {
 		{"duplicate-oidc", "testdata/duplicate-oidc.json", errCheck{is: ErrDuplicateOIDCConfig}},
 		{"invalid-oidc-override", "testdata/invalid-oidc-override.json", errCheck{is: ErrInvalidOIDCOverride}},
 		{"multiple-oidc", "testdata/multiple-oidc.json", errCheck{is: ErrMultipleOIDCConfig}},
-		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidRedisURL}},
+		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}
 
@@ -67,6 +67,88 @@ func TestValidateConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := (&LocalConfigFile{path: tt.path}).Validate()
 			tt.check.Check(t, err)
+		})
+	}
+}
+
+func TestValidateURLs(t *testing.T) {
+	const (
+		validURL      = "http://fake"
+		invalidURL    = "ht tp://invalid"
+		validRedisURL = "redis://localhost:6379/0"
+	)
+
+	urlTests := []struct {
+		name    string
+		oidCCfg *oidcv1.OIDCConfig
+		check   errCheck
+	}{
+		{"empty", &oidcv1.OIDCConfig{}, errCheck{is: nil}},
+		{
+			"invalid-redis",
+			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: invalidURL}},
+			errCheck{is: ErrInvalidURL},
+		},
+		{
+			"invalid-jwks-fetcher",
+			&oidcv1.OIDCConfig{
+				JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+					JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: invalidURL},
+				},
+			},
+			errCheck{is: ErrInvalidURL},
+		},
+		{"invalid-proxy-uri", &oidcv1.OIDCConfig{ProxyUri: invalidURL}, errCheck{is: ErrInvalidURL}},
+		{"invalid-token-uri", &oidcv1.OIDCConfig{TokenUri: invalidURL}, errCheck{is: ErrInvalidURL}},
+		{"invalid-authorization-uri", &oidcv1.OIDCConfig{AuthorizationUri: invalidURL}, errCheck{is: ErrInvalidURL}},
+		{"invalid-callback-uri", &oidcv1.OIDCConfig{CallbackUri: invalidURL}, errCheck{is: ErrInvalidURL}},
+		{
+			"valid",
+			&oidcv1.OIDCConfig{
+				ProxyUri: validURL, AuthorizationUri: validURL, TokenUri: validURL, CallbackUri: validURL,
+				JwksConfig:              &oidcv1.OIDCConfig_JwksFetcher{JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: validURL}},
+				RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: validRedisURL},
+			},
+			errCheck{is: nil},
+		},
+	}
+
+	configTests := []struct {
+		name string
+		cfg  func(*oidcv1.OIDCConfig) *configv1.Config
+	}{
+		{
+			"default",
+			func(oidcCfg *oidcv1.OIDCConfig) *configv1.Config {
+				return &configv1.Config{DefaultOidcConfig: oidcCfg}
+			},
+		},
+		{
+			"chain-oidc",
+			func(oidcCfg *oidcv1.OIDCConfig) *configv1.Config {
+				return &configv1.Config{
+					Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{{Type: &configv1.Filter_Oidc{Oidc: oidcCfg}}}}},
+				}
+			},
+		},
+		{
+			"chain-oidc-override",
+			func(oidcCfg *oidcv1.OIDCConfig) *configv1.Config {
+				return &configv1.Config{
+					Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{{Type: &configv1.Filter_OidcOverride{OidcOverride: oidcCfg}}}}},
+				}
+			},
+		},
+	}
+
+	for _, ct := range configTests {
+		t.Run(ct.name, func(t *testing.T) {
+			for _, tt := range urlTests {
+				t.Run(tt.name, func(t *testing.T) {
+					cfg := ct.cfg(tt.oidCCfg)
+					tt.check.Check(t, validateURLs(cfg))
+				})
+			}
 		})
 	}
 }

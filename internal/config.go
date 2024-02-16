@@ -17,6 +17,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 
 	"github.com/redis/go-redis/v9"
@@ -35,7 +36,7 @@ var (
 	ErrInvalidOIDCOverride = errors.New("invalid OIDC override")
 	ErrDuplicateOIDCConfig = errors.New("duplicate OIDC configuration")
 	ErrMultipleOIDCConfig  = errors.New("multiple OIDC configurations")
-	ErrInvalidRedisURL     = errors.New("invalid Redis URL")
+	ErrInvalidURL          = errors.New("invalid URL")
 )
 
 // LocalConfigFile is a run.Config that loads the configuration file.
@@ -67,6 +68,11 @@ func (l *LocalConfigFile) Validate() error {
 	}
 
 	if err = protojson.Unmarshal(content, &l.Config); err != nil {
+		return err
+	}
+
+	// Validate the URLs before merging the OIDC configurations
+	if err = validateURLs(&l.Config); err != nil {
 		return err
 	}
 
@@ -117,12 +123,6 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 				proto.Merge(oidc, f.GetOidcOverride())
 				f.Type = &configv1.Filter_Oidc{Oidc: oidc}
 			}
-
-			if redisURL := f.GetOidc().GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
-				if _, err := redis.ParseURL(redisURL); err != nil {
-					return fmt.Errorf("%w: invalid redis URL in chain %q", ErrInvalidRedisURL, fc.Name)
-				}
-			}
 		}
 	}
 	// Clear the default config as it has already been merged. This way there is only one
@@ -135,4 +135,63 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 func ConfigToJSONString(c *configv1.Config) string {
 	b, _ := protojson.Marshal(c)
 	return string(b)
+}
+
+func validateURLs(config *configv1.Config) error {
+	if err := validateOIDCConfigURLs(config.DefaultOidcConfig); err != nil {
+		return fmt.Errorf("invalid default OIDC config: %w", err)
+	}
+
+	for _, fc := range config.Chains {
+		for fi, f := range fc.Filters {
+			if f.GetOidc() != nil {
+				err := validateOIDCConfigURLs(f.GetOidc())
+				if err != nil {
+					return fmt.Errorf("invalid OIDC config from chain[%s].filter[%d]: %w", fc.GetName(), fi, err)
+				}
+			}
+			if f.GetOidcOverride() != nil {
+				err := validateOIDCConfigURLs(f.GetOidcOverride())
+				if err != nil {
+					return fmt.Errorf("invalid OIDC override from chain[%s].filter[%d]: %w", fc.GetName(), fi, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
+	if err := validateURL(c.GetProxyUri()); err != nil {
+		return fmt.Errorf("%w: invalid proxy URL: %w", ErrInvalidURL, err)
+	}
+	if err := validateURL(c.GetTokenUri()); err != nil {
+		return fmt.Errorf("%w: invalid token URL: %w", ErrInvalidURL, err)
+	}
+	if err := validateURL(c.GetAuthorizationUri()); err != nil {
+		return fmt.Errorf("%w: invalid authorization URL: %w", ErrInvalidURL, err)
+	}
+	if err := validateURL(c.GetCallbackUri()); err != nil {
+		return fmt.Errorf("%w: invalid callback URL: %w", ErrInvalidURL, err)
+	}
+	if err := validateURL(c.GetJwksFetcher().GetJwksUri()); err != nil {
+		return fmt.Errorf("%w: invalid JWKS Fetcher URL: %w", ErrInvalidURL, err)
+	}
+	if redisURL := c.GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
+		if _, err := redis.ParseURL(redisURL); err != nil {
+			return fmt.Errorf("%w: invalid Redis session store URL: %w", ErrInvalidURL, err)
+		}
+	}
+	return nil
+}
+
+func validateURL(u string) error {
+	if u == "" {
+		return nil
+	}
+	fmt.Println("u: ", u)
+	_, err := url.Parse(u)
+	fmt.Println("err: ", err)
+	return err
 }

@@ -67,8 +67,14 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SkipVerifyPeerCert}
+
+	if cfg.ProxyUri != "" {
+		// config validation ensures that the proxy uri is valid
+		proxyURL, _ := url.Parse(cfg.ProxyUri)
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+
 	client := &http.Client{Transport: transport}
-	// TODO (sergicastro) use proxy uri
 
 	return &oidcHandler{
 		log:        internal.Logger(internal.Authz).With("type", "oidc"),

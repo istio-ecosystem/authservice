@@ -99,8 +99,8 @@ func (s *sessionStoreFactory) PreRun() error {
 				opts, _ := redis.ParseURL(redisServer)
 				client := redis.NewClient(opts)
 				r, err := NewRedisStore(clock, client,
-					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout()),
-					time.Duration(f.GetOidc().GetIdleSessionTimeout()),
+					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout())*time.Second,
+					time.Duration(f.GetOidc().GetIdleSessionTimeout())*time.Second,
 				)
 				if err != nil {
 					return err
@@ -109,8 +109,8 @@ func (s *sessionStoreFactory) PreRun() error {
 			} else if s.memory == nil { // Use a shared in-memory store for all OIDC configurations
 				log.Info("initializing in-memory session store")
 				s.memory = NewMemoryStore(clock,
-					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout()),
-					time.Duration(f.GetOidc().GetIdleSessionTimeout()),
+					time.Duration(f.GetOidc().GetAbsoluteSessionTimeout())*time.Second,
+					time.Duration(f.GetOidc().GetIdleSessionTimeout())*time.Second,
 				)
 			}
 		}

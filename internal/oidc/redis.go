@@ -259,7 +259,12 @@ func (r *redisStore) refreshExpiration(ctx context.Context, sessionID string, ti
 		}
 	}
 
-	log.Debug("updating session expiration", "expire_at", expireAt)
+	log.Debug("updating session expiration",
+		"expire_at", expireAt.Format(time.DateTime),
+		"time_added", timeAdded.Format(time.DateTime),
+		"absolute_session_timeout", r.absoluteSessionTimeout,
+		"idle_session_timeout", r.idleSessionTimeout,
+	)
 
 	return r.client.ExpireAt(ctx, sessionID, expireAt).Err()
 }
