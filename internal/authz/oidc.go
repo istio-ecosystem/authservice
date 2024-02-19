@@ -17,7 +17,9 @@ package authz
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -65,16 +67,10 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 	sessions oidc.SessionStoreFactory, clock oidc.Clock,
 	sessionGen oidc.SessionGenerator) (Handler, error) {
 
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SkipVerifyPeerCert}
-
-	if cfg.ProxyUri != "" {
-		// config validation ensures that the proxy uri is valid
-		proxyURL, _ := url.Parse(cfg.ProxyUri)
-		transport.Proxy = http.ProxyURL(proxyURL)
+	client, err := getHTTPClient(cfg)
+	if err != nil {
+		return nil, err
 	}
-
-	client := &http.Client{Transport: transport}
 
 	if err := loadWellKnownConfig(client, cfg); err != nil {
 		return nil, err
@@ -89,6 +85,31 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 		sessionGen: sessionGen,
 		httpClient: client,
 	}, nil
+}
+
+func getHTTPClient(cfg *oidcv1.OIDCConfig) (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SkipVerifyPeerCert}
+
+	if cfg.GetTrustedCertificateAuthority() != "" {
+		certPool, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, fmt.Errorf("error creating system cert pool: %w", err)
+		}
+		transport.TLSClientConfig.RootCAs = certPool
+
+		if ok := certPool.AppendCertsFromPEM([]byte(cfg.GetTrustedCertificateAuthority())); !ok {
+			return nil, errors.New("could no load trusted certificate authority")
+		}
+	}
+
+	if cfg.ProxyUri != "" {
+		// config validation ensures that the proxy uri is valid
+		proxyURL, _ := url.Parse(cfg.ProxyUri)
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+
+	return &http.Client{Transport: transport}, nil
 }
 
 // Process a CheckRequest and populate a CheckResponse according to the mockHandler configuration.
