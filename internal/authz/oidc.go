@@ -30,6 +30,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/lestrrat-go/jwx/jws"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -375,34 +376,41 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	if oidcNonce, ok := idToken.Get("nonce"); ok {
-		if oidcNonce.(string) != stateFromStore.Nonce {
-			log.Info("id token nonce does not match", "nonce-from-id-token", oidcNonce, "nonce-from-store", stateFromStore.Nonce)
-			setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
-			return
-		}
+	oidcNonce, ok := idToken.Get("nonce")
+	if !ok {
+		log.Info("id token does not have nonce claim")
+		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
+		return
 	}
-	var (
-		audMatches bool
-		oidcAud    interface{}
-		ok         bool
-	)
-	if oidcAud, ok = idToken.Get("aud"); ok {
-		switch aud := oidcAud.(type) {
-		case string:
-			audMatches = aud == o.config.GetClientId()
-		case []string:
-			for _, a := range aud {
-				if a == o.config.GetClientId() {
-					audMatches = true
-					break
-				}
-			}
+	if oidcNonce.(string) != stateFromStore.Nonce {
+		log.Info("id token nonce does not match", "nonce-from-id-token", oidcNonce, "nonce-from-store", stateFromStore.Nonce)
+		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
+		return
+	}
+
+	var audMatches bool
+	for _, a := range idToken.Audience() {
+		if a == o.config.GetClientId() {
+			audMatches = true
+			break
 		}
 	}
 	if !audMatches {
-		log.Info("id token audience does not match", "aud-from-id-token", oidcAud, "aud-from-config", o.config.GetClientId())
+		log.Info("id token audience does not match", "aud-from-id-token", idToken.Audience(), "aud-from-config", o.config.GetClientId())
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
+		return
+	}
+
+	jwtSet, err := o.jwks.Get(ctx, o.config)
+	if err != nil {
+		log.Error("error fetching jwks", err)
+		setDenyResponse(resp, newDenyResponse(), codes.Internal)
+		return
+	}
+
+	if _, err := jws.VerifySet([]byte(bodyTokens.IDToken), jwtSet); err != nil {
+		log.Error("error verifying id token with fetched jwks", err)
+		setDenyResponse(resp, newDenyResponse(), codes.Internal)
 		return
 	}
 
