@@ -16,13 +16,13 @@
 # When adding a suite, create a new directory under e2e/ and add a Makefile that
 # includes this file.
 
-# Force run of the e2e tests
+ROOT := $(shell git rev-parse --show-toplevel)
+
+include $(ROOT)/env.mk
+
+# Force run of the e2e tests by default
 E2E_TEST_OPTS ?= -count=1
 
-export ARCH := $(shell uname -m)
-ifeq ($(ARCH),x86_64)
-export ARCH := amd64
-endif
 
 .PHONY: e2e
 e2e: e2e-pre

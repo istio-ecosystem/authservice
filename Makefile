@@ -18,22 +18,9 @@ BUILD_OPTS ?=
 TEST_OPTS  ?=
 TEST_PKGS  ?= $(shell go list ./... | grep -v /e2e)
 OUTDIR     ?= bin
-TARGETS    ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 
-DOCKER_HUB          ?= gcr.io/tetrate-internal-containers
-DOCKER_TAG          ?= $(shell git rev-parse HEAD)
-DOCKER_TARGETS      ?= linux-amd64 linux-arm64
-DOCKER_BUILDER_NAME ?= $(NAME)-builder
-
-GO_MODULE := $(shell sed -ne 's/^module //gp' go.mod)
-
-GOLANGCI_LINT ?= github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-GOSIMPORTS    ?= github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
-LICENSER      ?= github.com/liamawhite/licenser@v0.6.1-0.20210729145742-be6c77bf6a1f
-
-
-# Pick up any local overrides.
--include .makerc
+include env.mk    # Load common variables
+-include .makerc  # Pick up any local overrides.
 
 
 ##@ Build targets

@@ -97,7 +97,7 @@ func (l *LocalConfigFile) Validate() error {
 			}
 			if f.GetOidc() != nil || f.GetOidcOverride() != nil {
 				if hasOidc {
-					return fmt.Errorf("%w: ionly one OIDC configuration is allowed in a chain", ErrMultipleOIDCConfig)
+					return fmt.Errorf("%w: only one OIDC configuration is allowed in a chain", ErrMultipleOIDCConfig)
 				}
 				hasOidc = true
 			}

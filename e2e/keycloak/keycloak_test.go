@@ -15,39 +15,26 @@
 package keycloak
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/html"
 
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
-	"github.com/tetrateio/authservice-go/internal/authz"
+	"github.com/tetrateio/authservice-go/e2e/common"
 )
 
 const (
-	dockerLocalHost         = "host.docker.internal"
-	authServiceCookiePrefix = "authservice"
-	keyCloakLoginFormID     = "kc-form-login"
-	testCAFile              = "certs/ca.crt"
-	username                = "authservice"
-	password                = "authservice"
+	dockerLocalHost     = "host.docker.internal"
+	keyCloakLoginFormID = "kc-form-login"
+	testCAFile          = "certs/ca.crt"
+	username            = "authservice"
+	password            = "authservice"
 )
 
-var (
-	testURL               = fmt.Sprintf("https://%s:8443", dockerLocalHost)
-	authServiceCookieName = authz.GetCookieName(&oidcv1.OIDCConfig{CookieNamePrefix: authServiceCookiePrefix})
-	authServiceCookie     *http.Cookie
-)
+var testURL = fmt.Sprintf("https://%s:8443", dockerLocalHost)
 
 // skipIfDockerHostNonResolvable skips the test if the Docker host is not resolvable.
 func skipIfDockerHostNonResolvable(t *testing.T) {
@@ -63,125 +50,27 @@ func skipIfDockerHostNonResolvable(t *testing.T) {
 func TestOIDC(t *testing.T) {
 	skipIfDockerHostNonResolvable(t)
 
-	client := testHTTPClient(t)
+	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
+	client, err := common.NewOIDCTestClient(
+		common.WithCustomCA(testCAFile),
+		common.WithLoggingOptions(t.Log, true),
+	)
+	require.NoError(t, err)
 
-	// Send a request. This will be redirected to the IdP login page
+	// Send a request to the test server. It will be redirected to the IdP login page
 	res, err := client.Get(testURL)
 	require.NoError(t, err)
-	logResponse(t, res)
 
 	// Parse the response body to get the URL where the login page would post the user-entered credentials
+	require.NoError(t, client.ParseLoginForm(res.Body, keyCloakLoginFormID))
+
+	// Submit the login form to the IdP. This will authenticate and redirect back to the application
+	res, err = client.Login(map[string]string{"username": username, "password": password, "credentialId": ""})
+	require.NoError(t, err)
+
+	// Verify that we get the expected response from the application
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
-	formAction, err := getFormAction(string(body), keyCloakLoginFormID)
-	require.NoError(t, err)
-
-	// Generate a request to authenticate against the IdP by posting the credentials
-	data := url.Values{}
-	data.Add("username", username)
-	data.Add("password", password)
-	data.Add("credentialId", "")
-	req, err := http.NewRequest("POST", formAction, strings.NewReader(data.Encode()))
-	require.NoError(t, err)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	for _, c := range res.Cookies() { // Propagate all returned cookies
-		req.AddCookie(c)
-	}
-	// This cookie should have been captured by the client when the AuthService redirected the request to the IdP
-	req.AddCookie(authServiceCookie)
-	logRequest(t, req)
-
-	// Post the login credentials. After this, the IdP should redirect to the original request URL
-	res, err = client.Do(req)
-	require.NoError(t, err)
-	logResponse(t, res)
-
-	// Verify the response to check that we were redirected to tha target service.
-	body, err = io.ReadAll(res.Body)
-	require.NoError(t, err)
-	require.Equal(t, res.StatusCode, http.StatusOK)
+	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.Contains(t, string(body), "Access allowed")
-}
-
-// testHTTPClient returns an HTTP client with custom transport that trusts the CA certificate used in the e2e tests.
-func testHTTPClient(t *testing.T) *http.Client {
-	caCert, err := os.ReadFile(testCAFile)
-	require.NoError(t, err)
-
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{RootCAs: caCertPool}
-
-	return &http.Client{
-		Transport: transport,
-		// We intercept the redirect call to the AuthService to be able to save the cookie set
-		// bu the AuthService and use it when posting the credentials to authenticate to the IdP.
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			for _, c := range req.Response.Cookies() {
-				if c.Name == authServiceCookieName {
-					authServiceCookie = c
-					break
-				}
-			}
-			return nil
-		},
-	}
-}
-
-// logRequest logs the request details.
-func logRequest(t *testing.T, req *http.Request) {
-	dump, err := httputil.DumpRequestOut(req, true)
-	require.NoError(t, err)
-	t.Log(string(dump))
-}
-
-// logResponse logs the response details.
-func logResponse(t *testing.T, res *http.Response) {
-	dump, err := httputil.DumpResponse(res, true)
-	require.NoError(t, err)
-	t.Log(string(dump))
-}
-
-// getFormAction returns the action attribute of the form with the specified ID in the given HTML response body.
-func getFormAction(responseBody string, formID string) (string, error) {
-	// Parse HTML response
-	doc, err := html.Parse(strings.NewReader(responseBody))
-	if err != nil {
-		return "", err
-	}
-
-	// Find the form with the specified ID
-	var findForm func(*html.Node) string
-	findForm = func(n *html.Node) string {
-		if n.Type == html.ElementNode && n.Data == "form" {
-			for _, attr := range n.Attr {
-				if attr.Key == "id" && attr.Val == formID {
-					// Found the form, return its action attribute
-					for _, a := range n.Attr {
-						if a.Key == "action" {
-							return a.Val
-						}
-					}
-				}
-			}
-		}
-
-		// Recursively search for the form in child nodes
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if result := findForm(c); result != "" {
-				return result
-			}
-		}
-
-		return ""
-	}
-
-	action := findForm(doc)
-	if action == "" {
-		return "", fmt.Errorf("form with ID '%s' not found", formID)
-	}
-
-	return action, nil
 }
