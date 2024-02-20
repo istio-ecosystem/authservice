@@ -29,6 +29,8 @@ import (
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
 
+const scopeOIDC = "openid"
+
 var (
 	_ run.Config = (*LocalConfigFile)(nil)
 
@@ -146,6 +148,9 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 					errs = append(errs, fmt.Errorf("%w: missing JWKS URI  in chain %q", ErrRequiredURL, fc.Name))
 				}
 			}
+
+			// Set the defaults
+			applyOIDCDefaults(f.GetOidc())
 		}
 	}
 	// Clear the default config as it has already been merged. This way there is only one
@@ -153,6 +158,18 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 	cfg.DefaultOidcConfig = nil
 
 	return errors.Join(errs...)
+}
+
+func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
+	if config.GetScopes() == nil {
+		config.Scopes = []string{scopeOIDC}
+	}
+	for _, s := range config.GetScopes() {
+		if s == scopeOIDC {
+			return
+		}
+	}
+	config.Scopes = append(config.Scopes, scopeOIDC)
 }
 
 func ConfigToJSONString(c *configv1.Config) string {

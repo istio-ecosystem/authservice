@@ -1,0 +1,103 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.9"
+
+services:
+  # This is the main backend service. It returns a fixed HTTP 200 response.
+  # It is configured to serve on port 443, and to use the ext-authz filter
+  # to intercept all requests.
+  envoy:
+    depends_on:
+      ext-authz:
+        condition: service_started
+    image: envoyproxy/envoy:v1.29-latest
+    platform: linux/${ARCH:-amd64}
+    command: -c /etc/envoy/envoy-config.yaml --log-level warning
+    ports:
+      - "8443:443"
+    volumes:
+      - type: bind
+        source: envoy-config.yaml
+        target: /etc/envoy/envoy-config.yaml
+      - type: bind
+        source: certs
+        target: /etc/envoy/certs
+
+  # This is the `authservice` image that should be up-to-date when running the tests.
+  ext-authz:
+    depends_on:
+      setup-keycloak:
+        condition: service_completed_successfully
+    image: gcr.io/tetrate-internal-containers/authservice:latest-${ARCH:-amd64}
+    platform: linux/${ARCH:-amd64}
+    volumes:
+      - type: bind
+        source: authz-config.json
+        target: /etc/authservice/config.json
+    extra_hosts:  # Required when running on Linux
+      - "host.docker.internal:host-gateway"
+
+  # Redis container to be used to persist the session information and OIDC authorization
+  # state.
+  redis:
+    image: redis:7.2.4
+    platform: linux/${ARCH:-amd64}
+
+  # Keycloak container to be used as the OIDC provider. The tests will use the `master` realm
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0.6
+    platform: linux/${ARCH:-amd64}
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    command: start-dev --import-realm
+    volumes:
+      - type: bind
+        source: setup-keycloak.sh
+        target: /opt/jboss/startup-scripts/setup-keycloak.sh
+    healthcheck:
+      test: /opt/keycloak/bin/kcadm.sh get realms/master --server http://localhost:8080 --realm master --user admin --password admin
+      interval: 5s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+    extra_hosts: # Required when running on Linux
+      - "host.docker.internal:host-gateway"
+
+  # Container to configure the Keycloak instance with a User and Client application
+  setup-keycloak:
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    image: quay.io/keycloak/keycloak:23.0.6
+    platform: linux/${ARCH:-amd64}
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    entrypoint: /opt/setup-keycloak.sh
+    volumes:
+      - type: bind
+        source: setup-keycloak.sh
+        target: /opt/setup-keycloak.sh
+    # Healthcheck to make sure the created client has been successfully created, and that other services
+    # can depend on
+    healthcheck:
+      test: /opt/keycloak/bin/kcreg.sh get authservice --server http://keycloak:8080 --realm master --user admin --password admin
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 2s

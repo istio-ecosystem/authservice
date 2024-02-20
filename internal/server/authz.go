@@ -80,7 +80,6 @@ func (e *ExtAuthZFilter) Register(server *grpc.Server) {
 
 // Check is the implementation of the Envoy AuthorizationServer interface.
 func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (response *envoy.CheckResponse, err error) {
-	ctx = propagateRequestID(ctx, req) // Push the original request id tot eh context to include it in all logs
 	log := e.log.Context(ctx)
 
 	// If there are no trigger rules, allow the request with no check executions.
@@ -118,7 +117,6 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
-				// TODO(nacx): Check if the Oidc setting is enough or we have to pull the default Oidc settings
 				if h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks, e.sessions, oidc.Clock{}, oidc.NewRandomGenerator()); err != nil {
 					return nil, err
 				}
@@ -146,15 +144,6 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 	}
 
 	return deny(codes.PermissionDenied, "no chains matched"), nil
-}
-
-// propagateRequestID propagates the request id from the request headers to the context.
-func propagateRequestID(ctx context.Context, req *envoy.CheckRequest) context.Context {
-	headers := req.GetAttributes().GetRequest().GetHttp().GetHeaders()
-	if headers == nil || headers[EnvoyXRequestID] == "" {
-		return ctx
-	}
-	return telemetry.KeyValuesToContext(ctx, EnvoyXRequestID, headers[EnvoyXRequestID])
 }
 
 // matches returns true if the given request matches the given match configuration

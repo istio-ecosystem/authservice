@@ -210,6 +210,7 @@ func TestLoadOIDC(t *testing.T) {
 								IdToken:                 &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
 								ProxyUri:                "http://fake",
 								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
+								Scopes:                  []string{scopeOIDC},
 							},
 						},
 					},

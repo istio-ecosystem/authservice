@@ -130,7 +130,7 @@ func TestGrpcNoChainsMatched(t *testing.T) {
 	require.NoError(t, err)
 	client := envoy.NewAuthorizationClient(conn)
 
-	ok, err := client.Check(context.Background(), &envoy.CheckRequest{})
+	ok, err := client.Check(context.Background(), header("test"))
 	require.NoError(t, err)
 	require.Equal(t, int32(codes.PermissionDenied), ok.Status.Code)
 }
@@ -325,6 +325,7 @@ func header(value string) *envoy.CheckRequest {
 			Request: &envoy.AttributeContext_Request{
 				Http: &envoy.AttributeContext_HttpRequest{
 					Headers: map[string]string{
+						"x-request-id":   "test-request-id",
 						"x-test-headers": value,
 					},
 				},

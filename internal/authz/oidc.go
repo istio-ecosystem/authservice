@@ -264,7 +264,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 	})
 
 	// add the set-cookie header
-	cookieName := getCookieName(o.config)
+	cookieName := GetCookieName(o.config)
 	cookie := generateSetCookieHeader(cookieName, sessionID, 0)
 	deny.Headers = append(deny.Headers, &corev3.HeaderValueOption{
 		Header: &corev3.HeaderValue{Key: inthttp.HeaderSetCookie, Value: cookie},
@@ -591,7 +591,7 @@ func getCookieDirectives(timeout time.Duration) []string {
 
 // getSessionIDFromCookie retrieves the session id from the cookie in the headers.
 func getSessionIDFromCookie(log telemetry.Logger, headers map[string]string, config *oidcv1.OIDCConfig) string {
-	cookieName := getCookieName(config)
+	cookieName := GetCookieName(config)
 
 	value := headers[inthttp.HeaderCookie]
 	if value == "" {
@@ -615,8 +615,8 @@ const (
 	defaultCookieName = "__Host-authservice-session-id-cookie"
 )
 
-// getCookieName returns the cookie name to use for the session id.
-func getCookieName(config *oidcv1.OIDCConfig) string {
+// GetCookieName returns the cookie name to use for the session id.
+func GetCookieName(config *oidcv1.OIDCConfig) string {
 	if prefix := config.GetCookieNamePrefix(); prefix != "" {
 		return prefixCookieName + prefix + suffixCookieName
 	}

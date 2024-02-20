@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# THis file contains the common e2e targets and variables for all e2e suites.
+# When adding a suite, create a new directory under e2e/ and add a Makefile that
+# includes this file.
+
 # Force run of the e2e tests
 E2E_TEST_OPTS ?= -count=1
 
@@ -29,12 +33,15 @@ e2e-test:
 	@go test $(E2E_TEST_OPTS) ./... || ( $(MAKE) e2e-post-error; exit 1 )
 
 .PHONY: e2e-pre
-e2e-pre:
+e2e-pre::
 	@docker compose up --detach --wait --force-recreate --remove-orphans || ($(MAKE) e2e-post-error; exit 1)
 
 .PHONY: e2e-post
-e2e-post:
-	@docker compose down
+e2e-post::
+ifeq ($(E2E_PRESERVE_LOGS),true)
+	@$(MAKE) capture-logs
+endif
+	@docker compose down --remove-orphans
 
 .PHONY: e2e-post-error
 e2e-post-error: capture-logs
@@ -45,5 +52,5 @@ capture-logs:
 	@docker compose logs > logs/docker-compose-logs.log
 
 .PHONY: clean
-clean:
+clean::
 	@rm -rf ./logs

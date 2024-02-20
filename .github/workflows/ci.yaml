@@ -69,6 +69,8 @@ jobs:
   e2e:
     needs: check
     runs-on: ubuntu-latest
+    env:
+      E2E_TEST_OPTS: -v -count=1
     steps:
       - uses: docker/setup-qemu-action@v3
         with:
@@ -78,4 +80,17 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # Configure the Docker hostname to be able to access the host from the containers
+      - name: Add Docker internal host to /etc/hosts
+        run: echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
       - run: make docker e2e
+
+      - name: Upload e2e logs on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-logs
+          path: |
+            e2e/**/logs/*
+            e2e/**/certs/*
+          if-no-files-found: ignore

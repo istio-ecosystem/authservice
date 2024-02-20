@@ -1,0 +1,28 @@
+{
+  "listen_address": "0.0.0.0",
+  "listen_port": 10003,
+  "log_level": "debug",
+  "chains": [
+    {
+      "name": "keycloak",
+      "filters": [
+        {
+          "oidc": {
+            "configuration_uri": "http://host.docker.internal:8080/realms/master/.well-known/openid-configuration",
+            "callback_uri": "https://host.docker.internal:8443/callback",
+            "client_id": "authservice",
+            "client_secret": "authservice-secret",
+            "cookie_name_prefix": "authservice",
+            "id_token": {
+              "preamble": "Bearer",
+              "header": "authorization"
+            },
+            "redis_session_store_config": {
+              "server_uri": "redis://redis:6379"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

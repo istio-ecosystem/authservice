@@ -16,6 +16,9 @@ version: "3.9"
 
 services:
   envoy:
+    # This is the main backend service. It returns a fixed HTTP 200 response.
+    # It is configured to serve on port 80, and to use the ext-authz filter
+    # to intercept all requests.
     image: envoyproxy/envoy:v1.29-latest
     platform: linux/${ARCH:-amd64}
     command: -c /etc/envoy/envoy-config.yaml --log-level warning
@@ -26,6 +29,7 @@ services:
         source: envoy-config.yaml
         target: /etc/envoy/envoy-config.yaml
 
+  # This is the `authservice` image that should be up-to-date when running the tests.
   ext-authz:
     image: gcr.io/tetrate-internal-containers/authservice:latest-${ARCH:-amd64}
     platform: linux/${ARCH:-amd64}

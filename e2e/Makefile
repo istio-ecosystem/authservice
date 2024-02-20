@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-SUITES := mock redis
+SUITES := mock redis keycloak
 
 .PHONY: e2e
 e2e: $(SUITES:%=e2e/%)  ## Run all e2e tests
