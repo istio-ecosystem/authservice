@@ -501,7 +501,10 @@ func setDenyResponse(resp *envoy.CheckResponse, deny *envoy.DeniedHttpResponse, 
 
 // allowResponse populates the CheckResponse as an OK response with the required tokens.
 func (o *oidcHandler) allowResponse(resp *envoy.CheckResponse, tokens *oidc.TokenResponse) {
-	ok := &envoy.OkHttpResponse{}
+	ok := resp.GetOkResponse()
+	if ok == nil {
+		ok = &envoy.OkHttpResponse{}
+	}
 
 	for key, value := range o.encodeTokensToHeaders(tokens) {
 		ok.Headers = append(ok.Headers, &corev3.HeaderValueOption{Header: &corev3.HeaderValue{Key: key, Value: value}})

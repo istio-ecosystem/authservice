@@ -102,17 +102,20 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			continue
 		}
 
+		if len(c.Filters) == 0 {
+			log.Debug("no filters in chain, allowing request")
+			return allow, nil
+		}
+
+		resp := &envoy.CheckResponse{}
+
 		// Inside a filter chain, all filters must match
 		for i, f := range c.Filters {
-			var (
-				h    authz.Handler
-				resp = &envoy.CheckResponse{}
-			)
-
 			log.Debug("applying filter", "type", fmt.Sprintf("%T", f.Type), "index", i)
 
 			// Note that the  Default_Oidc or the Oidc_Override types can't reach this point. The configurations have
 			// already been merged when loaded from the configuration file and populated accordingly in the Oidc settings.
+			var h authz.Handler
 			switch ft := f.Type.(type) {
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
@@ -135,8 +138,8 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			}
 		}
 
-		// Return OK if the chain matched and all filters allowed the request
-		return allow, nil
+		// At this point all filters allowed the request, so return the response with any additional headers the filters may have added.
+		return resp, nil
 	}
 
 	if e.cfg.AllowUnmatchedRequests {
