@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
@@ -221,6 +222,12 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 	if err := validateURL(c.GetJwksFetcher().GetJwksUri()); err != nil {
 		return fmt.Errorf("%w: invalid JWKS Fetcher URL: %w", ErrInvalidURL, err)
 	}
+
+	// Backwards compatibility with redis tcp:// URIs used in the old authservice
+	if redisURI := c.GetRedisSessionStoreConfig().GetServerUri(); redisURI != "" {
+		c.GetRedisSessionStoreConfig().ServerUri = strings.Replace(redisURI, "tcp://", "redis://", 1)
+	}
+
 	if redisURL := c.GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
 		if _, err := redis.ParseURL(redisURL); err != nil {
 			return fmt.Errorf("%w: invalid Redis session store URL: %w", ErrInvalidURL, err)

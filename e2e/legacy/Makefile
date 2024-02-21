@@ -1,0 +1,38 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Variables exported to parameterize the image used in the docker-compose.yaml
+# This allows running the same setup with the authservice-go and the legacy authservice images.
+
+ifneq ($(E2E_SUITE_MODE),legacy)
+export E2E_IMAGE    ?= $(DOCKER_HUB)/$(NAME):latest-$(ARCH)
+export E2E_PLATFORM ?= linux/$(ARCH)
+else
+E2E_LEGACY_IMAGE    ?= ghcr.io/istio-ecosystem/authservice/authservice:0.5.3
+export E2E_IMAGE    ?= $(E2E_LEGACY_IMAGE)
+export E2E_PLATFORM ?= linux/amd64
+endif
+
+
+.PHONY: e2e-pre
+e2e-pre:: gen
+
+include ../suite-certs.mk
+include ../suite-docker.mk
+
+gen: clean-certs ca/ca.internal certificate/host.docker.internal  ## Generates the CA and certificates
+	@chmod -R a+r $(CERTS_DIR)
+
+.PHONY: clean
+clean:: clean-certs

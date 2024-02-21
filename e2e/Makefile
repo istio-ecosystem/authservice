@@ -14,7 +14,7 @@
 
 SUITES_DOCKER := mock redis keycloak
 SUITES_K8S    := istio
-SUITES        := $(SUITES_DOCKER) $(SUITES_K8S)
+SUITES        := $(SUITES_DOCKER) $(SUITES_K8S) legacy
 
 .PHONY: e2e
 e2e: $(SUITES:%=e2e/%)  ## Run all e2e tests

@@ -1,0 +1,39 @@
+{
+  "listen_address": "0.0.0.0",
+  "listen_port": 10003,
+  "log_level": "trace",
+  "threads": 1,
+  "chains": [
+    {
+      "name": "keycloak",
+      "filters": [
+        {
+          "oidc": {
+            "authorization_uri":  "https://host.docker.internal:9443/realms/master/protocol/openid-connect/auth",
+            "token_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/token",
+            "jwks_fetcher": {
+              "jwks_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/certs",
+              "skip_verify_peer_cert": true
+            },
+            "callback_uri": "https://host.docker.internal:8443/callback",
+            "client_id": "authservice",
+            "client_secret": "authservice-secret",
+            "cookie_name_prefix": "authservice",
+            "id_token": {
+              "preamble": "Bearer",
+              "header": "authorization"
+            },
+            "logout": {
+              "path": "/logout",
+              "redirect_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/logout"
+            },
+            "redis_session_store_config": {
+              "server_uri": "tcp://redis:6379"
+            },
+            "skip_verify_peer_cert": true
+          }
+        }
+      ]
+    }
+  ]
+}

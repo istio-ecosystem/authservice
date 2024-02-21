@@ -25,7 +25,7 @@ E2E_TEST_OPTS    ?= -count=1
 E2E_CLUSTER_NAME ?= authservice
 E2E_KIND_CONFIG  := cluster/kind-config.yaml
 E2E_KUBECONFIG   := cluster/kubeconfig
-E2E_IMAGE		 ?= $(DOCKER_HUB)/$(NAME):latest-$(ARCH)
+E2E_IMAGE        ?= $(DOCKER_HUB)/$(NAME):latest-$(ARCH)
 
 
 .PHONY: e2e
