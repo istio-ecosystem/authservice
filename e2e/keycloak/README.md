@@ -11,12 +11,3 @@ configures the default `master` realm with:
 * A client named `authservice` with a predefined secret.
 
 The user and client will be used in the e2e tests to verify the entire Authorization Code flow.
-
-## Docker host name resolution
-
-The Keycloak end-to-end tests rely on the host `host.docker.internal` to resolve to the host machine,
-so you may need to add an entry to your `/etc/hosts` file to make it work. For example:
-
-```bash
-$ echo "127.0.0.1  host.docker.internal" >> /etc/hosts
-```

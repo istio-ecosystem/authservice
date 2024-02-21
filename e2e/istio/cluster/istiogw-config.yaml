@@ -1,0 +1,32 @@
+# Copyright 2023 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Configure the ingress as NodePort to make accessible to the local test environment
+service:
+  type: NodePort
+  ports:
+    - name: status-port
+      port: 15021
+      protocol: TCP
+      targetPort: 15021
+    - name: https
+      port: 443
+      nodePort: 30000  # Make it accessible form the host without having to install MetalLB or others
+      protocol: TCP
+      targetPort: 443
+
+# Clear the default resources to allow it to run in very constrained local environments
+# without explicitly requesting more memory than the one that might be available in the
+# local Kind cluster.
+resources: null

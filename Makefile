@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME       ?= authservice
 PKG	   	   ?= ./cmd
 BUILD_OPTS ?=
 TEST_OPTS  ?=
@@ -20,7 +19,6 @@ TEST_PKGS  ?= $(shell go list ./... | grep -v /e2e)
 OUTDIR     ?= bin
 
 include env.mk    # Load common variables
--include .makerc  # Pick up any local overrides.
 
 
 ##@ Build targets

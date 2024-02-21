@@ -12,4 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include ../suite-docker.mk
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: authservice
+  namespace: http-echo
+spec:
+  action: CUSTOM
+  provider:
+    # Name defined in the extensionProviders property in the MeshConfig
+    # (the `istio` ConfigMap in the istio-system namespace)
+    name: authservice-grpc
+  # A single empty rule will force all requests to be forwarded to the external
+  # authorization backend, as long as the workload is captured by the selectors
+  # configured above.
+  rules:
+    - {}

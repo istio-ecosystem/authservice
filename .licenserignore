@@ -9,3 +9,8 @@ bin/
 .vimrc
 *.json
 LICENSE
+*.crt
+*.csr
+*.srl
+*.key
+kubeconfig

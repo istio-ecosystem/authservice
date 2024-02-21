@@ -64,11 +64,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
       - "8080:8080"
-    command: start-dev --import-realm
-    volumes:
-      - type: bind
-        source: setup-keycloak.sh
-        target: /opt/jboss/startup-scripts/setup-keycloak.sh
+    command: start-dev
     healthcheck:
       test: /opt/keycloak/bin/kcadm.sh get realms/master --server http://localhost:8080 --realm master --user admin --password admin
       interval: 5s

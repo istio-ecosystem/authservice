@@ -15,10 +15,14 @@
 ROOT      := $(shell git rev-parse --show-toplevel)
 GO_MODULE := $(shell sed -ne 's/^module //gp' $(ROOT)/go.mod)
 
+-include $(ROOT)/.makerc  # Pick up any local overrides.
+
 GOLANGCI_LINT ?= github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
 GOSIMPORTS    ?= github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 LICENSER      ?= github.com/liamawhite/licenser@v0.6.1-0.20210729145742-be6c77bf6a1f
+KIND          ?= sigs.k8s.io/kind@v0.18.0
 
+NAME    ?= authservice
 TARGETS ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 
 DOCKER_HUB            ?= gcr.io/tetrate-internal-containers

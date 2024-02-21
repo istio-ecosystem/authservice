@@ -1084,6 +1084,7 @@ func TestMatchesCallbackPath(t *testing.T) {
 		host, path string
 		want       bool
 	}{
+		{"https://example.com", "example.com", "/", false},
 		{"https://example.com/callback", "example.com", "/callback", true},
 		{"http://example.com/callback", "example.com", "/callback", true},
 		{"https://example.com/callback", "example.com", "/callback/", false},

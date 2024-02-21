@@ -17,14 +17,13 @@ package keycloak
 import (
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetrateio/authservice-go/e2e/common"
+	"github.com/tetrateio/authservice-go/e2e"
 )
 
 const (
@@ -36,26 +35,22 @@ const (
 	password            = "authservice"
 )
 
-var testURL = fmt.Sprintf("https://%s:8443", dockerLocalHost)
+var (
+	testURL = fmt.Sprintf("https://%s:8443", dockerLocalHost)
 
-// skipIfDockerHostNonResolvable skips the test if the Docker host is not resolvable.
-func skipIfDockerHostNonResolvable(t *testing.T) {
-	_, err := net.ResolveIPAddr("ip", dockerLocalHost)
-	if err != nil {
-		t.Fatalf("skipping test: %[1]q is not resolvable\n"+
-			"Please configure your environment so that %[1]q resolves to the address of the Docker host machine.\n"+
-			"For example: echo \"127.0.0.1 %[1]s\" >>/etc/hosts",
-			dockerLocalHost)
+	// customAddressMappings to let the test HTTP client connect to the right hosts
+	customAddressMappings = map[string]string{
+		"host.docker.internal:8080": "localhost:8080", // Keycloak
+		"host.docker.internal:8443": "localhost:8443", // Target application
 	}
-}
+)
 
 func TestOIDC(t *testing.T) {
-	skipIfDockerHostNonResolvable(t)
-
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
-	client, err := common.NewOIDCTestClient(
-		common.WithCustomCA(testCAFile),
-		common.WithLoggingOptions(t.Log, true),
+	client, err := e2e.NewOIDCTestClient(
+		e2e.WithCustomCA(testCAFile),
+		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
 
@@ -78,12 +73,11 @@ func TestOIDC(t *testing.T) {
 }
 
 func TestOIDCRefreshTokens(t *testing.T) {
-	skipIfDockerHostNonResolvable(t)
-
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
-	client, err := common.NewOIDCTestClient(
-		common.WithCustomCA(testCAFile),
-		common.WithLoggingOptions(t.Log, true),
+	client, err := e2e.NewOIDCTestClient(
+		e2e.WithCustomCA(testCAFile),
+		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
 
@@ -132,13 +126,13 @@ func TestOIDCRefreshTokens(t *testing.T) {
 }
 
 func TestOIDCLogout(t *testing.T) {
-	skipIfDockerHostNonResolvable(t)
 
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
-	client, err := common.NewOIDCTestClient(
-		common.WithCustomCA(testCAFile),
-		common.WithLoggingOptions(t.Log, true),
-		common.WithBaseURL(idpBaseURLHost),
+	client, err := e2e.NewOIDCTestClient(
+		e2e.WithCustomCA(testCAFile),
+		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithBaseURL(idpBaseURLHost),
+		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
 

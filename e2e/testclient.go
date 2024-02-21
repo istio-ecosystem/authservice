@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package e2e
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -37,17 +39,17 @@ type LoggingRoundTripper struct {
 
 // RoundTrip logs all the requests and responses using the configured settings.
 func (l LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if dump, derr := httputil.DumpRequestOut(req, l.LogBody); derr == nil {
-		l.LogFunc(string(dump))
+	if l.LogFunc != nil {
+		if dump, derr := httputil.DumpRequest(req, l.LogBody); derr == nil {
+			l.LogFunc(string(dump))
+		}
 	}
 
 	res, err := l.Delegate.RoundTrip(req)
-	if err != nil {
-		return res, err
-	}
-
-	if dump, derr := httputil.DumpResponse(res, l.LogBody); derr == nil {
-		l.LogFunc(string(dump))
+	if err == nil && l.LogFunc != nil {
+		if dump, derr := httputil.DumpResponse(res, l.LogBody); derr == nil {
+			l.LogFunc(string(dump))
+		}
 	}
 
 	return res, err
@@ -60,28 +62,36 @@ type CookieTracker struct {
 }
 
 // RoundTrip tracks the cookies received from the server.
-func (c CookieTracker) RoundTrip(req *http.Request) (*http.Response, error) {
+func (c *CookieTracker) RoundTrip(req *http.Request) (*http.Response, error) {
+	for _, ck := range c.Cookies {
+		req.AddCookie(ck)
+	}
+
 	res, err := c.Delegate.RoundTrip(req)
+
 	if err == nil {
 		// Track the cookies received from the server
 		for _, ck := range res.Cookies() {
 			c.Cookies[ck.Name] = ck
 		}
 	}
+
 	return res, err
 }
 
 // OIDCTestClient encapsulates a http.Client and keeps track of the state of the OIDC login process.
 type OIDCTestClient struct {
-	http         *http.Client            // Delegate HTTP client
-	cookies      map[string]*http.Cookie // Cookies received from the server
-	loginURL     string                  // URL of the IdP where users need to authenticate
-	loginMethod  string                  // Method (GET/POST) to use when posting the credentials to the IdP
-	idpBaseURL   string                  // Base URL of the IdP
-	logoutURL    string                  // URL of the IdP where users need to log out
-	logoutMethod string                  // Method (GET/POST) to use when posting the logout request to the IdP
-	logoutForm   url.Values              // Form data to use when posting the logout request to the IdP
-	tlsConfig    *tls.Config             // Custom TLS configuration, if needed
+	http         *http.Client     // Delegate HTTP client
+	loginURL     string           // URL of the IdP where users need to authenticate
+	loginMethod  string           // Method (GET/POST) to use when posting the credentials to the IdP
+	idpBaseURL   string           // Base URL of the IdP
+	logoutURL    string           // URL of the IdP where users need to log out
+	logoutMethod string           // Method (GET/POST) to use when posting the logout request to the IdP
+	logoutForm   url.Values       // Form data to use when posting the logout request to the IdP
+	customCA     *x509.CertPool   // Custom TLS configuration, if needed
+	mappings     *AddressMappings // Custom address mappings
+	logFunc      func(...any)     // Logging function to log all requests and responses
+	logBody      bool             // Whether to log the request and response bodies
 }
 
 // Option is a functional option for configuring the OIDCTestClient.
@@ -97,7 +107,7 @@ func WithCustomCA(caCert string) Option {
 
 		caCertPool := x509.NewCertPool()
 		caCertPool.AppendCertsFromPEM(caCert)
-		o.tlsConfig = &tls.Config{RootCAs: caCertPool}
+		o.customCA = caCertPool
 		return nil
 	}
 }
@@ -105,10 +115,44 @@ func WithCustomCA(caCert string) Option {
 // WithLoggingOptions configures the OIDCTestClient to log requests and responses.
 func WithLoggingOptions(logFunc func(...any), logBody bool) Option {
 	return func(o *OIDCTestClient) error {
-		o.http.Transport = LoggingRoundTripper{
-			LogBody:  logBody,
-			LogFunc:  logFunc,
-			Delegate: o.http.Transport,
+		o.logFunc = logFunc
+		o.logBody = logBody
+		return nil
+	}
+}
+
+// AddressMappings is a custom dialer that resolves specific host:port to specific target addresses.
+type AddressMappings struct {
+	addresses map[string]string
+}
+
+// DialContext is a custom dialer that resolves specific host:port to specific target addresses.
+func (a *AddressMappings) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	if resolved, ok := a.addresses[addr]; ok {
+		addr = resolved
+	}
+	return (&net.Dialer{}).DialContext(ctx, network, addr)
+}
+
+// DialTLSContext is a custom dialer that resolves specific host:port to specific target addresses.
+func (a *AddressMappings) DialTLSContext(tlsConfig *tls.Config) func(context.Context, string, string) (net.Conn, error) {
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		cfg := tlsConfig.Clone()
+		if resolved, ok := a.addresses[addr]; ok {
+			// Use the original hostname for the SNI, to avoid certificate verification errors
+			cfg.ServerName = addr[:strings.Index(addr, ":")]
+			addr = resolved
+		}
+		return tls.Dial(network, addr, cfg)
+	}
+}
+
+// WithCustomAddressMappings configures the OIDCTestClient to resolve specific host:port to
+// specific target addresses.
+func WithCustomAddressMappings(mappings map[string]string) Option {
+	return func(o *OIDCTestClient) error {
+		o.mappings = &AddressMappings{
+			addresses: mappings,
 		}
 		return nil
 	}
@@ -127,16 +171,9 @@ func WithBaseURL(idpBaseURL string) Option {
 func NewOIDCTestClient(opts ...Option) (*OIDCTestClient, error) {
 	var (
 		defaultTransport = http.DefaultTransport.(*http.Transport).Clone()
-		cookies          = make(map[string]*http.Cookie)
-		client           = &OIDCTestClient{
-			cookies: cookies,
-			http: &http.Client{
-				Transport: CookieTracker{
-					Cookies:  cookies,
-					Delegate: defaultTransport,
-				},
-			},
-		}
+		logging          = &LoggingRoundTripper{Delegate: defaultTransport}
+		cookieTracker    = &CookieTracker{Cookies: make(map[string]*http.Cookie), Delegate: logging}
+		client           = &OIDCTestClient{http: &http.Client{Transport: cookieTracker}}
 	)
 
 	for _, opt := range opts {
@@ -145,7 +182,14 @@ func NewOIDCTestClient(opts ...Option) (*OIDCTestClient, error) {
 		}
 	}
 
-	defaultTransport.TLSClientConfig = client.tlsConfig
+	logging.LogFunc = client.logFunc
+	logging.LogBody = client.logBody
+
+	defaultTransport.TLSClientConfig = &tls.Config{RootCAs: client.customCA}
+	if client.mappings != nil {
+		defaultTransport.DialContext = client.mappings.DialContext
+		defaultTransport.DialTLSContext = client.mappings.DialTLSContext(defaultTransport.TLSClientConfig)
+	}
 
 	return client, nil
 }
@@ -161,9 +205,6 @@ func (o *OIDCTestClient) Get(url string) (*http.Response, error) {
 
 // Send sends the specified request.
 func (o *OIDCTestClient) Send(req *http.Request) (*http.Response, error) {
-	for _, c := range o.cookies {
-		req.AddCookie(c)
-	}
 	return o.http.Do(req)
 }
 
@@ -348,4 +389,48 @@ func (m firstFormMatcher) matches(n *html.Node) bool {
 
 func (m firstFormMatcher) String() string {
 	return "first form"
+}
+
+// NewSkipHostnameVerificationConfig returns a TLS configuration that
+// doesn't perform the default certificate verification because it
+// will verify the hostname. Instead, it verifies the server's
+// certificate chain in VerifyPeerCertificate and ignores the server
+// name.
+//
+// See https://github.com/golang/go/issues/21971#issuecomment-332693931
+// and https://pkg.go.dev/crypto/tls?tab=doc#example-Config-VerifyPeerCertificate
+// for more info.
+func NewSkipHostnameVerificationConfig(rootCAs *x509.CertPool) *tls.Config {
+	// Disable "G402 (CWE-295): TLS InsecureSkipVerify set true. (Confidence: HIGH, Severity: HIGH)"
+	// #nosec G402
+	return &tls.Config{
+		// Set to true because otherwise the certs AND the hostname are verified.
+		// Instead, the certificate verification will be done by the custom
+		// VerifyPeerCertificate, ignoring the server name,
+		InsecureSkipVerify: true,
+		VerifyPeerCertificate: func(certificates [][]byte, _ [][]*x509.Certificate) error {
+			certs := make([]*x509.Certificate, len(certificates))
+			for i, asn1Data := range certificates {
+				cert, err := x509.ParseCertificate(asn1Data)
+				if err != nil {
+					return fmt.Errorf("failed to parse certificate from server: %w", err)
+				}
+				certs[i] = cert
+			}
+
+			// Leave DNSName empty to skip hostname verification.
+			opts := x509.VerifyOptions{
+				Roots:         rootCAs,
+				Intermediates: x509.NewCertPool(),
+			}
+			// Skip the first cert because it's the leaf. All others
+			// are intermediates.
+			for _, cert := range certs[1:] {
+				opts.Intermediates.AddCert(cert)
+			}
+
+			_, err := certs[0].Verify(opts)
+			return err
+		},
+	}
 }

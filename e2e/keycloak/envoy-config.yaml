@@ -60,9 +60,9 @@ static_resources:
               common_tls_context:
                 tls_certificates:
                   - certificate_chain:
-                      filename: /etc/envoy/certs/server.crt
+                      filename: /etc/envoy/certs/host.docker.internal.crt
                     private_key:
-                      filename: /etc/envoy/certs/server.key
+                      filename: /etc/envoy/certs/host.docker.internal.key
                 validation_context:
                   trusted_ca:
                     filename: /etc/envoy/certs/ca.crt

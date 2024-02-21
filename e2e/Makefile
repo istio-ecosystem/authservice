@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-SUITES := mock redis keycloak
+SUITES_DOCKER := mock redis keycloak
+SUITES_K8S    := istio
+SUITES        := $(SUITES_DOCKER) $(SUITES_K8S)
 
 .PHONY: e2e
 e2e: $(SUITES:%=e2e/%)  ## Run all e2e tests
+
+.PHONY: e2e/docker
+e2e/docker: $(SUITES_DOCKER:%=e2e/%)
+
+.PHONY: e2e/k8s
+e2e/k8s: $(SUITES_K8S:%=e2e/%)
 
 e2e/%:
 	@$(MAKE) -C $(@F) $(@D)

@@ -1,0 +1,41 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+pilot:
+  # Clear the default resources to allow it to run in very constrained local environments
+  # without explicitly requesting more memory than the one that might be available in the
+  # local Kind cluster.
+  resources: null
+
+#global:
+#  proxy:
+#    # Default log levels to be used by sidecars and gateways.
+#    # The HTTP and RBAC loggers will print the requests and responses with all the headers,
+#    # and the access decision records.
+#    # The `misc` is a bit noisy due to the version of Envoy being used, and we just silence
+#    # it to remove deprecation warning messages.
+#    componentLogLevel: "http:debug,rbac:debug,misc:error"
+
+meshConfig:
+  defaultConfig:
+    # Make sure everything is up and running before we start trying to
+    # send traffic to the services
+    holdApplicationUntilProxyStarts: true
+  extensionProviders:
+    # Configure the backend for the Auth Service provider that can be used in AuthorizationPolicies
+    # in CUSTOM mode.
+    - name: authservice-grpc
+      envoyExtAuthzGrpc:
+        service: "authservice.authservice.svc.cluster.local"
+        port: "10003"

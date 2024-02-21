@@ -12,4 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include ../suite-docker.mk
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: access-logs
+  namespace: istio-system
+spec:
+  accessLogging:
+    - providers:
+        - name: envoy

@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# THis file contains the common e2e targets and variables for all e2e suites.
+# This file contains the common e2e targets and variables for e2e suites that use
+# Docker compose to spin up the environment.
 # When adding a suite, create a new directory under e2e/ and add a Makefile that
 # includes this file.
 
