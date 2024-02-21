@@ -205,7 +205,20 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// token_response. If successful, allow the request to proceed. If
 	// unsuccessful, redirect for login.
 	log.Debug("attempting token refresh")
-	// TODO (sergicastro): Handle token refresh
+	refreshedTokens := o.refreshToken(ctx, log, tokenResponse, tokenResponse.RefreshToken, sessionID)
+	if refreshedTokens == nil {
+		log.Info("Token refresh failed. Sending user to re-authenticate.")
+		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
+		return nil
+	}
+	if err := store.SetTokenResponse(ctx, sessionID, refreshedTokens); err != nil {
+		log.Error("error saving refreshed tokens to session store", err)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return nil
+	}
+
+	log.Info("Token refresh successful. Allowing request to proceed.")
+	o.allowResponse(resp, refreshedTokens)
 	return nil
 }
 
@@ -247,13 +260,14 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 	}
 
 	// Generate the redirect URL
-	query := url.Values{}
-	query.Add("response_type", "code")
-	query.Add("client_id", o.config.GetClientId())
-	query.Add("redirect_uri", o.config.GetCallbackUri())
-	query.Add("scope", strings.Join(o.config.GetScopes(), " "))
-	query.Add("state", state)
-	query.Add("nonce", nonce)
+	query := url.Values{
+		"response_type": []string{"code"},
+		"client_id":     []string{o.config.GetClientId()},
+		"redirect_uri":  []string{o.config.GetCallbackUri()},
+		"scope":         []string{strings.Join(o.config.GetScopes(), " ")},
+		"state":         []string{state},
+		"nonce":         []string{nonce},
+	}
 	redirectURL := o.config.GetAuthorizationUri() + "?" + query.Encode()
 
 	// Generate denied response with redirect headers
@@ -273,6 +287,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
+// retrieveTokens retrieves the tokens from the Identity Provider and redirects the user back to the originally requested URL.
 func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, req *envoy.CheckRequest, resp *envoy.CheckResponse, sessionID string) {
 	store := o.sessions.Get(o.config)
 
@@ -327,118 +342,28 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		"redirect_uri": []string{o.config.GetCallbackUri()},
 	}
 
-	oidcReq, err := http.NewRequest("POST", o.config.GetTokenUri(), strings.NewReader(form.Encode()))
-	if err != nil {
-		log.Error("error creating tokens request to OIDC", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
 	// build headers
-	oidcReq.Header = http.Header{
+	headers := http.Header{
 		inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
 		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
 	}
 
-	oidcResp, err := o.httpClient.Do(oidcReq)
-	if err != nil {
-		log.Error("error performing tokens request to OIDC", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
+	log.Info("performing request to retrieve new tokens")
+	bodyTokens, errCode := performIDPRequest(log, o.httpClient, o.config.GetTokenUri(), form, headers)
+	if errCode != codes.OK {
+		setDenyResponse(resp, newDenyResponse(), errCode)
 		return
 	}
 
-	if oidcResp.StatusCode != http.StatusOK {
-		log.Info("OIDC server returned non-200 status code", "status-code", oidcResp.StatusCode, "url", oidcReq.URL.String())
-		setDenyResponse(resp, newDenyResponse(), codes.Unknown)
-		return
-	}
-
-	respBody, err := io.ReadAll(oidcResp.Body)
-	_ = oidcResp.Body.Close()
-	if err != nil {
-		log.Error("error reading tokens response", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
-	bodyTokens := &tokensResponse{}
-	err = json.Unmarshal(respBody, &bodyTokens)
-	if err != nil {
-		log.Error("error unmarshalling tokens response", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
-	idToken, err := oidc.ParseToken(bodyTokens.IDToken)
-	if err != nil {
-		log.Error("error parsing id token", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
-	oidcNonce, ok := idToken.Get("nonce")
-	if !ok {
-		log.Info("id token does not have nonce claim")
-		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
-		return
-	}
-	if oidcNonce.(string) != stateFromStore.Nonce {
-		log.Info("id token nonce does not match", "nonce-from-id-token", oidcNonce, "nonce-from-store", stateFromStore.Nonce)
+	// validate IDP tokens response
+	if !isValidIDPNewTokensResponse(log, o.config, bodyTokens) {
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return
 	}
 
-	var audMatches bool
-	for _, a := range idToken.Audience() {
-		if a == o.config.GetClientId() {
-			audMatches = true
-			break
-		}
-	}
-	if !audMatches {
-		log.Info("id token audience does not match", "aud-from-id-token", idToken.Audience(), "aud-from-config", o.config.GetClientId())
-		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
-		return
-	}
-
-	jwtSet, err := o.jwks.Get(ctx, o.config)
-	if err != nil {
-		log.Error("error fetching jwks", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
-	if _, err := jws.VerifySet([]byte(bodyTokens.IDToken), jwtSet); err != nil {
-		log.Error("error verifying id token with fetched jwks", err)
-		setDenyResponse(resp, newDenyResponse(), codes.Internal)
-		return
-	}
-
-	// https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse
-	// token_type must be Bearer
-	if bodyTokens.TokenType != "Bearer" {
-		log.Info("token type is not Bearer in token response", "token-type", bodyTokens.TokenType)
-		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
-		return
-	}
-
-	// expires_in must be a positive value
-	if bodyTokens.ExpiresIn < 0 {
-		log.Info("expires_in is not a positive value in token response", "expires-in", bodyTokens.ExpiresIn)
-		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
-		return
-	}
-
-	// Knock 5 seconds off the expiry time to take into account the time it may
-	// have taken to retrieve the token.
-	expiresIn := time.Duration(bodyTokens.ExpiresIn)*time.Second - 5
-	accessTokenExpiration := o.clock.Now().Add(expiresIn)
-
-	// If access_token forwarding is configured but there is not an access token
-	// in the token response then there is a problem
-	if o.config.GetAccessToken() != nil && bodyTokens.AccessToken == "" {
-		log.Info("access token forwarding is configured but no access token was returned")
-		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
+	// validate ID token
+	if ok, errCode := o.isValidIDToken(ctx, log, bodyTokens.IDToken, stateFromStore.Nonce, true); !ok {
+		setDenyResponse(resp, newDenyResponse(), errCode)
 		return
 	}
 
@@ -447,6 +372,11 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
+
+	// Knock 5 seconds off the expiry time to take into account the time it may
+	// have taken to retrieve the token.
+	expiresIn := time.Duration(bodyTokens.ExpiresIn)*time.Second - 5
+	accessTokenExpiration := o.clock.Now().Add(expiresIn)
 
 	log.Debug("saving tokens to session store")
 	if err := store.SetTokenResponse(ctx, sessionID, &oidc.TokenResponse{
@@ -469,7 +399,94 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
-type tokensResponse struct {
+// refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
+func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, expiredTokens *oidc.TokenResponse, token, sessionID string) *oidc.TokenResponse {
+	store := o.sessions.Get(o.config)
+
+	form := url.Values{
+		"grant_type":    []string{"refresh_token"},
+		"refresh_token": []string{token},
+		"client_id":     []string{o.config.GetClientId()},
+		"client_secret": []string{o.config.GetClientSecret()},
+		// according to this link, omitting the `scope` param should return new
+		// tokens with the previously requested `scope`
+		// https://www.oauth.com/oauth2-servers/access-tokens/refreshing-access-tokens/
+	}
+
+	// build headers
+	headers := http.Header{
+		inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+	}
+
+	log.Info("performing request to refresh access token")
+	bodyTokens, errCode := performIDPRequest(log, o.httpClient, o.config.GetTokenUri(), form, headers)
+
+	if errCode != codes.OK {
+		return nil
+	}
+
+	// validate IDP tokens response
+	if !isValidIDPRefreshTokenResponse(log, bodyTokens) {
+		//setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
+		return nil
+	}
+
+	// merge the new tokens with the stored ones
+	newTokenResponse := &oidc.TokenResponse{}
+
+	_, err := oidc.ParseToken(bodyTokens.IDToken)
+	if err != nil {
+		log.Error("error parsing new id token, using the old one", err)
+		newTokenResponse.IDToken = expiredTokens.IDToken
+	} else {
+		log.Debug("updating id token")
+		newTokenResponse.IDToken = bodyTokens.IDToken
+	}
+
+	if bodyTokens.AccessToken != "" {
+		log.Debug("updating access token")
+		newTokenResponse.AccessToken = bodyTokens.AccessToken
+	} else {
+		newTokenResponse.AccessToken = expiredTokens.AccessToken
+	}
+
+	if bodyTokens.RefreshToken != "" {
+		log.Debug("updating refresh token")
+		newTokenResponse.RefreshToken = bodyTokens.RefreshToken
+	} else {
+		newTokenResponse.RefreshToken = expiredTokens.RefreshToken
+	}
+
+	if bodyTokens.ExpiresIn > 0 {
+		log.Debug("updating access token expiration")
+		// Knock 5 seconds off the expiry time to take into account the time it may
+		// have taken to retrieve the token.
+		expiresIn := time.Duration(bodyTokens.ExpiresIn)*time.Second - 5
+		newTokenResponse.AccessTokenExpiresAt = o.clock.Now().Add(expiresIn)
+	} else {
+		newTokenResponse.AccessTokenExpiresAt = expiredTokens.AccessTokenExpiresAt
+	}
+
+	stateFromStore, err := store.GetAuthorizationState(ctx, sessionID)
+	if err != nil {
+		log.Error("error retrieving authorization state from session store", err)
+		return nil
+	}
+	var expectedNonce string
+	if stateFromStore != nil {
+		expectedNonce = stateFromStore.Nonce
+	}
+
+	// validate the id token
+	if ok, _ := o.isValidIDToken(context.Background(), log, newTokenResponse.IDToken, expectedNonce, false); !ok {
+		return nil
+	}
+
+	return newTokenResponse
+}
+
+// idpTokensResponse is the response from the Identity Provider when requesting tokens.
+type idpTokensResponse struct {
 	IDToken      string `json:"id_token"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -477,6 +494,137 @@ type tokensResponse struct {
 	TokenType    string `json:"token_type"`
 	Scope        string `json:"scope"`
 	DeviceSecret string `json:"device_secret"`
+}
+
+// performIDPRequest performs a request to the Identity Provider to retrieve tokens.
+func performIDPRequest(log telemetry.Logger, client *http.Client, uri string, form url.Values, headers http.Header) (*idpTokensResponse, codes.Code) {
+	oidcReq, err := http.NewRequest("POST", uri, strings.NewReader(form.Encode()))
+	if err != nil {
+		log.Error("error creating tokens request to OIDC", err)
+		return nil, codes.Internal
+	}
+	oidcReq.Header = headers
+
+	oidcResp, err := client.Do(oidcReq)
+	if err != nil {
+		log.Error("error performing tokens request to OIDC", err)
+		return nil, codes.Internal
+	}
+
+	if oidcResp.StatusCode != http.StatusOK {
+		log.Info("OIDC server returned non-200 status code", "status-code", oidcResp.StatusCode, "url", oidcReq.URL.String())
+		return nil, codes.Unknown
+	}
+
+	respBody, err := io.ReadAll(oidcResp.Body)
+	_ = oidcResp.Body.Close()
+	if err != nil {
+		log.Error("error reading tokens response", err)
+		return nil, codes.Internal
+	}
+
+	bodyTokens := &idpTokensResponse{}
+	err = json.Unmarshal(respBody, &bodyTokens)
+	if err != nil {
+		log.Error("error unmarshalling tokens response", err)
+		return nil, codes.Internal
+	}
+
+	return bodyTokens, codes.OK
+}
+
+// isValidIDPNewTokensResponse checks if the response from the Identity Provider is valid according to the OpenID Connect specification.
+// https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse
+func isValidIDPNewTokensResponse(log telemetry.Logger, config *oidcv1.OIDCConfig, tokenResponse *idpTokensResponse) bool {
+	// token_type must be Bearer
+	if tokenResponse.TokenType != "Bearer" {
+		log.Info("token type is not Bearer in token response", "token-type", tokenResponse.TokenType)
+		return false
+	}
+
+	// expires_in must be a positive value
+	if tokenResponse.ExpiresIn < 0 {
+		log.Info("expires_in is not a positive value in token response", "expires-in", tokenResponse.ExpiresIn)
+		return false
+	}
+
+	// If access_token forwarding is configured but there is not an access token
+	// in the token response then there is a problem
+	if config.GetAccessToken() != nil && tokenResponse.AccessToken == "" {
+		log.Info("access token forwarding is configured but no access token was returned")
+		return false
+	}
+
+	return true
+}
+
+// isValidIDPRefreshTokenResponse checks if the response from the Identity Provider is valid according to the OpenID Connect specification.
+// https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse
+func isValidIDPRefreshTokenResponse(log telemetry.Logger, tokenResponse *idpTokensResponse) bool {
+	// token_type must be Bearer
+	if tokenResponse.TokenType != "Bearer" {
+		log.Info("token type is not Bearer in token response", "token-type", tokenResponse.TokenType)
+		return false
+	}
+
+	// expires_in must be a positive value
+	if tokenResponse.ExpiresIn < 0 {
+		log.Info("expires_in is not a positive value in token response", "expires-in", tokenResponse.ExpiresIn)
+		return false
+	}
+
+	return true
+}
+
+// isValidIDToken checks if the id token is valid according to the OpenID Connect specification.
+// It checks the nonce, audience, and verifies the signature with the fetched jwks.
+// It returns a boolean indicating if the token is valid and a code indicating the reason if it is not.
+// If the nonce is not required, it will only check the expectedNonce against the token's nonce if it is present, as OIDC spec defines.
+func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, idTokenString, expectedNonce string, isNonceRequired bool) (bool, codes.Code) {
+	idToken, err := oidc.ParseToken(idTokenString)
+	if err != nil {
+		log.Error("error parsing id token", err)
+		return false, codes.Internal
+	}
+
+	oidcNonce, ok := idToken.Get("nonce")
+	if !ok && isNonceRequired {
+		log.Info("id token does not have nonce claim")
+		return false, codes.InvalidArgument
+	}
+	if ok {
+		tokenNonce := oidcNonce.(string)
+		// if nonce is not required, both token and expected nonce must be present to perform the check
+		if (isNonceRequired || tokenNonce != "" && expectedNonce != "") && tokenNonce != expectedNonce {
+			log.Info("id token nonce does not match", "nonce-from-id-token", oidcNonce, "nonce-from-store", expectedNonce)
+			return false, codes.InvalidArgument
+		}
+	}
+
+	var audMatches bool
+	for _, a := range idToken.Audience() {
+		if a == o.config.GetClientId() {
+			audMatches = true
+			break
+		}
+	}
+	if !audMatches {
+		log.Info("id token audience does not match", "aud-from-id-token", idToken.Audience(), "aud-from-config", o.config.GetClientId())
+		return false, codes.InvalidArgument
+	}
+
+	jwtSet, err := o.jwks.Get(ctx, o.config)
+	if err != nil {
+		log.Error("error fetching jwks", err)
+		return false, codes.Internal
+	}
+
+	if _, err := jws.VerifySet([]byte(idTokenString), jwtSet); err != nil {
+		log.Error("error verifying id token with fetched jwks", err)
+		return false, codes.Internal
+	}
+
+	return true, codes.OK
 }
 
 // newDenyResponse creates a new DeniedHttpResponse with the standard headers.

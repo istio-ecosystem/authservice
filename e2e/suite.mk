@@ -18,7 +18,8 @@
 
 ROOT := $(shell git rev-parse --show-toplevel)
 
-include $(ROOT)/env.mk
+include $(ROOT)/env.mk # Load common variables
+-include $(ROOT)/.makerc  # Pick up any local overrides.
 
 # Force run of the e2e tests by default
 E2E_TEST_OPTS ?= -count=1

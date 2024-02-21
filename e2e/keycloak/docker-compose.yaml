@@ -73,7 +73,7 @@ services:
       test: /opt/keycloak/bin/kcadm.sh get realms/master --server http://localhost:8080 --realm master --user admin --password admin
       interval: 5s
       timeout: 2s
-      retries: 10
+      retries: 30
       start_period: 5s
     extra_hosts: # Required when running on Linux
       - "host.docker.internal:host-gateway"

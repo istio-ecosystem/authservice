@@ -24,6 +24,13 @@ REDIRECT_URL=https://host.docker.internal:8443/callback
 
 set -ex
 
+/opt/keycloak/bin/kcadm.sh update realms/${REALM} \
+    -s accessTokenLifespan=10 \
+    --realm "${REALM}" \
+    --server "${KEYCLOAK_SERVER}" \
+    --user "${KEYCLOAK_ADMIN}" \
+    --password "${KEYCLOAK_ADMIN_PASSWORD}"
+
 /opt/keycloak/bin/kcadm.sh create users \
     -s username="${USERNAME}" \
     -s enabled=true \

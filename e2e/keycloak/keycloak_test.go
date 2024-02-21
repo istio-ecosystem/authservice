@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -73,4 +74,58 @@ func TestOIDC(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, res.StatusCode)
 	require.Contains(t, string(body), "Access allowed")
+}
+
+func TestOIDCRefreshTokens(t *testing.T) {
+	skipIfDockerHostNonResolvable(t)
+
+	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
+	client, err := common.NewOIDCTestClient(
+		common.WithCustomCA(testCAFile),
+		common.WithLoggingOptions(t.Log, true),
+	)
+	require.NoError(t, err)
+
+	// Send a request to the test server. It will be redirected to the IdP login page
+	res, err := client.Get(testURL)
+	require.NoError(t, err)
+
+	// Parse the response body to get the URL where the login page would post the user-entered credentials
+	require.NoError(t, client.ParseLoginForm(res.Body, keyCloakLoginFormID))
+
+	// Submit the login form to the IdP. This will authenticate and redirect back to the application
+	res, err = client.Login(map[string]string{"username": username, "password": password, "credentialId": ""})
+	require.NoError(t, err)
+
+	// Verify that we get the expected response from the application
+	body, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.Contains(t, string(body), "Access allowed")
+
+	// Access tokens should expire in 10 seconds (tried with 5, but keycloak setup fails)
+	// Let's perform a request now and after 10 seconds to verify that the access token is refreshed
+
+	t.Run("request with same tokens", func(t *testing.T) {
+		res, err = client.Get(testURL)
+		require.NoError(t, err)
+
+		body, err = io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "Access allowed")
+	})
+
+	t.Log("waiting for access token to expire...")
+	time.Sleep(10 * time.Second)
+
+	t.Run("request with expired tokens", func(t *testing.T) {
+		res, err = client.Get(testURL)
+		require.NoError(t, err)
+
+		body, err = io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "Access allowed")
+	})
 }
