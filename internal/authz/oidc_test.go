@@ -86,6 +86,33 @@ var (
 		},
 	}
 
+	logoutWithNoSession = &envoy.CheckRequest{
+		Attributes: &envoy.AttributeContext{
+			Request: &envoy.AttributeContext_Request{
+				Http: &envoy.AttributeContext_HttpRequest{
+					Id:     "request-id",
+					Scheme: "https", Host: "example.com", Path: "/logout?some-params",
+					Method: "GET",
+				},
+			},
+		},
+	}
+
+	logoutWithSession = &envoy.CheckRequest{
+		Attributes: &envoy.AttributeContext{
+			Request: &envoy.AttributeContext_Request{
+				Http: &envoy.AttributeContext_HttpRequest{
+					Id:     "request-id",
+					Scheme: "https", Host: "example.com", Path: "/logout?some-params",
+					Method: "GET",
+					Headers: map[string]string{
+						inthttp.HeaderCookie: defaultCookieName + "=test-session-id",
+					},
+				},
+			},
+		},
+	}
+
 	requestedAppURL = "https://localhost:443/final-app"
 	validAuthState  = &oidc.AuthorizationState{
 		Nonce:        newNonce,
@@ -116,6 +143,10 @@ var (
 		ClientId:         "test-client-id",
 		ClientSecret:     "test-client-secret",
 		Scopes:           []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
 	}
 
 	dynamicOIDCConfig = &oidcv1.OIDCConfig{
@@ -249,6 +280,27 @@ func TestOIDCProcess(t *testing.T) {
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredState(t, store, newSessionID, false)
 				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "matches logout: request with no sessionId",
+			req:  logoutWithNoSession,
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), "http://idp-test-server/logout", url.Values{"with-params": {""}})
+				requireDeleteCookie(t, resp.GetDeniedResponse())
+			},
+		},
+		{
+			name: "matches logout: request with sessionId",
+			req:  logoutWithSession,
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), "http://idp-test-server/logout", url.Values{"with-params": {""}})
+				requireDeleteCookie(t, resp.GetDeniedResponse())
+				requireStoredState(t, store, sessionID, false)
 			},
 		},
 	}
@@ -535,7 +587,7 @@ func TestOIDCProcess(t *testing.T) {
 	}
 
 	for _, tt := range callbackTests {
-		t.Run("request matches callback: "+tt.name, func(t *testing.T) {
+		t.Run("matches callback: "+tt.name, func(t *testing.T) {
 			idpServer.Start()
 			t.Cleanup(func() {
 				idpServer.Stop()
@@ -839,19 +891,28 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	// So there's no expected communication with any external server.
 	requestToAppTests := []struct {
 		name        string
+		req         *envoy.CheckRequest
 		storeErrors map[int]bool
 	}{
 		{
 			name:        "app request - fails to get token response from given session ID",
+			req:         withSessionHeader,
 			storeErrors: map[int]bool{getTokenResponse: true},
 		},
 		{
 			name:        "app request (redirect to IDP) - fails to remove old session",
+			req:         withSessionHeader,
 			storeErrors: map[int]bool{removeSession: true},
 		},
 		{
 			name:        "app request (redirect to IDP) - fails to set new authorization state",
+			req:         withSessionHeader,
 			storeErrors: map[int]bool{setAuthorizationState: true},
+		},
+		{
+			name:        "logout request - fails to remove session",
+			req:         logoutWithSession,
+			storeErrors: map[int]bool{removeSession: true},
 		},
 	}
 
@@ -860,7 +921,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 			store.errs = tt.storeErrors
 			t.Cleanup(func() { store.errs = nil })
 			resp := &envoy.CheckResponse{}
-			require.NoError(t, h.Process(ctx, withSessionHeader, resp))
+			require.NoError(t, h.Process(ctx, tt.req, resp))
 			requireSessionErrorResponse(t, resp)
 		})
 	}
@@ -1038,16 +1099,54 @@ func TestMatchesCallbackPath(t *testing.T) {
 		{"http://example.com:8080/callback", "example.com:8080", "/callback", true},
 	}
 
-	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
-
 	for _, tt := range tests {
 		t.Run(tt.callback, func(t *testing.T) {
-			h, err := NewOIDCHandler(&oidcv1.OIDCConfig{CallbackUri: tt.callback}, nil, sessions, oidc.Clock{}, nil)
-			require.NoError(t, err)
-			got := h.(*oidcHandler).matchesCallbackPath(telemetry.NoopLogger(), &envoy.AttributeContext_HttpRequest{Host: tt.host, Path: tt.path})
+			got := matchesCallbackPath(telemetry.NoopLogger(),
+				&oidcv1.OIDCConfig{CallbackUri: tt.callback},
+				&envoy.AttributeContext_HttpRequest{Host: tt.host, Path: tt.path})
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestMatchesLogoutPath(t *testing.T) {
+	var (
+		logoutPathConfig      = &oidcv1.LogoutConfig{Path: "/logout"}
+		emptyLogoutPathConfig = &oidcv1.LogoutConfig{}
+	)
+
+	tests := []struct {
+		name         string
+		logoutConfig *oidcv1.LogoutConfig
+		reqPath      string
+		want         bool
+	}{
+		{"with-config", logoutPathConfig, "/logout", true},
+		{"with-config", logoutPathConfig, "/logout/", false},
+		{"with-config", logoutPathConfig, "/logout?query#fragment", true},
+		{"with-config", logoutPathConfig, "/other", false},
+		{"with-config", logoutPathConfig, "/logout-nope", false},
+		{"empty-config", emptyLogoutPathConfig, "/logout", false},
+		{"empty-config", emptyLogoutPathConfig, "/logout/", false},
+		{"empty-config", emptyLogoutPathConfig, "/logout?query#fragment", false},
+		{"empty-config", emptyLogoutPathConfig, "/other", false},
+		{"empty-config", emptyLogoutPathConfig, "/logout-nope", false},
+		{"nil-config", nil, "/logout", false},
+		{"nil-config", nil, "/logout/", false},
+		{"nil-config", nil, "/logout?query#fragment", false},
+		{"nil-config", nil, "/other", false},
+		{"nil-config", nil, "/logout-nope", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name+" "+tt.reqPath, func(t *testing.T) {
+			got := matchesLogoutPath(telemetry.NoopLogger(),
+				&oidcv1.OIDCConfig{Logout: tt.logoutConfig},
+				&envoy.AttributeContext_HttpRequest{Path: tt.reqPath})
+			require.Equal(t, tt.want, got)
+		})
+	}
+
 }
 
 func TestEncodeTokensToHeaders(t *testing.T) {
@@ -1385,6 +1484,16 @@ func requireCookie(t *testing.T, response *envoy.DeniedHttpResponse) {
 		}
 	}
 	require.Equal(t, "__Host-authservice-session-id-cookie=new-session-id; HttpOnly; Secure; SameSite=Lax; Path=/", cookieHeader)
+}
+
+func requireDeleteCookie(t *testing.T, response *envoy.DeniedHttpResponse) {
+	var cookieHeader string
+	for _, header := range response.GetHeaders() {
+		if header.GetHeader().GetKey() == inthttp.HeaderSetCookie {
+			cookieHeader = header.GetHeader().GetValue()
+		}
+	}
+	require.Equal(t, "__Host-authservice-session-id-cookie=deleted; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0", cookieHeader)
 }
 
 func requireTokensInResponse(t *testing.T, resp *envoy.OkHttpResponse, cfg *oidcv1.OIDCConfig, idToken, accessToken string) {

@@ -17,6 +17,10 @@
               "preamble": "Bearer",
               "header": "authorization"
             },
+            "logout": {
+              "path": "/logout",
+              "redirect_uri": "http://host.docker.internal:8080/realms/master/protocol/openid-connect/logout"
+            },
             "redis_session_store_config": {
               "server_uri": "redis://redis:6379"
             }

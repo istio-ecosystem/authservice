@@ -29,6 +29,7 @@ import (
 
 const (
 	dockerLocalHost     = "host.docker.internal"
+	idpBaseURLHost      = "http://host.docker.internal:8080"
 	keyCloakLoginFormID = "kc-form-login"
 	testCAFile          = "certs/ca.crt"
 	username            = "authservice"
@@ -124,6 +125,86 @@ func TestOIDCRefreshTokens(t *testing.T) {
 		require.NoError(t, err)
 
 		body, err = io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "Access allowed")
+	})
+}
+
+func TestOIDCLogout(t *testing.T) {
+	skipIfDockerHostNonResolvable(t)
+
+	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
+	client, err := common.NewOIDCTestClient(
+		common.WithCustomCA(testCAFile),
+		common.WithLoggingOptions(t.Log, true),
+		common.WithBaseURL(idpBaseURLHost),
+	)
+	require.NoError(t, err)
+
+	t.Run("first request requires login", func(t *testing.T) {
+		// Send a request to the test server. It will be redirected to the IdP login page
+		res, err := client.Get(testURL)
+		require.NoError(t, err)
+
+		// Parse the response body to get the URL where the login page would post the user-entered credentials
+		require.NoError(t, client.ParseLoginForm(res.Body, keyCloakLoginFormID))
+
+		// Submit the login form to the IdP. This will authenticate and redirect back to the application
+		res, err = client.Login(map[string]string{"username": username, "password": password, "credentialId": ""})
+		require.NoError(t, err)
+
+		// Verify that we get the expected response from the application
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "Access allowed")
+	})
+
+	t.Run("second request works without login redirect", func(t *testing.T) {
+		res, err := client.Get(testURL)
+		require.NoError(t, err)
+
+		// Verify that we get the expected response from the application
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "Access allowed")
+	})
+
+	t.Run("logout", func(t *testing.T) {
+		// Logout
+		res, err := client.Get(testURL + "/logout")
+		require.NoError(t, err)
+
+		// Parse the response body to get the URL where the login page would post the session logout
+		require.NoError(t, client.ParseLogoutForm(res.Body))
+
+		// Submit the logout form to the IdP. This will log out the user and redirect back to the application
+		res, err = client.Logout()
+		require.NoError(t, err)
+
+		// Verify that we get the logout confirmation from the IDP
+		body, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, res.StatusCode)
+		require.Contains(t, string(body), "You are logged out")
+	})
+
+	t.Run("request after logout requires login again", func(t *testing.T) {
+		// Send a request to the test server. It will be redirected to the IdP login page
+		res, err := client.Get(testURL)
+		require.NoError(t, err)
+
+		// Parse the response body to get the URL where the login page would post the user-entered credentials
+		require.NoError(t, client.ParseLoginForm(res.Body, keyCloakLoginFormID))
+
+		// Submit the login form to the IdP. This will authenticate and redirect back to the application
+		res, err = client.Login(map[string]string{"username": username, "password": password, "credentialId": ""})
+		require.NoError(t, err)
+
+		// Verify that we get the expected response from the application
+		body, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
 		require.Contains(t, string(body), "Access allowed")

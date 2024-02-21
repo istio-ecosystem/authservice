@@ -137,7 +137,26 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 
 	// If the request is for the configured logout path,
 	// then logout and redirect to the configured logout redirect uri.
-	// TODO (sergicastro): Handle logout request
+	if matchesLogoutPath(log, o.config, req.GetAttributes().GetRequest().GetHttp()) {
+		log.Info("handling logout request")
+		if sessionID != "" {
+			log.Info("removing session from session store during logout", "session-id", sessionID)
+			store := o.sessions.Get(o.config)
+			if err := store.RemoveSession(ctx, sessionID); err != nil {
+				log.Error("error removing session", err)
+				setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+				return nil
+			}
+		}
+		log.Info("Logout complete. Redirecting to logout redirect uri")
+		deny := newDenyResponse()
+		// add IDP logout location
+		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
+		// add the set-cookie header to delete the session_id cookie
+		setSetCookieHeader(deny, generateSetCookieHeader(getCookieName(o.config), "deleted", 0))
+		setDenyResponse(resp, deny, codes.Unauthenticated)
+		return nil
+	}
 
 	// If the request does not have a session_id cookie,
 	// then generate a session id, put it in a header, and redirect for login.
@@ -152,7 +171,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If the request path is the callback for receiving the authorization code,
 	// has a session id then exchange it for tokens and redirects end-user back to
 	// their originally requested URL.
-	if o.matchesCallbackPath(log, req.GetAttributes().GetRequest().GetHttp()) {
+	if matchesCallbackPath(log, o.config, req.GetAttributes().GetRequest().GetHttp()) {
 		log.Debug("handling callback request")
 		o.retrieveTokens(ctx, log, req, resp, sessionID)
 		return nil
@@ -272,18 +291,11 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 
 	// Generate denied response with redirect headers
 	deny := newDenyResponse()
-	deny.Status = &typev3.HttpStatus{Code: typev3.StatusCode_Found}
-	deny.Headers = append(deny.Headers, &corev3.HeaderValueOption{
-		Header: &corev3.HeaderValue{Key: inthttp.HeaderLocation, Value: redirectURL},
-	})
+	setRedirect(deny, redirectURL)
 
 	// add the set-cookie header
 	cookieName := getCookieName(o.config)
-	cookie := generateSetCookieHeader(cookieName, sessionID, 0)
-	deny.Headers = append(deny.Headers, &corev3.HeaderValueOption{
-		Header: &corev3.HeaderValue{Key: inthttp.HeaderSetCookie, Value: cookie},
-	})
-
+	setSetCookieHeader(deny, generateSetCookieHeader(cookieName, sessionID, -1))
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
@@ -647,6 +659,21 @@ func setDenyResponse(resp *envoy.CheckResponse, deny *envoy.DeniedHttpResponse, 
 	resp.Status = &status.Status{Code: int32(code)}
 }
 
+// setRedirect populates the DeniedHttpResponse with the given location and a 302 status code.
+func setRedirect(deny *envoy.DeniedHttpResponse, location string) {
+	deny.Status = &typev3.HttpStatus{Code: typev3.StatusCode_Found}
+	deny.Headers = append(deny.Headers, &corev3.HeaderValueOption{
+		Header: &corev3.HeaderValue{Key: inthttp.HeaderLocation, Value: location},
+	})
+}
+
+// setSetCookieHeader populates the DeniedHttpResponse with the given cookie.
+func setSetCookieHeader(deny *envoy.DeniedHttpResponse, cookie string) {
+	deny.Headers = append(deny.Headers, &corev3.HeaderValueOption{
+		Header: &corev3.HeaderValue{Key: inthttp.HeaderSetCookie, Value: cookie},
+	})
+}
+
 // allowResponse populates the CheckResponse as an OK response with the required tokens.
 func (o *oidcHandler) allowResponse(resp *envoy.CheckResponse, tokens *oidc.TokenResponse) {
 	ok := resp.GetOkResponse()
@@ -663,13 +690,14 @@ func (o *oidcHandler) allowResponse(resp *envoy.CheckResponse, tokens *oidc.Toke
 }
 
 // matchesCallbackPath checks if the request matches the configured callback uri.
-func (o *oidcHandler) matchesCallbackPath(log telemetry.Logger, httpReq *envoy.AttributeContext_HttpRequest) bool {
+// Request done by the IDP directly to the authservice to exchange the authorization code for tokens.
+func matchesCallbackPath(log telemetry.Logger, config *oidcv1.OIDCConfig, httpReq *envoy.AttributeContext_HttpRequest) bool {
 	reqFullPath := httpReq.GetPath()
 	reqHost := httpReq.GetHost()
 	reqPath, _, _ := inthttp.GetPathQueryFragment(reqFullPath)
 
 	// no need to handle the error since config validation already checks for this
-	confURI, _ := url.Parse(o.config.GetCallbackUri())
+	confURI, _ := url.Parse(config.GetCallbackUri())
 	confPort := confURI.Port()
 	confHost := confURI.Hostname()
 	confScheme := confURI.Scheme
@@ -687,6 +715,23 @@ func (o *oidcHandler) matchesCallbackPath(log telemetry.Logger, httpReq *envoy.A
 
 	if pathMatches && hostMatches {
 		log.Debug("request matches configured callback uri")
+		return true
+	}
+	return false
+}
+
+// matchesLogoutPath checks if the request matches the configured logout uri.
+// Request done by the end-user to log out.
+func matchesLogoutPath(log telemetry.Logger, config *oidcv1.OIDCConfig, httpReq *envoy.AttributeContext_HttpRequest) bool {
+	if config.GetLogout() == nil {
+		return false
+	}
+
+	reqPath, _, _ := inthttp.GetPathQueryFragment(httpReq.GetPath())
+	confPath := config.GetLogout().GetPath()
+
+	if reqPath == confPath {
+		log.Debug("request matches configured logout uri")
 		return true
 	}
 	return false
@@ -734,7 +779,7 @@ func generateSetCookieHeader(cookieName, cookieValue string, timeout time.Durati
 // getCookieDirectives returns the directives to use in the Set-Cookie header depending on the timeout.
 func getCookieDirectives(timeout time.Duration) []string {
 	directives := []string{inthttp.HeaderSetCookieHTTPOnly, inthttp.HeaderSetCookieSecure, inthttp.HeaderSetCookieSameSiteLax, "Path=/"}
-	if timeout > 0 {
+	if timeout >= 0 {
 		directives = append(directives, fmt.Sprintf("%s=%d", inthttp.HeaderSetCookieMaxAge, int(timeout.Seconds())))
 	}
 	return directives
