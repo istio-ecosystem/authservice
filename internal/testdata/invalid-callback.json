@@ -1,0 +1,26 @@
+{
+  "listen_address":  "0.0.0.0",
+  "listen_port": 8080,
+  "log_level": "debug",
+  "chains": [
+    {
+      "name": "mock",
+      "filters": [
+        {
+          "oidc": {
+            "callback_uri": "http://fake",
+            "authorization_uri": "http://fake",
+            "token_uri": "http://fake",
+            "client_id": "fake",
+            "client_secret": "fake",
+            "jwks": "fake",
+            "id_token": {
+              "header": "authorization",
+              "preamble": "Bearer"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

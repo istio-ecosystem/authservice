@@ -62,6 +62,9 @@ func TestValidateConfig(t *testing.T) {
 		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"invalid-oidc-uris", "testdata/invalid-oidc-uris.json", errCheck{is: ErrRequiredURL}},
 		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
+		{"invalid-callback-uri", "testdata/invalid-callback.json", errCheck{is: ErrMustNotBeRootPath}},
+		{"invalid-logout-path", "testdata/invalid-logout.json", errCheck{is: ErrMustNotBeRootPath}},
+		{"invalid-callback-and-logout-path", "testdata/invalid-callback-logout.json", errCheck{is: ErrMustBeDifferentPath}},
 		{"oidc-dynamic", "testdata/oidc-dynamic.json", errCheck{is: nil}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 	}
@@ -76,7 +79,7 @@ func TestValidateConfig(t *testing.T) {
 
 func TestValidateURLs(t *testing.T) {
 	const (
-		validURL      = "http://fake"
+		validURL      = "http://fake/path"
 		invalidURL    = "ht tp://invalid"
 		validRedisURL = "redis://localhost:6379/0"
 	)
@@ -202,7 +205,7 @@ func TestLoadOIDC(t *testing.T) {
 							Oidc: &oidcv1.OIDCConfig{
 								AuthorizationUri:        "http://fake",
 								TokenUri:                "http://fake",
-								CallbackUri:             "http://fake",
+								CallbackUri:             "http://fake/callback",
 								JwksConfig:              &oidcv1.OIDCConfig_Jwks{Jwks: "fake-jwks"},
 								ClientId:                "fake-client-id",
 								ClientSecret:            "fake-client-secret",
@@ -211,6 +214,7 @@ func TestLoadOIDC(t *testing.T) {
 								ProxyUri:                "http://fake",
 								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
 								Scopes:                  []string{scopeOIDC},
+								Logout:                  &oidcv1.LogoutConfig{Path: "/logout", RedirectUri: "http://fake"},
 							},
 						},
 					},

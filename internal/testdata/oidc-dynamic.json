@@ -9,7 +9,7 @@
         {
           "oidc": {
             "configuration_uri": "http://fake",
-            "callback_uri": "http://fake",
+            "callback_uri": "http://fake/callback",
             "proxy_uri": "http://fake",
             "client_id": "fake-client-id",
             "client_secret": "fake-client-secret",

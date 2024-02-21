@@ -5,7 +5,7 @@
   "default_oidc_config": {
     "authorization_uri": "http://default",
     "token_uri": "http://default",
-    "callback_uri": "http://fake",
+    "callback_uri": "http://fake/callback",
     "proxy_uri": "http://fake"
   },
   "chains": [
@@ -25,6 +25,10 @@
             },
             "redis_session_store_config": {
               "server_uri": "tcp://localhost:6379/0"
+            },
+            "logout": {
+              "path": "/logout",
+              "redirect_uri": "http://fake"
             }
           }
         }

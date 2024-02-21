@@ -42,6 +42,8 @@ var (
 	ErrInvalidURL          = errors.New("invalid URL")
 	ErrRequiredURL         = errors.New("required URL")
 	ErrHealthPortInUse     = errors.New("health port is already in use by listen port")
+	ErrMustNotBeRootPath   = errors.New("must not be root path")
+	ErrMustBeDifferentPath = errors.New("must be different path")
 )
 
 // LocalConfigFile is a run.Config that loads the configuration file.
@@ -152,6 +154,12 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 
 			// Set the defaults
 			applyOIDCDefaults(f.GetOidc())
+
+			// validate the callback and the logout path are different
+			callbackURI, _ := url.Parse(f.GetOidc().GetCallbackUri())
+			if f.GetOidc().GetLogout() != nil && callbackURI.Path == f.GetOidc().GetLogout().GetPath() {
+				errs = append(errs, fmt.Errorf("%w: callback and logout paths must be different in chain %q", ErrMustBeDifferentPath, fc.Name))
+			}
 		}
 	}
 	// Clear the default config as it has already been merged. This way there is only one
@@ -233,6 +241,15 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 			return fmt.Errorf("%w: invalid Redis session store URL: %w", ErrInvalidURL, err)
 		}
 	}
+
+	if hasRootPath(c.GetCallbackUri()) {
+		return fmt.Errorf("%w: invalid callback URL", ErrMustNotBeRootPath)
+	}
+	if c.GetLogout() != nil {
+		if isRootPath(c.GetLogout().GetPath()) {
+			return fmt.Errorf("%w: invalid logout path", ErrMustNotBeRootPath)
+		}
+	}
 	return nil
 }
 
@@ -242,4 +259,19 @@ func validateURL(u string) error {
 	}
 	_, err := url.Parse(u)
 	return err
+}
+
+// hasRootPath returns true if the path of the given URL is "/" or empty.
+// prerequisite: u is a valid URL.
+func hasRootPath(uri string) bool {
+	if uri == "" {
+		return false
+	}
+	parsed, _ := url.Parse(uri)
+	return isRootPath(parsed.Path)
+}
+
+// isRootPath returns true if the path is "/" or empty.
+func isRootPath(path string) bool {
+	return path == "/" || path == ""
 }

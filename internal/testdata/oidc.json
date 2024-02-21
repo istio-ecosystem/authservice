@@ -10,7 +10,7 @@
           "oidc": {
             "authorization_uri": "http://fake",
             "token_uri": "http://fake",
-            "callback_uri": "http://fake",
+            "callback_uri": "http://fake/callback",
             "proxy_uri": "http://fake",
             "jwks": "fake-jwks",
             "client_id": "fake-client-id",
@@ -21,6 +21,10 @@
             },
             "redis_session_store_config": {
               "server_uri": "redis://localhost:6379/0"
+            },
+            "logout": {
+              "path": "/logout",
+                "redirect_uri": "http://fake"
             }
           }
         }

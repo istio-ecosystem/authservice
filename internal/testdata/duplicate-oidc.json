@@ -5,7 +5,7 @@
   "default_oidc_config": {
     "authorization_uri": "http://fake",
     "token_uri": "http://fake",
-    "callback_uri": "http://fake",
+    "callback_uri": "http://fake/callback",
     "proxy_uri": "http://fake",
     "jwks": "fake-jwks",
     "client_id": "fake-client-id",
@@ -23,7 +23,7 @@
           "oidc": {
             "authorization_uri": "http://fake",
             "token_uri": "http://fake",
-            "callback_uri": "http://fake",
+            "callback_uri": "http://fake/callback",
             "proxy_uri": "http://fake",
             "jwks": "fake-jwks",
             "client_id": "fake-client-id",
