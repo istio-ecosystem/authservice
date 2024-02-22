@@ -35,11 +35,28 @@ services:
         source: certs
         target: /etc/envoy/certs
 
+  # idp-proxy is a proxy that will be used to forward traffic to the external authorization server
+  # Set the OIDC config `proxy_url` to `http://idp-proxy:9000` in the `authservice` config to use this proxy.
+  idp-proxy:
+    image: envoyproxy/envoy:v1.29-latest
+    platform: linux/${ARCH:-amd64}
+    command: -c /etc/envoy/envoy-config.yaml --log-level warning
+    ports:
+      - "9000:9000" # Expose the proxy to auth0
+    volumes:
+      - type: bind
+        source: idp-proxy-config.yaml
+        target: /etc/envoy/envoy-config.yaml
+    extra_hosts: # Required when running on Linux
+      - "host.docker.internal:host-gateway"
+
   # This is the `authservice` image that should be up-to-date when running the tests.
   ext-authz:
     depends_on:
       setup-keycloak:
         condition: service_completed_successfully
+      idp-proxy:
+        condition: service_started
     image: gcr.io/tetrate-internal-containers/authservice:latest-${ARCH:-amd64}
     platform: linux/${ARCH:-amd64}
     volumes:
@@ -63,8 +80,12 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
-      - "8080:8080"
-    command: start-dev
+      - "9443:9443"
+    command: start-dev  --https-port=9443 --https-certificate-file=/opt/keycloak/certs/host.docker.internal.crt --https-certificate-key-file=/opt/keycloak/certs/host.docker.internal.key
+    volumes:
+      - type: bind
+        source: certs
+        target: /opt/keycloak/certs
     healthcheck:
       test: /opt/keycloak/bin/kcadm.sh get realms/master --server http://localhost:8080 --realm master --user admin --password admin
       interval: 5s

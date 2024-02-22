@@ -8,7 +8,11 @@
       "filters": [
         {
           "oidc": {
-            "configuration_uri": "http://host.docker.internal:8080/realms/master/.well-known/openid-configuration",
+            "configuration_uri": "https://host.docker.internal:9443/realms/master/.well-known/openid-configuration",
+            "jwks_fetcher": {
+              "skip_verify_peer_cert": true
+            },
+            "proxy_uri": "http://idp-proxy:9000",
             "callback_uri": "https://host.docker.internal:8443/callback",
             "client_id": "authservice",
             "client_secret": "authservice-secret",
@@ -19,11 +23,12 @@
             },
             "logout": {
               "path": "/logout",
-              "redirect_uri": "http://host.docker.internal:8080/realms/master/protocol/openid-connect/logout"
+              "redirect_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/logout"
             },
             "redis_session_store_config": {
               "server_uri": "redis://redis:6379"
-            }
+            },
+            "skip_verify_peer_cert": true
           }
         }
       ]

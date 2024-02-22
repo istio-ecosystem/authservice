@@ -11,13 +11,14 @@ flowchart LR
         app
         authservice
         redis
-        keycloak["keycloak\n(localhost:8080)"]
+        keycloak["keycloak\n(localhost:9443)"]
+        idp-proxy["idp-proxy\n(localhost:9000)"]
     end
     subgraph "Host"
         test-suite
     end
     authservice --sessions--> redis
-    authservice --OIDC--> keycloak
+    authservice --OIDC--> idp-proxy --> keycloak
     test-suite --user login--> keycloak
     test-suite --> envoy
     envoy -.OIDC.-> authservice

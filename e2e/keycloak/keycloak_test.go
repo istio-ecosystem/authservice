@@ -28,7 +28,7 @@ import (
 
 const (
 	dockerLocalHost     = "host.docker.internal"
-	idpBaseURLHost      = "http://host.docker.internal:8080"
+	idpBaseURLHost      = "https://host.docker.internal:9443"
 	keyCloakLoginFormID = "kc-form-login"
 	testCAFile          = "certs/ca.crt"
 	username            = "authservice"
@@ -40,7 +40,7 @@ var (
 
 	// customAddressMappings to let the test HTTP client connect to the right hosts
 	customAddressMappings = map[string]string{
-		"host.docker.internal:8080": "localhost:8080", // Keycloak
+		"host.docker.internal:9443": "localhost:9443", // Keycloak
 		"host.docker.internal:8443": "localhost:8443", // Target application
 	}
 )

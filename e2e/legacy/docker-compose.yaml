@@ -63,7 +63,6 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
     ports:
-      - "8080:8080"
       - "9443:9443"
     command: start-dev --https-port=9443 --https-certificate-file=/opt/keycloak/certs/host.docker.internal.crt --https-certificate-key-file=/opt/keycloak/certs/host.docker.internal.key
     volumes:
