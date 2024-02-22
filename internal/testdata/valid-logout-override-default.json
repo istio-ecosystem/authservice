@@ -1,0 +1,68 @@
+{
+  "allow_unmatched_requests": true,
+  "listen_address": "0.0.0.0",
+  "listen_port": "10003",
+  "log_level": "trace",
+  "default_oidc_config": {
+    "authorization_uri": "https://fake/auth",
+    "token_uri": "https://fake/token",
+    "jwks_fetcher": {
+      "jwks_uri": "https://fake/certs"
+    },
+    "client_id": "global_id",
+    "client_secret": "global_secret",
+    "id_token": {
+      "preamble": "Bearer",
+      "header": "Authorization"
+    },
+    "logout": {
+      "path": "/globallogout",
+      "redirect_uri": "https://fake/logout"
+    }
+  },
+  "threads": 8,
+  "chains": [
+    {
+      "name": "jaeger",
+      "match": {
+        "header": ":authority",
+        "prefix": "some"
+      },
+      "filters": [
+        {
+          "oidc_override": {
+            "authorization_uri": "https://fake/auth",
+            "token_uri": "https://fale/token",
+            "callback_uri": "https://some/login",
+            "client_id": "client-id",
+            "logout": {
+              "redirect_uri": "https://fake/logout"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "local",
+      "match": {
+        "header": ":local",
+        "prefix": "localhost"
+      },
+      "filters": [
+        {
+          "oidc_override": {
+            "callback_uri": "https://localhost/login",
+            "client_id": "local_id",
+            "client_secret": "local_secret",
+            "cookie_name_prefix": "local",
+            "logout": {
+              "path": "/local",
+              "redirect_uri": "https://localhost/logout"
+            },
+            "scopes": []
+          }
+        }
+      ]
+    }
+  ]
+}

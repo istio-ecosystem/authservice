@@ -155,6 +155,13 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 			// Set the defaults
 			applyOIDCDefaults(f.GetOidc())
 
+			// validate the logout path is not the root path
+			if f.GetOidc().GetLogout() != nil {
+				if isRootPath(f.GetOidc().GetLogout().GetPath()) {
+					return fmt.Errorf("%w: invalid logout path", ErrMustNotBeRootPath)
+				}
+			}
+
 			// validate the callback and the logout path are different
 			callbackURI, _ := url.Parse(f.GetOidc().GetCallbackUri())
 			if f.GetOidc().GetLogout() != nil && callbackURI.Path == f.GetOidc().GetLogout().GetPath() {
@@ -244,11 +251,6 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 
 	if hasRootPath(c.GetCallbackUri()) {
 		return fmt.Errorf("%w: invalid callback URL", ErrMustNotBeRootPath)
-	}
-	if c.GetLogout() != nil {
-		if isRootPath(c.GetLogout().GetPath()) {
-			return fmt.Errorf("%w: invalid logout path", ErrMustNotBeRootPath)
-		}
 	}
 	return nil
 }

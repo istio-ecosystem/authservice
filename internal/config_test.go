@@ -64,6 +64,7 @@ func TestValidateConfig(t *testing.T) {
 		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
 		{"invalid-callback-uri", "testdata/invalid-callback.json", errCheck{is: ErrMustNotBeRootPath}},
 		{"invalid-logout-path", "testdata/invalid-logout.json", errCheck{is: ErrMustNotBeRootPath}},
+		{"valid-logout-override-default", "testdata/valid-logout-override-default.json", errCheck{is: nil}},
 		{"invalid-callback-and-logout-path", "testdata/invalid-callback-logout.json", errCheck{is: ErrMustBeDifferentPath}},
 		{"oidc-dynamic", "testdata/oidc-dynamic.json", errCheck{is: nil}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
