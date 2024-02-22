@@ -1,10 +1,34 @@
 # Istio e2e tests
 
 The [Istio](https://istio.io/) end-to-end tests are designed to verify the integration of the
-Auth Service with Istio.
+Auth Service with Istio. They deploy a [KinD](https://kind.sigs.k8s.io/) Kubernetes cluster where Istio and the Auth Service are
+installed and then run a series of tests to verify the integration. The following diagram shows the setup:
 
-They deploy a [KinD](https://kind.sigs.k8s.io/) Kubernetes cluster where Istio and the Auth Service are
-installed and then run a series of tests to verify the integration. 
+```mermaid
+flowchart LR
+    subgraph "KinD Cluster"
+        subgraph http-echo
+            sidecar
+            app
+        end
+        istio-ingress["istio-ingress\n(nodeport:30000)"]
+        authservice
+        redis
+        keycloak["keycloak\n(nodeport:30001)"]
+    end
+    subgraph "Host"
+        test-suite
+    end
+
+    sidecar --> app
+    sidecar -.OIDC.-> authservice
+    authservice -.-> sidecar
+    authservice --sessions--> redis
+    authservice --OIDC-->keycloak
+    istio-ingress --> sidecar
+    test-suite --> istio-ingress
+    test-suite --user login--> keycloak
+```
 
 ## Accessing the cluster from the host machine
 

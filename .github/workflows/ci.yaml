@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
-    paths-ignore:
-      - "**/*.md"
+    branches:
+      - main
+      - release-**
   pull_request:
-    branches: [main]
-    paths-ignore:
-      - "**/*.md"
+    branches:
+      - main
+      - release-**
 
 env:
   GOPROXY: https://proxy.golang.org

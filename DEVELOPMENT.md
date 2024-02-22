@@ -88,7 +88,22 @@ $ E2E_PRESERVE_LOGS=true make e2e       # Preserve the container logs even if te
 > The end-to-end tests use the `authservice` Docker image, and it **must be up-to-date**.  
 > Make sure you run `make clean docker` before running the tests
 
-The end-to-end tests use Docker Compose to set up the required infrastructure before running the tests.
-Once the tests are done, the infrastructure is automatically torn down if tests pass, or left running
-if tests fail, to facilitate troubleshooting. Container logs are also captured upon test failure, to
-aid in debugging.
+The end-to-end tests use Docker Compose or [KinD](https://kind.sigs.k8s.io/) to set up the required
+infrastructure before running the tests.  Once the tests are done, the infrastructure is automatically
+torn down if tests pass, or left running  if tests fail, to facilitate troubleshooting. Container logs
+are also captured upon test failure, to aid in debugging.
+
+#### Backward-compatibility tests
+
+The [e2e/legacy](e2e/legacy/) suite directory contains a set of tests that are designed to verify the
+backward compatibility of the Auth Service with the older C++ based version. This suite can be run with
+the current image and the old image as follows:
+
+```bash
+$ E2E_SUITE_MODE=current make e2e/legacy   # Run the suite with the current image
+$ E2E_SUITE_MODE=legacy make e2e/legacy    # Run the suite with the old authservice image
+
+# Run the suite with a custom image
+$ export E2E_LEGACY_IMAGE=ghcr.io/istio-ecosystem/authservice/authservice:0.5.3
+$ E2E_SUITE_MODE=legacy make e2e/legacy
+```
