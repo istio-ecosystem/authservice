@@ -43,7 +43,39 @@ var (
 		"host.docker.internal:9443": "localhost:9443", // Keycloak
 		"host.docker.internal:8443": "localhost:8443", // Target application
 	}
+
+	idpProxyService = "idp-proxy"
 )
+
+func TestOIDCUsesTheConfiguredProxy(t *testing.T) {
+	client, err := e2e.NewOIDCTestClient(
+		e2e.WithCustomCA(testCAFile),
+		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithCustomAddressMappings(customAddressMappings),
+	)
+	require.NoError(t, err)
+
+	docker := e2e.NewDockerCompose(e2e.WithDockerComposeLogFunc(t.Log))
+
+	// Stop the IDP proxy and verify that the request is rejected
+	require.NoError(t, docker.StopDockerService(idpProxyService))
+	require.NoError(t, docker.WaitForDockerService(idpProxyService, e2e.DockerServiceExited, 10*time.Second, 500*time.Millisecond))
+
+	res, err := client.Get(testURL)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusForbidden, res.StatusCode)
+
+	// Start the IDP proxy and verify that the request is accepted
+	require.NoError(t, docker.StartDockerService(idpProxyService))
+	require.NoError(t, docker.WaitForDockerService(idpProxyService, e2e.DockerServiceContainerUp, 10*time.Second, 500*time.Millisecond))
+
+	res, err = client.Get(testURL)
+	require.NoError(t, err)
+	// As this is the first request with no kind of session, the client is redirected to the IdP login page.
+	// Assume this redirect as enough to consider the test successful and relay the details into the TestOIDC test.
+	require.Equal(t, http.StatusOK, res.StatusCode)
+	require.NoError(t, client.ParseLoginForm(res.Body, keyCloakLoginFormID))
+}
 
 func TestOIDC(t *testing.T) {
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
