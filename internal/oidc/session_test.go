@@ -78,7 +78,7 @@ func TestSessionStoreFactory(t *testing.T) {
 		},
 	}
 
-	store := &sessionStoreFactory{Config: config}
+	store := NewSessionStoreFactory(config).(*sessionStoreFactory)
 	g := run.Group{Logger: telemetry.NoopLogger()}
 	g.Register(store)
 	require.NoError(t, g.Run())
@@ -123,4 +123,22 @@ func TestSessionStoreFactoryRedisFails(t *testing.T) {
 
 	mr.SetError("server error")
 	require.ErrorContains(t, g.Run(), "server error")
+}
+
+func TestSessionGenerator(t *testing.T) {
+	t.Run("random", func(t *testing.T) {
+		sg := NewRandomGenerator()
+		require.NotEqual(t, sg.GenerateSessionID(), sg.GenerateSessionID())
+		require.NotEqual(t, sg.GenerateState(), sg.GenerateState())
+		require.NotEqual(t, sg.GenerateNonce(), sg.GenerateNonce())
+	})
+	t.Run("static", func(t *testing.T) {
+		sg := NewStaticGenerator("sessionid", "nonce", "state")
+		require.Equal(t, sg.GenerateSessionID(), sg.GenerateSessionID())
+		require.Equal(t, sg.GenerateState(), sg.GenerateState())
+		require.Equal(t, sg.GenerateNonce(), sg.GenerateNonce())
+		require.Equal(t, "sessionid", sg.GenerateSessionID())
+		require.Equal(t, "state", sg.GenerateState())
+		require.Equal(t, "nonce", sg.GenerateNonce())
+	})
 }
