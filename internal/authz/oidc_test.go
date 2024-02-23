@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -1152,10 +1151,8 @@ func TestMatchesLogoutPath(t *testing.T) {
 
 func TestEncodeTokensToHeaders(t *testing.T) {
 	const (
-		idToken        = "id-token"
-		accessToken    = "access-token"
-		idTokenB64     = "aWQtdG9rZW4="
-		accessTokenB64 = "YWNjZXNzLXRva2Vu"
+		idToken     = "id-token"
+		accessToken = "access-token"
 	)
 
 	tests := []struct {
@@ -1171,7 +1168,7 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 			},
 			idToken: idToken, accessToken: "",
 			want: map[string]string{
-				"Authorization": "Bearer " + idTokenB64,
+				"Authorization": "Bearer " + idToken,
 			},
 		},
 		{
@@ -1182,8 +1179,8 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 			},
 			idToken: idToken, accessToken: accessToken,
 			want: map[string]string{
-				"Authorization":  "Bearer " + idTokenB64,
-				"X-Access-Token": "Bearer " + accessTokenB64,
+				"Authorization":  "Bearer " + idToken,
+				"X-Access-Token": "Bearer " + accessToken,
 			},
 		},
 		{
@@ -1194,8 +1191,8 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 			},
 			idToken: idToken, accessToken: accessToken,
 			want: map[string]string{
-				"X-Id-Token":           "Other " + idTokenB64,
-				"X-Access-Token-Other": "Other " + accessTokenB64,
+				"X-Id-Token":           "Other " + idToken,
+				"X-Access-Token-Other": "Other " + accessToken,
 			},
 		},
 		{
@@ -1206,7 +1203,7 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 			},
 			idToken: idToken, accessToken: "",
 			want: map[string]string{
-				"Authorization": "Bearer " + idTokenB64,
+				"Authorization": "Bearer " + idToken,
 			},
 		},
 		{
@@ -1216,7 +1213,19 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 			},
 			idToken: idToken, accessToken: accessToken,
 			want: map[string]string{
-				"Authorization": "Bearer " + idTokenB64,
+				"Authorization": "Bearer " + idToken,
+			},
+		},
+		{
+			name: "config with out preamble",
+			config: &oidcv1.OIDCConfig{
+				IdToken:     &oidcv1.TokenConfig{Header: "X-ID-Token"},
+				AccessToken: &oidcv1.TokenConfig{Header: "X-Access-Token"},
+			},
+			idToken: idToken, accessToken: accessToken,
+			want: map[string]string{
+				"X-ID-Token":     idToken,
+				"X-Access-Token": accessToken,
 			},
 		},
 	}
@@ -1487,9 +1496,9 @@ func requireTokensInResponse(t *testing.T, resp *envoy.OkHttpResponse, cfg *oidc
 		wantIDToken, wantAccessToken string
 	)
 
-	wantIDToken = cfg.GetIdToken().GetPreamble() + " " + base64.URLEncoding.EncodeToString([]byte(idToken))
+	wantIDToken = encodeHeaderValue(cfg.GetIdToken().GetPreamble(), idToken)
 	if cfg.GetAccessToken() != nil {
-		wantAccessToken = cfg.GetAccessToken().GetPreamble() + " " + base64.URLEncoding.EncodeToString([]byte(accessToken))
+		wantAccessToken = encodeHeaderValue(cfg.GetAccessToken().GetPreamble(), accessToken)
 	}
 
 	for _, header := range resp.GetHeaders() {

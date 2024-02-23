@@ -731,16 +731,24 @@ func (o *oidcHandler) encodeTokensToHeaders(tokens *oidc.TokenResponse) map[stri
 	headers := make(map[string]string)
 
 	// Always add the ID token to the headers
-	headers[o.config.GetIdToken().GetHeader()] = o.config.IdToken.GetPreamble() + " " + oidc.EncodeToken(tokens.IDToken)
+	headers[o.config.GetIdToken().GetHeader()] = encodeHeaderValue(o.config.IdToken.GetPreamble(), tokens.IDToken)
 
 	if o.config.GetAccessToken() == nil || tokens.AccessToken == "" {
 		return headers
 	}
 
 	// If there is an access token and config enables it, add it to the headers
-	headers[o.config.GetAccessToken().GetHeader()] = o.config.GetAccessToken().GetPreamble() + " " + oidc.EncodeToken(tokens.AccessToken)
+	headers[o.config.GetAccessToken().GetHeader()] = encodeHeaderValue(o.config.GetAccessToken().GetPreamble(), tokens.AccessToken)
 
 	return headers
+}
+
+// encodeHeaderValue encodes the value with the given preamble, if any
+func encodeHeaderValue(preamble string, value string) string {
+	if preamble != "" {
+		return preamble + " " + value
+	}
+	return value
 }
 
 // areRequiredTokensExpired checks if the required tokens are expired.
