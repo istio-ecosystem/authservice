@@ -63,6 +63,9 @@ services:
       - type: bind
         source: authz-config.json
         target: /etc/authservice/config.json
+      - type: bind
+        source: certs
+        target: /etc/authservice/certs
     extra_hosts:  # Required when running on Linux
       - "host.docker.internal:host-gateway"
 

@@ -9,9 +9,6 @@
         {
           "oidc": {
             "configuration_uri": "https://host.docker.internal:9443/realms/master/.well-known/openid-configuration",
-            "jwks_fetcher": {
-              "skip_verify_peer_cert": true
-            },
             "proxy_uri": "http://idp-proxy:9000",
             "callback_uri": "https://host.docker.internal:8443/callback",
             "client_id": "authservice",
@@ -28,7 +25,7 @@
             "redis_session_store_config": {
               "server_uri": "redis://redis:6379"
             },
-            "skip_verify_peer_cert": true
+            "trusted_certificate_authority_file": "/etc/authservice/certs/ca.crt"
           }
         }
       ]

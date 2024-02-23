@@ -16,7 +16,6 @@ package oidc
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net/http"
@@ -94,7 +93,7 @@ func (j *DefaultJWKSProvider) GracefulStop() {
 // Get the JWKS for the given OIDC configuration
 func (j *DefaultJWKSProvider) Get(ctx context.Context, config *oidcv1.OIDCConfig) (jwk.Set, error) {
 	if config.GetJwksFetcher() != nil {
-		return j.fetchDynamic(ctx, config.GetJwksFetcher())
+		return j.fetchDynamic(ctx, config)
 	}
 	return j.fetchStatic(config.GetJwks())
 }
@@ -102,29 +101,35 @@ func (j *DefaultJWKSProvider) Get(ctx context.Context, config *oidcv1.OIDCConfig
 // fetchDynamic fetches the JWKS from the given URI. If the JWKS URI is already know, the JWKS will be returned from
 // the cache. Otherwise, the JWKS will be fetched from the URI and the cache will be configured to periodically
 // refresh the JWKS.
-func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.OIDCConfig_JwksFetcherConfig) (jwk.Set, error) {
+func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.OIDCConfig) (jwk.Set, error) {
 	log := j.log.Context(ctx)
+	jwksConfig := config.GetJwksFetcher()
 
-	if !j.cache.IsRegistered(config.JwksUri) {
+	if !j.cache.IsRegistered(jwksConfig.JwksUri) {
 		transport := http.DefaultTransport.(*http.Transport).Clone()
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: config.SkipVerifyPeerCert}
+
+		var err error
+		if transport.TLSClientConfig, err = internal.LoadTLSConfig(config); err != nil {
+			return nil, fmt.Errorf("error loading TLS config: %w", err)
+		}
+
 		client := &http.Client{Transport: transport}
-		refreshInterval := time.Duration(config.PeriodicFetchIntervalSec) * time.Second
+		refreshInterval := time.Duration(jwksConfig.PeriodicFetchIntervalSec) * time.Second
 		if refreshInterval == 0 {
 			refreshInterval = DefaultFetchInterval
 		}
 
-		log.Info("configuring JWKS auto refresh", "jwks", config.JwksUri, "interval", refreshInterval, "skip_verify", config.SkipVerifyPeerCert)
+		log.Info("configuring JWKS auto refresh", "jwks", jwksConfig.JwksUri, "interval", refreshInterval, "skip_verify", config.GetSkipVerifyPeerCert())
 
-		j.cache.Configure(config.JwksUri,
+		j.cache.Configure(jwksConfig.JwksUri,
 			jwk.WithHTTPClient(client),
 			jwk.WithRefreshInterval(refreshInterval),
 		)
 	}
 
-	log.Debug("fetching JWKS", "jwks", config.JwksUri)
+	log.Debug("fetching JWKS", "jwks", jwksConfig.JwksUri)
 
-	jwks, err := j.cache.Fetch(ctx, config.JwksUri)
+	jwks, err := j.cache.Fetch(ctx, jwksConfig.JwksUri)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrJWKSFetch, err)
 	}

@@ -185,8 +185,10 @@ func TestDynamicJWKSProvider(t *testing.T) {
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
 					JwksUri:                  server.URL,
 					PeriodicFetchIntervalSec: 1,
-					SkipVerifyPeerCert:       true,
 				},
+			},
+			TrustedCaConfig: &oidcv1.OIDCConfig_SkipVerifyPeerCert{
+				SkipVerifyPeerCert: true,
 			},
 		}
 

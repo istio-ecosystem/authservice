@@ -1333,20 +1333,6 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
 
-const smallCAPem = `-----BEGIN CERTIFICATE-----
-MIIB8TCCAZugAwIBAgIJANZ3fvnlU+1IMA0GCSqGSIb3DQEBCwUAMF4xCzAJBgNV
-BAYTAlVTMRMwEQYDVQQIDApDYWxpZm9ybmlhMRAwDgYDVQQKDAdUZXRyYXRlMRQw
-EgYDVQQLDAtFbmdpbmVlcmluZzESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI0MDIx
-NjE1MzExOFoXDTI0MDIxNzE1MzExOFowXjELMAkGA1UEBhMCVVMxEzARBgNVBAgM
-CkNhbGlmb3JuaWExEDAOBgNVBAoMB1RldHJhdGUxFDASBgNVBAsMC0VuZ2luZWVy
-aW5nMRIwEAYDVQQDDAlsb2NhbGhvc3QwXDANBgkqhkiG9w0BAQEFAANLADBIAkEA
-17tRxNJNLZVu2ntW/ehw5BneJFV+o7UmpCipv0zBtMtgJw2Z04fYiipaXgwg/sVL
-wnyFgbhd0OgoIEg+ND38iQIDAQABozwwOjASBgNVHRMBAf8ECDAGAQH/AgEBMA4G
-A1UdDwEB/wQEAwIC5DAUBgNVHREEDTALgglsb2NhbGhvc3QwDQYJKoZIhvcNAQEL
-BQADQQAnQuyYJ6FbTuwtduT1ZCDcXMqTKcLb4ex3iaowflGubQuCX41yIprFScN4
-2P5SpEcFlILZiK6vRzyPmuWEQVVr
------END CERTIFICATE-----`
-
 func TestNewOIDCHandler(t *testing.T) {
 
 	tests := []struct {
@@ -1356,8 +1342,6 @@ func TestNewOIDCHandler(t *testing.T) {
 	}{
 		{"empty", &oidcv1.OIDCConfig{}, false},
 		{"proxy uri", &oidcv1.OIDCConfig{ProxyUri: "http://proxy"}, false},
-		{"trusted CA-invalid", &oidcv1.OIDCConfig{TrustedCertificateAuthority: "<ca pem>"}, true},
-		{"trusted CA-valid", &oidcv1.OIDCConfig{TrustedCertificateAuthority: smallCAPem}, false},
 	}
 
 	for _, tt := range tests {

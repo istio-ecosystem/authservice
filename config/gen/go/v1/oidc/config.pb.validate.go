@@ -543,8 +543,6 @@ func (m *OIDCConfig) validate(all bool) error {
 
 	// no validation rules for IdleSessionTimeout
 
-	// no validation rules for TrustedCertificateAuthority
-
 	// no validation rules for ProxyUri
 
 	if all {
@@ -575,8 +573,6 @@ func (m *OIDCConfig) validate(all bool) error {
 			}
 		}
 	}
-
-	// no validation rules for SkipVerifyPeerCert
 
 	switch v := m.JwksConfig.(type) {
 	case *OIDCConfig_Jwks:
@@ -632,6 +628,46 @@ func (m *OIDCConfig) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
+	}
+	switch v := m.TrustedCaConfig.(type) {
+	case *OIDCConfig_TrustedCertificateAuthority:
+		if v == nil {
+			err := OIDCConfigValidationError{
+				field:  "TrustedCaConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for TrustedCertificateAuthority
+	case *OIDCConfig_TrustedCertificateAuthorityFile:
+		if v == nil {
+			err := OIDCConfigValidationError{
+				field:  "TrustedCaConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for TrustedCertificateAuthorityFile
+	case *OIDCConfig_SkipVerifyPeerCert:
+		if v == nil {
+			err := OIDCConfigValidationError{
+				field:  "TrustedCaConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SkipVerifyPeerCert
 	default:
 		_ = v // ensures v is used
 	}

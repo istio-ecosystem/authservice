@@ -16,10 +16,7 @@ package authz
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -90,18 +87,10 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 
 func getHTTPClient(cfg *oidcv1.OIDCConfig) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.SkipVerifyPeerCert}
 
-	if cfg.GetTrustedCertificateAuthority() != "" {
-		certPool, err := x509.SystemCertPool()
-		if err != nil {
-			return nil, fmt.Errorf("error creating system cert pool: %w", err)
-		}
-		transport.TLSClientConfig.RootCAs = certPool
-
-		if ok := certPool.AppendCertsFromPEM([]byte(cfg.GetTrustedCertificateAuthority())); !ok {
-			return nil, errors.New("could no load trusted certificate authority")
-		}
+	var err error
+	if transport.TLSClientConfig, err = internal.LoadTLSConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	if cfg.ProxyUri != "" {
