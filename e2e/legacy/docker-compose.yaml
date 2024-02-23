@@ -15,9 +15,8 @@
 version: "3.9"
 
 services:
-  # This is the main backend service. It returns a fixed HTTP 200 response.
-  # It is configured to serve on port 443, and to use the ext-authz filter
-  # to intercept all requests.
+  # This is a proxy that intercepts requests to the target application and calls the authservice to
+  # perform the OIDC authorization check.
   envoy:
     depends_on:
       ext-authz:
@@ -34,6 +33,12 @@ services:
       - type: bind
         source: certs
         target: /etc/envoy/certs
+
+  # This is a simple HTTP server that will be used as the target application for the tests.
+  http-echo:
+    image: jmalloc/echo-server:0.3.6
+    platform: linux/${ARCH:-amd64}
+    hostname: http-echo
 
   # This is the `authservice` image that should be up-to-date when running the tests.
   ext-authz:

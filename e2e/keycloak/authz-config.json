@@ -18,6 +18,9 @@
               "preamble": "Bearer",
               "header": "authorization"
             },
+            "access_token": {
+              "header": "x-access-token"
+            },
             "logout": {
               "path": "/logout",
               "redirect_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/logout"

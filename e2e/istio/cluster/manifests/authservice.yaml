@@ -120,7 +120,10 @@ data:
                 "cookie_name_prefix": "authservice",
                 "id_token": {
                   "preamble": "Bearer",
-                  "header": "Authorization"
+                  "header": "authorization"
+                },
+                "access_token": {
+                  "header": "x-access-token"
                 },
                 "redis_session_store_config": {
                   "server_uri": "redis://redis.redis.svc.cluster.local:6379"

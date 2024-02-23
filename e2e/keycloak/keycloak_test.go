@@ -45,6 +45,7 @@ var (
 	}
 
 	idpProxyService = "idp-proxy"
+	okPayload       = "Request served by http-echo"
 )
 
 func TestOIDCUsesTheConfiguredProxy(t *testing.T) {
@@ -101,7 +102,7 @@ func TestOIDC(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, res.StatusCode)
-	require.Contains(t, string(body), "Access allowed")
+	require.Contains(t, string(body), okPayload)
 }
 
 func TestOIDCRefreshTokens(t *testing.T) {
@@ -128,7 +129,7 @@ func TestOIDCRefreshTokens(t *testing.T) {
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, res.StatusCode)
-	require.Contains(t, string(body), "Access allowed")
+	require.Contains(t, string(body), okPayload)
 
 	// Access tokens should expire in 10 seconds (tried with 5, but keycloak setup fails)
 	// Let's perform a request now and after 10 seconds to verify that the access token is refreshed
@@ -140,7 +141,7 @@ func TestOIDCRefreshTokens(t *testing.T) {
 		body, err = io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
-		require.Contains(t, string(body), "Access allowed")
+		require.Contains(t, string(body), okPayload)
 	})
 
 	t.Log("waiting for access token to expire...")
@@ -153,7 +154,7 @@ func TestOIDCRefreshTokens(t *testing.T) {
 		body, err = io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
-		require.Contains(t, string(body), "Access allowed")
+		require.Contains(t, string(body), okPayload)
 	})
 }
 
@@ -184,7 +185,7 @@ func TestOIDCLogout(t *testing.T) {
 		body, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
-		require.Contains(t, string(body), "Access allowed")
+		require.Contains(t, string(body), okPayload)
 	})
 
 	t.Run("second request works without login redirect", func(t *testing.T) {
@@ -195,7 +196,7 @@ func TestOIDCLogout(t *testing.T) {
 		body, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
-		require.Contains(t, string(body), "Access allowed")
+		require.Contains(t, string(body), okPayload)
 	})
 
 	t.Run("logout", func(t *testing.T) {
@@ -233,6 +234,6 @@ func TestOIDCLogout(t *testing.T) {
 		body, err := io.ReadAll(res.Body)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, res.StatusCode)
-		require.Contains(t, string(body), "Access allowed")
+		require.Contains(t, string(body), okPayload)
 	})
 }

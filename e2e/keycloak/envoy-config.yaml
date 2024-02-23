@@ -37,10 +37,8 @@ static_resources:
                       routes:
                         - match:
                             prefix: "/"
-                          direct_response:
-                            status: 200
-                            body:
-                              inline_string: "Access allowed\n"
+                          route:
+                            cluster: http_echo
                 http_filters:
                   - name: envoy.filters.http.ext_authz
                     typed_config:
@@ -86,3 +84,21 @@ static_resources:
                     socket_address:
                       address: ext-authz
                       port_value: 10003
+    - name: http_echo
+      connect_timeout: 0.25s
+      type: LOGICAL_DNS
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: http_echo
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: http-echo
+                      port_value: 8080
