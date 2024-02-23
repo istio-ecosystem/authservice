@@ -188,9 +188,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 					PeriodicFetchIntervalSec: 1,
 				},
 			},
-			TrustedCaConfig: &oidcv1.OIDCConfig_SkipVerifyPeerCert{
-				SkipVerifyPeerCert: structpb.NewBoolValue(true),
-			},
+			SkipVerifyPeerCert: structpb.NewBoolValue(true),
 		}
 
 		keys, err := cache.Get(context.Background(), config)

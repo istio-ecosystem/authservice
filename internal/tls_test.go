@@ -66,7 +66,7 @@ func TestLoadTLSConfig(t *testing.T) {
 		},
 		{
 			name:     "skip verify config",
-			config:   &oidc.OIDCConfig{TrustedCaConfig: &oidc.OIDCConfig_SkipVerifyPeerCert{SkipVerifyPeerCert: structpb.NewBoolValue(true)}},
+			config:   &oidc.OIDCConfig{SkipVerifyPeerCert: structpb.NewBoolValue(true)},
 			wantTLS:  true,
 			wantSkip: true,
 		},

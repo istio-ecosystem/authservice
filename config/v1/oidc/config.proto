@@ -200,13 +200,6 @@ message OIDCConfig {
     // The file path to the PEM-encoded certificate authority to trust when performing HTTPS calls to the OIDC Identity Provider.
     // Optional.
     string trusted_certificate_authority_file = 20;
-
-    // If set to true, the verification of the destination certificate will be skipped when
-    // making a request to the Token Endpoint. This option is useful when you want to use a
-    // self-signed certificate for testing purposes, but basically should not be set to true
-    // in any other cases.
-    // Optional.
-    google.protobuf.Value skip_verify_peer_cert = 18;
   }
 
   // The Authservice makes two kinds of direct network connections directly to the OIDC Provider.
@@ -228,5 +221,12 @@ message OIDCConfig {
   // When specified, the Authservice will use the configured Redis server to store session data.
   // Optional.
   RedisConfig redis_session_store_config = 16;
+
+  // If set to true, the verification of the destination certificate will be skipped when
+  // making a request to the Token Endpoint. This option is useful when you want to use a
+  // self-signed certificate for testing purposes, but basically should not be set to true
+  // in any other cases.
+  // Optional.
+  google.protobuf.Value skip_verify_peer_cert = 18; // keep this field out from the trusted_ca_config one of for backward compatibility.
 }
 
