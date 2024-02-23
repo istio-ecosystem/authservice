@@ -23,6 +23,7 @@ import (
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
@@ -204,10 +205,15 @@ func TestLoadOIDC(t *testing.T) {
 					{
 						Type: &configv1.Filter_Oidc{
 							Oidc: &oidcv1.OIDCConfig{
-								AuthorizationUri:        "http://fake",
-								TokenUri:                "http://fake",
-								CallbackUri:             "http://fake/callback",
-								JwksConfig:              &oidcv1.OIDCConfig_Jwks{Jwks: "fake-jwks"},
+								AuthorizationUri: "http://fake",
+								TokenUri:         "http://fake",
+								CallbackUri:      "http://fake/callback",
+								JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+									JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
+										JwksUri:            "http://fake/jwks",
+										SkipVerifyPeerCert: structpb.NewStringValue("true"),
+									},
+								},
 								ClientId:                "fake-client-id",
 								ClientSecret:            "fake-client-secret",
 								CookieNamePrefix:        "",
@@ -216,6 +222,7 @@ func TestLoadOIDC(t *testing.T) {
 								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
 								Scopes:                  []string{scopeOIDC},
 								Logout:                  &oidcv1.LogoutConfig{Path: "/logout", RedirectUri: "http://fake"},
+								TrustedCaConfig:         &oidcv1.OIDCConfig_SkipVerifyPeerCert{SkipVerifyPeerCert: structpb.NewBoolValue(true)},
 							},
 						},
 					},

@@ -13,7 +13,7 @@
             "token_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/token",
             "jwks_fetcher": {
               "jwks_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/certs",
-              "skip_verify_peer_cert": true
+              "skip_verify_peer_cert": "true"
             },
             "callback_uri": "https://host.docker.internal:8443/callback",
             "client_id": "authservice",

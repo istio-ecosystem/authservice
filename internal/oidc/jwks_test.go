@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
@@ -188,7 +189,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 				},
 			},
 			TrustedCaConfig: &oidcv1.OIDCConfig_SkipVerifyPeerCert{
-				SkipVerifyPeerCert: true,
+				SkipVerifyPeerCert: structpb.NewBoolValue(true),
 			},
 		}
 

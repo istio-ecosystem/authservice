@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
@@ -65,7 +66,7 @@ func TestLoadTLSConfig(t *testing.T) {
 		},
 		{
 			name:     "skip verify config",
-			config:   &oidc.OIDCConfig{TrustedCaConfig: &oidc.OIDCConfig_SkipVerifyPeerCert{SkipVerifyPeerCert: true}},
+			config:   &oidc.OIDCConfig{TrustedCaConfig: &oidc.OIDCConfig_SkipVerifyPeerCert{SkipVerifyPeerCert: structpb.NewBoolValue(true)}},
 			wantTLS:  true,
 			wantSkip: true,
 		},

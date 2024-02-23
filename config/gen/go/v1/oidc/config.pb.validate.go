@@ -667,7 +667,36 @@ func (m *OIDCConfig) validate(all bool) error {
 			}
 			errors = append(errors, err)
 		}
-		// no validation rules for SkipVerifyPeerCert
+
+		if all {
+			switch v := interface{}(m.GetSkipVerifyPeerCert()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OIDCConfigValidationError{
+						field:  "SkipVerifyPeerCert",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OIDCConfigValidationError{
+						field:  "SkipVerifyPeerCert",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetSkipVerifyPeerCert()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OIDCConfigValidationError{
+					field:  "SkipVerifyPeerCert",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -775,7 +804,34 @@ func (m *OIDCConfig_JwksFetcherConfig) validate(all bool) error {
 
 	// no validation rules for PeriodicFetchIntervalSec
 
-	// no validation rules for SkipVerifyPeerCert
+	if all {
+		switch v := interface{}(m.GetSkipVerifyPeerCert()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, OIDCConfig_JwksFetcherConfigValidationError{
+					field:  "SkipVerifyPeerCert",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, OIDCConfig_JwksFetcherConfigValidationError{
+					field:  "SkipVerifyPeerCert",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSkipVerifyPeerCert()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return OIDCConfig_JwksFetcherConfigValidationError{
+				field:  "SkipVerifyPeerCert",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	if len(errors) > 0 {
 		return OIDCConfig_JwksFetcherConfigMultiError(errors)

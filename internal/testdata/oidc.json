@@ -12,7 +12,6 @@
             "token_uri": "http://fake",
             "callback_uri": "http://fake/callback",
             "proxy_uri": "http://fake",
-            "jwks": "fake-jwks",
             "client_id": "fake-client-id",
             "client_secret": "fake-client-secret",
             "id_token": {
@@ -25,6 +24,11 @@
             "logout": {
               "path": "/logout",
                 "redirect_uri": "http://fake"
+            },
+            "skip_verify_peer_cert": true,
+            "jwks_fetcher": {
+              "jwks_uri": "http://fake/jwks",
+              "skip_verify_peer_cert": "true"
             }
           }
         }

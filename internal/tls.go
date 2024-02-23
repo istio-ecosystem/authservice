@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // TLSConfig is an interface for the TLS configuration of the AuthService.
@@ -29,7 +31,7 @@ type TLSConfig interface {
 	// GetTrustedCertificateAuthorityFile returns the path to the trusted certificate authority file.
 	GetTrustedCertificateAuthorityFile() string
 	// GetSkipVerifyPeerCert returns whether to skip verification of the peer certificate.
-	GetSkipVerifyPeerCert() bool
+	GetSkipVerifyPeerCert() *structpb.Value
 }
 
 // LoadTLSConfig loads a TLS configuration from the given TLSConfig.
@@ -39,20 +41,16 @@ func LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
 	// Load the trusted CA PEM from the config
 	var ca []byte
 	switch {
-
 	case config.GetTrustedCertificateAuthority() != "":
 		ca = []byte(config.GetTrustedCertificateAuthority())
-
 	case config.GetTrustedCertificateAuthorityFile() != "":
 		var err error
 		ca, err = os.ReadFile(config.GetTrustedCertificateAuthorityFile())
 		if err != nil {
 			return nil, fmt.Errorf("error reading trusted CA file: %w", err)
 		}
-
-	case config.GetSkipVerifyPeerCert():
-		tlsConfig.InsecureSkipVerify = true
-
+	case config.GetSkipVerifyPeerCert() != nil:
+		tlsConfig.InsecureSkipVerify = BoolStrValue(config.GetSkipVerifyPeerCert())
 	default:
 		// No CA or skip verification, return nil TLS config
 		return nil, nil
