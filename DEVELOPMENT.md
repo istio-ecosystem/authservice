@@ -15,19 +15,6 @@ The following software and tools are needed to build the project and run the tes
 * [Helm](https://helm.sh/docs/intro/install/) (needed to run the Istio e2e test suite)
 
 
-## Generating the API code
-
-The configuration options are defined in the [config](config/) directory using [Protocol Buffers](https://protobuf.dev/).
-To generate the configuration API code after doing changes to the `.proto` files, run:
-
-```bash
-$ make generate
-```
-
-There is no need to run `generate` after checking out the code; it's only needed when changes are made to
-the `.proto` files.
-
-
 ## Building the binary
 
 To build the binary simply run:
@@ -57,6 +44,19 @@ The `make docker` target will produce images that are suitable to be used in the
 The `make docker-push` target will produce multi-arch images and push them to the registry.
 You can use the `DOCKER_TARGETS` environment variable to control the operating systems and architectures
 you want to build the Docker images for.
+
+
+## Generating the API code
+
+The configuration options are defined in the [config](config/) directory using [Protocol Buffers](https://protobuf.dev/).
+To generate the configuration API code after doing changes to the `.proto` files, run:
+
+```bash
+$ make generate
+```
+
+There is no need to run `generate` after checking out the code; it's only needed when changes are made to
+the `.proto` files.
 
 
 ## Testing
