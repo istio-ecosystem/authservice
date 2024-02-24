@@ -94,6 +94,39 @@ spec:
           configMap:
             name: authservice-config
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: authservice-secrets
+  namespace: authservice
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: authservice-secrets
+  namespace: authservice
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: authservice-secrets
+subjects:
+  - kind: ServiceAccount
+    name: authservice
+    namespace: authservice
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: client-secret
+  namespace: authservice
+type: Opaque
+stringData:
+  client-secret: "authservice-secret"
+---
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -116,7 +149,10 @@ data:
                 "configuration_uri": "http://keycloak.keycloak:8080/realms/master/.well-known/openid-configuration",
                 "callback_uri": "https://http-echo.authservice.internal/callback",
                 "client_id": "authservice",
-                "client_secret": "authservice-secret",
+                "client_secret_ref": {
+                  "namespace": "authservice",
+                  "name": "client-secret"
+                },
                 "cookie_name_prefix": "authservice",
                 "id_token": {
                   "preamble": "Bearer",

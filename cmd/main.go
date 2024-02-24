@@ -37,6 +37,7 @@ func main() {
 		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 		healthz     = server.NewHealthServer(&configFile.Config)
+		secrets     = internal.NewSecretLoader(&configFile.Config)
 	)
 
 	configLog := run.NewPreRunner("config-log", func() error {
@@ -52,6 +53,7 @@ func main() {
 	g.Register(
 		configFile,        // load the configuration
 		logging,           // set up the logging system
+		secrets,           // load the secrets and update the configuration
 		configLog,         // log the configuration
 		jwks,              // start the JWKS provider
 		sessions,          // start the session store

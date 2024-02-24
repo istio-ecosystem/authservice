@@ -140,8 +140,10 @@ var (
 		AuthorizationUri: "http://idp-test-server/auth",
 		CallbackUri:      "https://localhost:443/callback",
 		ClientId:         "test-client-id",
-		ClientSecret:     "test-client-secret",
-		Scopes:           []string{"openid", "email"},
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		Scopes: []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
 			RedirectUri: "http://idp-test-server/logout?with-params",
@@ -160,8 +162,10 @@ var (
 		ConfigurationUri: "http://idp-test-server/.well-known/openid-configuration",
 		CallbackUri:      "https://localhost:443/callback",
 		ClientId:         "test-client-id",
-		ClientSecret:     "test-client-secret",
-		Scopes:           []string{"openid", "email"},
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		Scopes: []string{"openid", "email"},
 	}
 
 	wellKnownURIs = `

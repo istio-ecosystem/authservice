@@ -3,5 +3,5 @@ bin/
 .makerc
 .vimrc
 logs/
-cluster/kubeconfig
+**/cluster/kubeconfig
 certs/

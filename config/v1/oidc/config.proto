@@ -132,10 +132,30 @@ message OIDCConfig {
   // Required.
   string client_id = 5 [(validate.rules).string.min_len = 1];
 
-  // The OIDC client secret assigned to the filter to be used in the
-  // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
-  // Required.
-  string client_secret = 6 [(validate.rules).string.min_len = 1];
+  // This message defines a reference to a Kubernetes Secret resource.
+  message SecretReference {
+    // The namespace of the referenced Secret, if not set, default to "default" namespace.
+    string namespace = 1;
+
+    // The name of the referenced Secret.
+    string name = 2 [(validate.rules).string.min_len = 1];
+  }
+
+  oneof client_secret_config {
+    option(validate.required) = true;
+    // The OIDC client secret assigned to the filter to be used in the
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    // This field keeps the client secret in plain text. Recommend to use `client_secret_ref` instead
+    // when running in a Kubernetes cluster.
+    string client_secret = 6;
+
+    // The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the
+    // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+    //
+    // This is an Opaque secret. The client secret should be stored in the key "client-secret".
+    // This filed is only valid when running in a Kubernetes cluster.
+    SecretReference client_secret_ref = 21;
+  }
 
   // Additional scopes passed to the OIDC Provider in the
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
@@ -229,4 +249,3 @@ message OIDCConfig {
   // Optional.
   google.protobuf.Value skip_verify_peer_cert = 18; // keep this field out from the trusted_ca_config one of for backward compatibility.
 }
-

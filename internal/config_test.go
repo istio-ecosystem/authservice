@@ -215,7 +215,7 @@ func TestLoadOIDC(t *testing.T) {
 									},
 								},
 								ClientId:                "fake-client-id",
-								ClientSecret:            "fake-client-secret",
+								ClientSecretConfig:      &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "fake-client-secret"},
 								CookieNamePrefix:        "",
 								IdToken:                 &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
 								ProxyUri:                "http://fake",
