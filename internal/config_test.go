@@ -220,7 +220,7 @@ func TestLoadOIDC(t *testing.T) {
 								IdToken:                 &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
 								ProxyUri:                "http://fake",
 								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
-								Scopes:                  []string{scopeOIDC},
+								Scopes:                  []string{ScopeOIDC},
 								Logout:                  &oidcv1.LogoutConfig{Path: "/logout", RedirectUri: "http://fake"},
 								TrustedCaConfig:         &oidcv1.OIDCConfig_TrustedCertificateAuthority{TrustedCertificateAuthority: "fake-ca-pem"},
 								SkipVerifyPeerCert:      structpb.NewBoolValue(true),

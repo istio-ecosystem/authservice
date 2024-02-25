@@ -24,6 +24,7 @@ import (
 	"github.com/tetratelabs/telemetry"
 
 	"github.com/tetrateio/authservice-go/internal"
+	"github.com/tetrateio/authservice-go/internal/k8s"
 	"github.com/tetrateio/authservice-go/internal/oidc"
 	"github.com/tetrateio/authservice-go/internal/server"
 )
@@ -37,7 +38,7 @@ func main() {
 		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 		healthz     = server.NewHealthServer(&configFile.Config)
-		secrets     = internal.NewSecretLoader(&configFile.Config)
+		secrets     = k8s.NewSecretLoader(&configFile.Config)
 	)
 
 	configLog := run.NewPreRunner("config-log", func() error {

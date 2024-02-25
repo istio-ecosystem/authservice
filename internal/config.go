@@ -30,7 +30,7 @@ import (
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 )
 
-const scopeOIDC = "openid"
+const ScopeOIDC = "openid"
 
 var (
 	_ run.Config = (*LocalConfigFile)(nil)
@@ -178,14 +178,14 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 
 func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
 	if config.GetScopes() == nil {
-		config.Scopes = []string{scopeOIDC}
+		config.Scopes = []string{ScopeOIDC}
 	}
 	for _, s := range config.GetScopes() {
-		if s == scopeOIDC {
+		if s == ScopeOIDC {
 			return
 		}
 	}
-	config.Scopes = append(config.Scopes, scopeOIDC)
+	config.Scopes = append(config.Scopes, ScopeOIDC)
 }
 
 func ConfigToJSONString(c *configv1.Config) string {

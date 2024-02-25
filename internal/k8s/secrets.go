@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package k8s
 
 import (
 	"context"
@@ -24,10 +24,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	"github.com/tetrateio/authservice-go/internal"
 )
 
 const (
@@ -38,9 +38,8 @@ const (
 var (
 	_ run.PreRunner = (*SecretLoader)(nil)
 
-	ErrLoadingKubeConfig = errors.New("error loading kube config")
-	ErrGetSecret         = errors.New("err getting secret")
-	ErrNoSecretData      = errors.New("client-secret not found in secret")
+	ErrGetSecret    = errors.New("error getting secret")
+	ErrNoSecretData = errors.New("client-secret not found in secret")
 )
 
 // SecretLoader is a pre-runner that loads secrets from Kubernetes and updates
@@ -55,7 +54,7 @@ type SecretLoader struct {
 // // the configuration with the loaded data.
 func NewSecretLoader(cfg *configv1.Config) *SecretLoader {
 	return &SecretLoader{
-		log: Logger(Config),
+		log: internal.Logger(internal.Config),
 		cfg: cfg,
 	}
 }
@@ -77,7 +76,7 @@ func (s *SecretLoader) PreRun() error {
 				var err error
 				s.k8sClient, err = getKubeClient()
 				if err != nil {
-					return fmt.Errorf("%w: loading client secret from k8s:  %w", ErrLoadingKubeConfig, err)
+					return fmt.Errorf("loading client secret from k8s: %w", err)
 				}
 			}
 
@@ -118,19 +117,4 @@ func (s *SecretLoader) loadClientSecretFromK8s(cfg *oidcv1.OIDCConfig) error {
 	}
 
 	return nil
-}
-
-// getKubeClient returns a new Kubernetes client used to load secrets.
-func getKubeClient() (client.Client, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error getting kube config: %w", err)
-	}
-
-	cl, err := client.New(cfg, client.Options{})
-	if err != nil {
-		return nil, fmt.Errorf("errot creating kube client: %w", err)
-	}
-
-	return cl, nil
 }
