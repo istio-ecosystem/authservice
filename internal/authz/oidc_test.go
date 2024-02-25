@@ -38,6 +38,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	"github.com/tetrateio/authservice-go/internal"
 	inthttp "github.com/tetrateio/authservice-go/internal/http"
 	"github.com/tetrateio/authservice-go/internal/oidc"
 )
@@ -201,7 +202,8 @@ func TestOIDCProcess(t *testing.T) {
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
-	h, err := NewOIDCHandler(basicOIDCConfig, oidc.NewJWKSProvider(), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -877,6 +879,7 @@ func TestOIDCProcess(t *testing.T) {
 func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	store := &storeMock{delegate: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
 	sessions := &mockSessionStoreFactory{store: store}
+	tlsPool := internal.NewTLSConfigPool(context.Background())
 
 	jwkPriv, jwkPub := newKeyPair(t)
 	bytes, err := json.Marshal(newKeySet(jwkPub))
@@ -885,7 +888,8 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 		Jwks: string(bytes),
 	}
 
-	h, err := NewOIDCHandler(basicOIDCConfig, oidc.NewJWKSProvider(), sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool),
+		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -1029,7 +1033,8 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
-	h, err := NewOIDCHandler(basicOIDCConfig, funcJWKSProvider, sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
 	idpServer := newServer()
@@ -1235,10 +1240,11 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 	}
 
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
+	tlsPool := internal.NewTLSConfigPool(context.Background())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewOIDCHandler(tt.config, nil, sessions, oidc.Clock{}, nil)
+			h, err := NewOIDCHandler(tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
 			require.NoError(t, err)
 
 			tokResp := &oidc.TokenResponse{
@@ -1307,10 +1313,11 @@ func TestAreTokensExpired(t *testing.T) {
 	}
 
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
+	tlsPool := internal.NewTLSConfigPool(context.Background())
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewOIDCHandler(tt.config, nil, sessions, oidc.Clock{}, nil)
+			h, err := NewOIDCHandler(tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
 			require.NoError(t, err)
 
 			tokResp := &oidc.TokenResponse{
@@ -1341,12 +1348,16 @@ func TestLoadWellKnownConfig(t *testing.T) {
 
 func TestLoadWellKnownConfigError(t *testing.T) {
 	clock := oidc.Clock{}
+	tlsPool := internal.NewTLSConfigPool(context.Background())
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	_, err := NewOIDCHandler(dynamicOIDCConfig, oidc.NewJWKSProvider(), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	_, err := NewOIDCHandler(dynamicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
 
 func TestNewOIDCHandler(t *testing.T) {
+	clock := oidc.Clock{}
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 
 	tests := []struct {
 		name    string
@@ -1359,9 +1370,8 @@ func TestNewOIDCHandler(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			clock := oidc.Clock{}
-			sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-			_, err := NewOIDCHandler(tt.config, oidc.NewJWKSProvider(), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+
+			_, err := NewOIDCHandler(tt.config, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

@@ -28,7 +28,8 @@
             "redis_session_store_config": {
               "server_uri": "redis://redis:6379"
             },
-            "trusted_certificate_authority_file": "/etc/authservice/certs/ca.crt"
+            "trusted_certificate_authority_file": "/etc/authservice/certs/ca.crt",
+            "trusted_certificate_authority_refresh_interval": "60.25s"
           }
         }
       ]

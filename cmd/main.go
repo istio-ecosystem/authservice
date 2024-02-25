@@ -31,11 +31,13 @@ import (
 
 func main() {
 	var (
+		lifecycle   = run.NewLifecycle()
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
-		jwks        = oidc.NewJWKSProvider()
+		tlsPool     = internal.NewTLSConfigPool(lifecycle.Context())
+		jwks        = oidc.NewJWKSProvider(tlsPool)
 		sessions    = oidc.NewSessionStoreFactory(&configFile.Config)
-		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, jwks, sessions)
+		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, tlsPool, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 		healthz     = server.NewHealthServer(&configFile.Config)
 		secrets     = k8s.NewSecretLoader(&configFile.Config)
@@ -52,6 +54,7 @@ func main() {
 	g := run.Group{Logger: internal.Logger(internal.Default)}
 
 	g.Register(
+		lifecycle,         // manage the lifecycle of the run.Services
 		configFile,        // load the configuration
 		logging,           // set up the logging system
 		secrets,           // load the secrets and update the configuration

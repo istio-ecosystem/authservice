@@ -52,12 +52,14 @@ type DefaultJWKSProvider struct {
 	log      telemetry.Logger
 	cache    *jwk.AutoRefresh
 	shutdown context.CancelFunc
+	tlsPool  internal.TLSConfigPool
 }
 
 // NewJWKSProvider returns a new JWKSProvider.
-func NewJWKSProvider() *DefaultJWKSProvider {
+func NewJWKSProvider(tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
 	return &DefaultJWKSProvider{
-		log: internal.Logger(internal.JWKS),
+		log:     internal.Logger(internal.JWKS),
+		tlsPool: tlsPool,
 	}
 }
 
@@ -109,7 +111,7 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 
 		var err error
-		if transport.TLSClientConfig, err = internal.LoadTLSConfig(config); err != nil {
+		if transport.TLSClientConfig, err = j.tlsPool.LoadTLSConfig(config); err != nil {
 			return nil, fmt.Errorf("error loading TLS config: %w", err)
 		}
 

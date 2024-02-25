@@ -33,6 +33,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	"github.com/tetrateio/authservice-go/internal"
 )
 
 // nolint: lll
@@ -76,8 +77,10 @@ var (
 )
 
 func TestStaticJWKSProvider(t *testing.T) {
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+
 	t.Run("invalid", func(t *testing.T) {
-		cache := NewJWKSProvider()
+		cache := NewJWKSProvider(tlsPool)
 		go func() { require.NoError(t, cache.Serve()) }()
 		t.Cleanup(cache.GracefulStop)
 
@@ -91,7 +94,7 @@ func TestStaticJWKSProvider(t *testing.T) {
 	})
 
 	t.Run("single-key", func(t *testing.T) {
-		cache := NewJWKSProvider()
+		cache := NewJWKSProvider(tlsPool)
 		go func() { require.NoError(t, cache.Serve()) }()
 		t.Cleanup(cache.GracefulStop)
 
@@ -112,7 +115,7 @@ func TestStaticJWKSProvider(t *testing.T) {
 	})
 
 	t.Run("multiple-keys", func(t *testing.T) {
-		cache := NewJWKSProvider()
+		cache := NewJWKSProvider(tlsPool)
 		go func() { require.NoError(t, cache.Serve()) }()
 		t.Cleanup(cache.GracefulStop)
 
@@ -144,8 +147,9 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		pub  = newKey(t)
 		jwks = newKeySet(pub)
 
+		tlsPool  = internal.NewTLSConfigPool(context.Background())
 		newCache = func(t *testing.T) JWKSProvider {
-			cache := NewJWKSProvider()
+			cache := NewJWKSProvider(tlsPool)
 			g := run.Group{Logger: telemetry.NoopLogger()}
 			g.Register(cache)
 			go func() { _ = g.Run() }()

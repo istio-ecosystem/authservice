@@ -39,7 +39,7 @@ func TestUnmatchedRequests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := NewExtAuthZFilter(&configv1.Config{AllowUnmatchedRequests: tt.allow}, nil, nil)
+			e := NewExtAuthZFilter(&configv1.Config{AllowUnmatchedRequests: tt.allow}, nil, nil, nil)
 			got, err := e.Check(context.Background(), &envoy.CheckRequest{})
 			require.NoError(t, err)
 			require.Equal(t, int32(tt.want), got.Status.Code)
@@ -61,7 +61,7 @@ func TestFiltersMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &configv1.Config{Chains: []*configv1.FilterChain{{Filters: tt.filters}}}
-			e := NewExtAuthZFilter(cfg, nil, nil)
+			e := NewExtAuthZFilter(cfg, nil, nil, nil)
 
 			got, err := e.Check(context.Background(), &envoy.CheckRequest{})
 			require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestUseFirstMatchingChain(t *testing.T) {
 		},
 	}
 
-	e := NewExtAuthZFilter(cfg, nil, nil)
+	e := NewExtAuthZFilter(cfg, nil, nil, nil)
 
 	got, err := e.Check(context.Background(), header("match"))
 	require.NoError(t, err)
@@ -121,7 +121,7 @@ func TestMatch(t *testing.T) {
 }
 
 func TestGrpcNoChainsMatched(t *testing.T) {
-	e := NewExtAuthZFilter(&configv1.Config{}, nil, nil)
+	e := NewExtAuthZFilter(&configv1.Config{}, nil, nil, nil)
 	s := NewTestServer(e.Register)
 	go func() { require.NoError(t, s.Start()) }()
 	t.Cleanup(s.Stop)
@@ -274,7 +274,7 @@ func TestCheckTriggerRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := NewExtAuthZFilter(tt.config, nil, nil)
+			e := NewExtAuthZFilter(tt.config, nil, nil, nil)
 			req := &envoy.CheckRequest{
 				Attributes: &envoy.AttributeContext{
 					Request: &envoy.AttributeContext_Request{

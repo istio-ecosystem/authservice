@@ -53,6 +53,7 @@ var (
 type oidcHandler struct {
 	log        telemetry.Logger
 	config     *oidcv1.OIDCConfig
+	tlsPool    internal.TLSConfigPool
 	jwks       oidc.JWKSProvider
 	sessions   oidc.SessionStoreFactory
 	sessionGen oidc.SessionGenerator
@@ -61,11 +62,10 @@ type oidcHandler struct {
 }
 
 // NewOIDCHandler creates a new OIDC implementation of the Handler interface.
-func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
-	sessions oidc.SessionStoreFactory, clock oidc.Clock,
-	sessionGen oidc.SessionGenerator) (Handler, error) {
+func NewOIDCHandler(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, jwks oidc.JWKSProvider,
+	sessions oidc.SessionStoreFactory, clock oidc.Clock, sessionGen oidc.SessionGenerator) (Handler, error) {
 
-	client, err := getHTTPClient(cfg)
+	client, err := getHTTPClient(cfg, tlsPool)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +77,7 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 	return &oidcHandler{
 		log:        internal.Logger(internal.Authz).With("type", "oidc"),
 		config:     cfg,
+		tlsPool:    tlsPool,
 		jwks:       jwks,
 		sessions:   sessions,
 		clock:      clock,
@@ -85,11 +86,11 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, jwks oidc.JWKSProvider,
 	}, nil
 }
 
-func getHTTPClient(cfg *oidcv1.OIDCConfig) (*http.Client, error) {
+func getHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 
 	var err error
-	if transport.TLSClientConfig, err = internal.LoadTLSConfig(cfg); err != nil {
+	if transport.TLSClientConfig, err = tlsPool.LoadTLSConfig(cfg); err != nil {
 		return nil, err
 	}
 

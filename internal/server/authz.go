@@ -59,15 +59,17 @@ var (
 type ExtAuthZFilter struct {
 	log      telemetry.Logger
 	cfg      *configv1.Config
+	tlsPool  internal.TLSConfigPool
 	jwks     oidc.JWKSProvider
 	sessions oidc.SessionStoreFactory
 }
 
 // NewExtAuthZFilter creates a new ExtAuthZFilter.
-func NewExtAuthZFilter(cfg *configv1.Config, jwks oidc.JWKSProvider, sessions oidc.SessionStoreFactory) *ExtAuthZFilter {
+func NewExtAuthZFilter(cfg *configv1.Config, tlsPool internal.TLSConfigPool, jwks oidc.JWKSProvider, sessions oidc.SessionStoreFactory) *ExtAuthZFilter {
 	return &ExtAuthZFilter{
 		log:      internal.Logger(internal.Authz),
 		cfg:      cfg,
+		tlsPool:  tlsPool,
 		jwks:     jwks,
 		sessions: sessions,
 	}
@@ -120,7 +122,7 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
-				if h, err = authz.NewOIDCHandler(ft.Oidc, e.jwks, e.sessions, oidc.Clock{}, oidc.NewRandomGenerator()); err != nil {
+				if h, err = authz.NewOIDCHandler(ft.Oidc, e.tlsPool, e.jwks, e.sessions, oidc.Clock{}, oidc.NewRandomGenerator()); err != nil {
 					return nil, err
 				}
 			}
