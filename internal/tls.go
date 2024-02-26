@@ -54,9 +54,7 @@ type (
 	// tlsConfigPool is a pool of TLS configurations.
 	// That reloads the trusted certificate authority when there are changes.
 	tlsConfigPool struct {
-		ctx    context.Context
-		cancel context.CancelFunc
-		log    telemetry.Logger
+		log telemetry.Logger
 
 		mu        sync.RWMutex
 		configs   map[string]*tls.Config
@@ -66,10 +64,7 @@ type (
 
 // NewTLSConfigPool creates a new TLSConfigPool.
 func NewTLSConfigPool(ctx context.Context) TLSConfigPool {
-	ctx, cancel := context.WithCancel(ctx)
 	return &tlsConfigPool{
-		ctx:       ctx,
-		cancel:    cancel,
 		log:       Logger(Config),
 		configs:   make(map[string]*tls.Config),
 		caWatcher: NewFileWatcher(ctx),
