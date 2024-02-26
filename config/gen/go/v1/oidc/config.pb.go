@@ -320,8 +320,7 @@ type OIDCConfig struct {
 	TrustedCaConfig isOIDCConfig_TrustedCaConfig `protobuf_oneof:"trusted_ca_config"`
 	// The duration between refreshes of the trusted certificate authority if `trusted_certificate_authority_file` is set.
 	// Unset or 0 (the default) disables the refresh, useful is no rotation is expected.
-	// Is a String that ends in `s` to indicate seconds and is preceded by the number of seconds,
-	// with nanoseconds expressed as fractional seconds, e.g. `120.15s`.
+	// Is a String that ends in `s` to indicate seconds and is preceded by the number of seconds, e.g. `120s` (represents 2 minutes).
 	// Optional.
 	TrustedCertificateAuthorityRefreshInterval *durationpb.Duration `protobuf:"bytes,22,opt,name=trusted_certificate_authority_refresh_interval,json=trustedCertificateAuthorityRefreshInterval,proto3" json:"trusted_certificate_authority_refresh_interval,omitempty"`
 	// The Authservice makes two kinds of direct network connections directly to the OIDC Provider.
