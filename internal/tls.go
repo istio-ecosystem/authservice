@@ -40,6 +40,8 @@ type (
 		GetTrustedCertificateAuthorityFile() string
 		// GetSkipVerifyPeerCert returns whether to skip verification of the peer certificate.
 		GetSkipVerifyPeerCert() *structpb.Value
+		// GetTrustedCertificateAuthorityRefreshInterval returns interval at which the trusted certificate
+		// authority should be refreshed.
 		GetTrustedCertificateAuthorityRefreshInterval() *durationpb.Duration
 	}
 

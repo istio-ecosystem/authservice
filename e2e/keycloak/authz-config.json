@@ -1,7 +1,7 @@
 {
   "listen_address": "0.0.0.0",
   "listen_port": 10003,
-  "log_level": "debug",
+  "log_level": "info",
   "chains": [
     {
       "name": "keycloak",

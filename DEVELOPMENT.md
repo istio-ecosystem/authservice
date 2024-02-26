@@ -93,6 +93,19 @@ infrastructure before running the tests.  Once the tests are done, the infrastru
 torn down if tests pass, or left running  if tests fail, to facilitate troubleshooting. Container logs
 are also captured upon test failure, to aid in debugging.
 
+#### Running tests from your IDE
+
+Sometimes it is useful to run the tests from your IDE. To do so, you can start the test infrastructure by
+running the `e2e-pre` target from the e2e test suite folder. For example:
+
+```
+$ make -C e2e/keycloak e2e-pre
+```
+
+Once the infra is up, you can run the tests from your IDE or with a normal `go test` command. After the tests
+are done, you can tear down the infrastructure by running the `e2e-post` target.
+
+
 #### Backward-compatibility tests
 
 The [e2e/legacy](e2e/legacy/) suite directory contains a set of tests that are designed to verify the

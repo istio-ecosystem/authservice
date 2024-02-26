@@ -138,7 +138,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 				return nil
 			}
 		}
-		log.Info("Logout complete. Redirecting to logout redirect uri")
+		log.Info("logout complete. Redirecting to logout redirect uri")
 		deny := newDenyResponse()
 		// add IDP logout location
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
@@ -151,7 +151,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If the request does not have a session_id cookie,
 	// then generate a session id, put it in a header, and redirect for login.
 	if sessionID == "" {
-		log.Info("No session cookie detected. Generating new session and sending user to re-authenticate.")
+		log.Info("no session cookie detected. Generating new session and sending user to re-authenticate.")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), "")
 		return nil
 	}
@@ -180,7 +180,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If the user has a session_id cookie but there are no required tokens in the
 	// session store associated with it, then redirect for login.
 	if tokenResponse == nil {
-		log.Info("Required tokens are not present. Sending user to re-authenticate.")
+		log.Info("required tokens are not present. Sending user to re-authenticate.")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -195,7 +195,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		return nil
 	}
 	if !expired {
-		log.Info("Tokens not expired. Allowing request to proceed.")
+		log.Info("tokens not expired. Allowing request to proceed.")
 		o.allowResponse(resp, tokenResponse)
 		return nil
 	}
@@ -205,7 +205,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If there is no refresh token,
 	// then direct the request to the identity provider for authentication
 	if tokenResponse.RefreshToken == "" {
-		log.Info("A token was expired, but session did not contain a refresh token. Sending user to re-authenticate.")
+		log.Info("a token was expired, but session did not contain a refresh token. Sending user to re-authenticate.")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -216,7 +216,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	log.Debug("attempting token refresh")
 	refreshedTokens := o.refreshToken(ctx, log, tokenResponse, tokenResponse.RefreshToken, sessionID)
 	if refreshedTokens == nil {
-		log.Info("Token refresh failed. Sending user to re-authenticate.")
+		log.Info("token refresh failed. Sending user to re-authenticate.")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -226,7 +226,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		return nil
 	}
 
-	log.Info("Token refresh successful. Allowing request to proceed.")
+	log.Info("token refresh successful. Allowing request to proceed.")
 	o.allowResponse(resp, refreshedTokens)
 	return nil
 }
