@@ -30,6 +30,14 @@ spec:
       tls:
         mode: SIMPLE
         credentialName: http-echo-certs
+    - hosts:
+      - "http-echo.authservice.internal"
+      port:
+        number: 80
+        name: http
+        protocol: HTTP
+      tls:
+        httpsRedirect: true
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService

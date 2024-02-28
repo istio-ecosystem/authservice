@@ -25,6 +25,11 @@ service:
       nodePort: 30000  # Make it accessible form the host without having to install MetalLB or others
       protocol: TCP
       targetPort: 443
+    - name: http
+      port: 80
+      nodePort: 30002
+      protocol: TCP
+      targetPort: 80
 
 # Clear the default resources to allow it to run in very constrained local environments
 # without explicitly requesting more memory than the one that might be available in the
