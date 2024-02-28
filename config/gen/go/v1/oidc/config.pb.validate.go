@@ -692,7 +692,18 @@ func (m *OIDCConfig) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		oneofClientSecretConfigPresent = true
-		// no validation rules for ClientSecret
+
+		if utf8.RuneCountInString(m.GetClientSecret()) < 1 {
+			err := OIDCConfigValidationError{
+				field:  "ClientSecret",
+				reason: "value length must be at least 1 runes",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
 	case *OIDCConfig_ClientSecretRef:
 		if v == nil {
 			err := OIDCConfigValidationError{

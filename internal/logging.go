@@ -22,6 +22,7 @@ import (
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"github.com/tetratelabs/telemetry/scope"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 )
@@ -35,6 +36,7 @@ const (
 	Requests = "requests"
 	Server   = "server"
 	Session  = "session"
+	K8s      = "k8s"
 )
 
 // scopes contains the list of all logging scopes
@@ -47,6 +49,7 @@ var scopes = map[string]string{
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",
 	Session:  "Session store messages",
+	K8s:      "Kubernetes controller messages",
 }
 
 // ErrInvalidLogLevel is returned when the configured log level is invalid.
@@ -97,6 +100,7 @@ func (s *setupLogging) PreRun() error {
 	if err != nil {
 		return err
 	}
+	ctrl.SetLogger(NewLogrAdapter(Logger(K8s)))
 	setLogLevels(s.logger, levels)
 	return nil
 }

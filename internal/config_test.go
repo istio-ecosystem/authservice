@@ -47,6 +47,8 @@ func (e errCheck) Check(t *testing.T, err error) {
 	}
 }
 
+const msgLengthValidation = "value length must be at least 1 runes"
+
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -69,6 +71,8 @@ func TestValidateConfig(t *testing.T) {
 		{"invalid-callback-and-logout-path", "testdata/invalid-callback-logout.json", errCheck{is: ErrMustBeDifferentPath}},
 		{"oidc-dynamic", "testdata/oidc-dynamic.json", errCheck{is: nil}},
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
+		{"invalid-oidc-client-secret", "testdata/invalid-oidc-client-secret.json", errCheck{msg: msgLengthValidation}},
+		{"invalid-oidc-client-secret-ref", "testdata/invalid-oidc-client-secret-ref.json", errCheck{msg: msgLengthValidation}},
 	}
 
 	for _, tt := range tests {

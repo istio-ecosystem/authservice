@@ -148,7 +148,7 @@ message OIDCConfig {
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
     // This field keeps the client secret in plain text. Recommend to use `client_secret_ref` instead
     // when running in a Kubernetes cluster.
-    string client_secret = 6;
+    string client_secret = 6 [(validate.rules).string.min_len = 1];
 
     // The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
