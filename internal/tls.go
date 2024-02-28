@@ -73,11 +73,22 @@ func NewTLSConfigPool(ctx context.Context) TLSConfigPool {
 
 // LoadTLSConfig loads a TLS configuration from the given TLSConfig.
 func (p *tlsConfigPool) LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
+	if config.GetTrustedCertificateAuthority() == "" &&
+		config.GetTrustedCertificateAuthorityFile() == "" &&
+		config.GetSkipVerifyPeerCert() == nil {
+		// no given TLS config, nothing to load
+		return nil, nil
+	}
+
 	encConfig := encodeConfig(config)
 	id := encConfig.hash()
+
+	p.mu.Lock()
 	if tlsConfig, ok := p.configs[id]; ok {
+		p.mu.Unlock()
 		return tlsConfig, nil
 	}
+	p.mu.Unlock()
 
 	log := p.log.With("id", id)
 	log.Info("loading new TLS config", "config", encConfig.JSON())
@@ -102,10 +113,6 @@ func (p *tlsConfigPool) LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
 
 	case config.GetSkipVerifyPeerCert() != nil:
 		tlsConfig.InsecureSkipVerify = BoolStrValue(config.GetSkipVerifyPeerCert())
-
-	default:
-		// No CA or skip verification, return nil TLS config
-		return nil, nil
 	}
 
 	// Add the loaded CA to the TLS config
