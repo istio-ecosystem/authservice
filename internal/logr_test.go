@@ -30,6 +30,7 @@ func TestWithValues(t *testing.T) {
 	var a logr.LogSink = &logrAdapter{}
 	a = a.WithValues("one", 1, "two", 2)
 	a = a.WithValues("three")
+	a = a.WithValues()
 
 	require.Equal(t, map[string]interface{}{"one": 1, "two": 2, "three": "(MISSING)"}, a.(*logrAdapter).kvs)
 }
@@ -71,6 +72,25 @@ func TestInfo(t *testing.T) {
 	require.Contains(t, string(out), "level=info msg=\"test\" one=1 two=2")
 }
 
+func TestDebug(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	logger := log.New()
+	logger.SetLevel(telemetry.LevelDebug)
+	a := logrAdapter{
+		scope: logger,
+	}
+
+	a.Info(0, "test", "one", 1, "two", 2)
+
+	_ = w.Close()
+	out, _ := io.ReadAll(r)
+	os.Stdout = rescueStdout
+	require.Contains(t, string(out), "level=debug msg=\"test\" one=1 two=2")
+}
+
 func TestError(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -102,9 +122,11 @@ func TestMissingKV(t *testing.T) {
 	}
 
 	a.Info(0, "test", "one", 1, "two")
+	a.Error(errors.New("failed"), "got an error", "last")
 
 	_ = w.Close()
 	out, _ := io.ReadAll(r)
 	os.Stdout = rescueStdout
 	require.Contains(t, string(out), "level=info msg=\"test\" one=1 two=\"(MISSING)\"")
+	require.Contains(t, string(out), "level=error msg=\"got an error\" last=\"(MISSING)\" error=\"failed\"")
 }

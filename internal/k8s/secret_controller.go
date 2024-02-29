@@ -36,13 +36,14 @@ import (
 	"github.com/tetrateio/authservice-go/internal"
 )
 
-const (
-	clientSecretKey = "client-secret"
-)
+const clientSecretKey = "client-secret"
 
 var (
 	_ run.PreRunner      = (*SecretController)(nil)
 	_ run.ServiceContext = (*SecretController)(nil)
+
+	ErrLoadingConfig           = errors.New("error loading kube config")
+	ErrCrossNamespaceSecretRef = errors.New("cross-namespace secret reference is not allowed")
 )
 
 // SecretController watches secrets for updates and updates the configuration with the loaded data.
@@ -104,27 +105,8 @@ func (s *SecretController) PreRun() error {
 	}
 
 	// Collect the k8s secrets that are used in the configuration
-	s.secrets = make(map[string][]*oidcv1.OIDCConfig)
-	for _, c := range s.config.Chains {
-		for _, f := range c.Filters {
-			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
-			if !isOIDCConf ||
-				oidcCfg.Oidc.GetClientSecretRef() == nil ||
-				oidcCfg.Oidc.GetClientSecretRef().GetName() == "" {
-				continue
-			}
-
-			ref := oidcCfg.Oidc.GetClientSecretRef()
-			if ref.Namespace != "" && ref.Namespace != s.namespace {
-				return fmt.Errorf(
-					"cross-namespace secret reference is not allowed:"+
-						" secret reference namespace %s does not match the current namespace %s",
-					ref.Namespace, s.namespace)
-			}
-
-			key := secretNamespacedName(ref, s.namespace).String()
-			s.secrets[key] = append(s.secrets[key], oidcCfg.Oidc)
-		}
+	if err = s.loadSecrets(); err != nil {
+		return err
 	}
 
 	// Load the k8s configuration from in-cluster environment
@@ -169,9 +151,34 @@ func (s *SecretController) ServeContext(ctx context.Context) error {
 	}
 
 	if err := s.manager.Start(ctx); err != nil {
-		return fmt.Errorf("error starting controller manager:%w", err)
+		return fmt.Errorf("error starting controller manager: %w", err)
 	}
 
+	return nil
+}
+
+// loadSecrets loads the secrets from the configuration and stores them in the secrets map.
+func (s *SecretController) loadSecrets() error {
+	s.secrets = make(map[string][]*oidcv1.OIDCConfig)
+	for _, c := range s.config.Chains {
+		for _, f := range c.Filters {
+			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
+			if !isOIDCConf ||
+				oidcCfg.Oidc.GetClientSecretRef() == nil ||
+				oidcCfg.Oidc.GetClientSecretRef().GetName() == "" {
+				continue
+			}
+
+			ref := oidcCfg.Oidc.GetClientSecretRef()
+			if ref.Namespace != "" && ref.Namespace != s.namespace {
+				return fmt.Errorf("%w: secret reference namespace %s does not match the current namespace %s",
+					ErrCrossNamespaceSecretRef, ref.Namespace, s.namespace)
+			}
+
+			key := secretNamespacedName(ref, s.namespace).String()
+			s.secrets[key] = append(s.secrets[key], oidcCfg.Oidc)
+		}
+	}
 	return nil
 }
 
