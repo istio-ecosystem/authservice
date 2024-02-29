@@ -36,6 +36,8 @@ jobs:
   test:
     needs: check
     runs-on: ubuntu-latest
+    env:
+      TEST_OPTS: -race
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

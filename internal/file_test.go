@@ -104,10 +104,10 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			genUpdates: func(reader *mockReader) {
 				reader.setData([]byte("update 1"))
 				reader.waitForRead()
-				reader.err = errors.New("error reading file")
+				reader.setErr(errors.New("error reading file"))
 				reader.waitForRead()
 				// stop error
-				reader.err = nil
+				reader.setErr(nil)
 				// even if an error happens, next updates should be notified
 				reader.setData([]byte("update 2"))
 				reader.waitForRead()
@@ -135,6 +135,7 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			t.Cleanup(cancel)
 			fw := NewFileWatcher(ctx)
 
+			mu := sync.Mutex{}
 			var gotUpdates []string
 
 			wg := sync.WaitGroup{}
@@ -142,7 +143,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 
 			got, err := fw.WatchFile(tt.fileReader, tt.interval, func(data []byte) {
 				defer wg.Done()
+				mu.Lock()
 				gotUpdates = append(gotUpdates, string(data))
+				mu.Unlock()
 			})
 			if tt.wantErr {
 				require.Error(t, err)
@@ -178,7 +181,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 		t.Cleanup(cancel)
 		fw := NewFileWatcher(ctx)
 
+		mu1 := sync.Mutex{}
 		gotUpdates1 := make([]string, 0)
+		mu2 := sync.Mutex{}
 		gotUpdates2 := make([]string, 0)
 
 		wg1 := sync.WaitGroup{}
@@ -189,7 +194,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 		file1 := newMockReader("test1", "original1", nil)
 		got1, err := fw.WatchFile(file1, watcherInterval, func(data []byte) {
 			defer wg1.Done()
+			mu1.Lock()
 			gotUpdates1 = append(gotUpdates1, string(data))
+			mu1.Unlock()
 		})
 		require.NoError(t, err)
 		file1.waitForRead() // Wait for the first read to happen
@@ -197,7 +204,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 		file2 := newMockReader("test2", "original2", nil)
 		got2, err := fw.WatchFile(file2, watcherInterval, func(data []byte) {
 			defer wg2.Done()
+			mu2.Lock()
 			gotUpdates2 = append(gotUpdates2, string(data))
+			mu2.Unlock()
 		})
 		require.NoError(t, err)
 		file2.waitForRead() // Wait for the first read to happen
@@ -229,12 +238,16 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 		t.Cleanup(cancel)
 		fw := NewFileWatcher(ctx)
 
+		muU := sync.Mutex{}
 		gotUpdates := make([]string, 0)
+		muO := sync.Mutex{}
 		gotOverride := make([]string, 0)
 
 		file1 := newMockReader("test1", "original", nil)
 		got, err := fw.WatchFile(file1, watcherInterval, func(data []byte) {
+			muU.Lock()
 			gotUpdates = append(gotUpdates, string(data))
+			muU.Unlock()
 		})
 		require.NoError(t, err)
 		file1.waitForRead() // Wait for the first read to happen
@@ -245,7 +258,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 		file1.setData([]byte("override"))
 		gotOvrr, err := fw.WatchFile(file1, watcherInterval/2, func(data []byte) {
 			defer wg.Done()
+			muO.Lock()
 			gotOverride = append(gotOverride, string(data))
+			muO.Unlock()
 		})
 		require.NoError(t, err)
 		file1.waitForRead() // Wait for the first read to happen again
@@ -298,12 +313,13 @@ func (m *mockReader) Read() ([]byte, error) {
 	// Notify that a read happened
 	defer func() { m.reads <- struct{}{} }()
 
+	m.m.Lock()
+	defer m.m.Unlock()
+
 	if m.err != nil {
 		return nil, m.err
 	}
 
-	m.m.Lock()
-	defer m.m.Unlock()
 	return m.fileData, nil
 }
 
@@ -311,6 +327,12 @@ func (m *mockReader) setData(data []byte) {
 	m.m.Lock()
 	defer m.m.Unlock()
 	m.fileData = data
+}
+
+func (m *mockReader) setErr(err error) {
+	m.m.Lock()
+	defer m.m.Unlock()
+	m.err = err
 }
 
 func (m *mockReader) waitForRead() {
