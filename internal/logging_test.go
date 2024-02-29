@@ -26,12 +26,17 @@ import (
 )
 
 func TestGetLogger(t *testing.T) {
-	l1 := scope.Register("l1", "test logger one")
+	var (
+		logger1Name = "l1"
+		// do not reuse this name in other tests, otherwise multiple runs of the test may fail due find it registered
+		noLoggerName = "lnoop"
+	)
+	l1 := scope.Register(logger1Name, "test logger one")
 
 	NewLogSystem(telemetry.NoopLogger(), nil)
 
-	require.Equal(t, l1, Logger("l1"))
-	require.Equal(t, telemetry.NoopLogger(), Logger("l2"))
+	require.Equal(t, l1, Logger(logger1Name))
+	require.Equal(t, telemetry.NoopLogger(), Logger(noLoggerName))
 }
 
 func TestLoggingSetup(t *testing.T) {
