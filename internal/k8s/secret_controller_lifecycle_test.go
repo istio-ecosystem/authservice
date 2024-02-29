@@ -17,6 +17,7 @@ package k8s
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -55,9 +56,14 @@ func TestManagerStarts(t *testing.T) {
 		controller = NewSecretController(&cfg.Config)
 	)
 
+	manual := &manualPreRun{
+		preRunStarted: new(atomic.Bool),
+		finishPreRun:  make(chan struct{}),
+	}
+
 	controller.restConf = startEnv(t)
 	controller.namespace = defaultNamespace
-	g.Register(irq, &cfg, logging, controller)
+	g.Register(irq, &cfg, logging, controller, manual)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -67,22 +73,25 @@ func TestManagerStarts(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	t.Run("controller is setup at preRun", func(t *testing.T) {
-		require.Eventually(t, func() bool {
-			return controller.k8sClient != nil
-		}, defaultWait, defaultTick, "Controller manager is not setup")
-	})
+	// eventually, the controller's PreRun should be done
+	require.Eventually(t, func() bool { return manual.preRunStarted.Load() },
+		defaultWait, defaultTick, "controller PreRun not done")
 
-	mgrStarted := false
+	// once preRun is done, the manager should initialize, and we can add our own test manager.Runnable
+	mgrStarted := &atomic.Bool{}
 	err := controller.manager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		mgrStarted = true
+		mgrStarted.Store(true)
 		<-ctx.Done()
 		return ctx.Err()
 	}))
 	require.NoError(t, err)
 
+	// signale the prerun phase to complete
+	close(manual.finishPreRun)
+
+	// at some point of serve phase, the manager should be started
 	t.Run("manager is started", func(t *testing.T) {
-		require.Eventually(t, func() bool { return mgrStarted },
+		require.Eventually(t, func() bool { return mgrStarted.Load() },
 			defaultWait, defaultTick, "manager not started")
 	})
 
@@ -101,9 +110,13 @@ func TestManagerNotInitializedIfNothingToWatch(t *testing.T) {
 		controller = NewSecretController(&cfg.Config)
 	)
 
+	manual := &manualService{
+		serveStarted: new(atomic.Bool),
+	}
+
 	controller.restConf = startEnv(t)
 	controller.namespace = defaultNamespace
-	g.Register(irq, &cfg, logging, controller)
+	g.Register(irq, &cfg, logging, controller, manual)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -112,6 +125,10 @@ func TestManagerNotInitializedIfNothingToWatch(t *testing.T) {
 		err := g.Run("", "--config-path", "testdata/oidc-without-secret-ref-in.json")
 		require.NoError(t, err)
 	}()
+
+	// wait for the run group to be fully started
+	require.Eventually(t, func() bool { return manual.serveStarted.Load() },
+		defaultWait, defaultTick, "run group not fully started")
 
 	// signal group termination and wait for it
 	require.NoError(t, irq.Close())
@@ -130,4 +147,40 @@ func startEnv(t *testing.T) *rest.Config {
 		require.NoError(t, env.Stop())
 	})
 	return cfg
+}
+
+var (
+	_ run.PreRunner      = (*manualPreRun)(nil)
+	_ run.ServiceContext = (*manualService)(nil)
+)
+
+type (
+	manualPreRun struct {
+		preRunStarted *atomic.Bool
+		finishPreRun  chan struct{}
+	}
+
+	manualService struct {
+		serveStarted *atomic.Bool
+	}
+)
+
+func (l *manualPreRun) Name() string {
+	return "manual preRun"
+}
+
+func (l *manualPreRun) PreRun() error {
+	l.preRunStarted.Store(true)
+	<-l.finishPreRun
+	return nil
+}
+
+func (l *manualService) Name() string {
+	return "manual service"
+}
+
+func (l *manualService) ServeContext(ctx context.Context) error {
+	l.serveStarted.Store(true)
+	<-ctx.Done()
+	return ctx.Err()
 }
