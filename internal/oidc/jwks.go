@@ -35,7 +35,7 @@ var (
 	// ErrJWKSFetch is returned when the JWKS document cannot be fetched.
 	ErrJWKSFetch = errors.New("error fetching JWKS document")
 
-	_ run.Service = (*DefaultJWKSProvider)(nil)
+	_ run.ServiceContext = (*DefaultJWKSProvider)(nil)
 )
 
 // DefaultFetchInterval is the default interval to use when none is set.
@@ -49,10 +49,10 @@ type JWKSProvider interface {
 
 // DefaultJWKSProvider provides a JWKS set
 type DefaultJWKSProvider struct {
-	log      telemetry.Logger
-	cache    *jwk.AutoRefresh
-	shutdown context.CancelFunc
-	tlsPool  internal.TLSConfigPool
+	log     telemetry.Logger
+	cache   *jwk.AutoRefresh
+	tlsPool internal.TLSConfigPool
+	started chan struct{}
 }
 
 // NewJWKSProvider returns a new JWKSProvider.
@@ -60,20 +60,20 @@ func NewJWKSProvider(tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
 	return &DefaultJWKSProvider{
 		log:     internal.Logger(internal.JWKS),
 		tlsPool: tlsPool,
+		started: make(chan struct{}),
 	}
 }
 
 // Name of the JWKSProvider run.Unit
 func (j *DefaultJWKSProvider) Name() string { return "JWKS" }
 
-// Serve implements run.Service
-func (j *DefaultJWKSProvider) Serve() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	j.shutdown = cancel
-
+func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
 	ch := make(chan jwk.AutoRefreshError)
 	j.cache = jwk.NewAutoRefresh(ctx)
 	j.cache.ErrorSink(ch)
+	defer func() { close(ch) }()
+
+	close(j.started) // signal channel start
 
 	for {
 		select {
@@ -85,16 +85,10 @@ func (j *DefaultJWKSProvider) Serve() error {
 	}
 }
 
-// GracefulStop implements run.Service
-func (j *DefaultJWKSProvider) GracefulStop() {
-	if j.shutdown != nil {
-		j.shutdown()
-	}
-}
-
 // Get the JWKS for the given OIDC configuration
 func (j *DefaultJWKSProvider) Get(ctx context.Context, config *oidcv1.OIDCConfig) (jwk.Set, error) {
 	if config.GetJwksFetcher() != nil {
+		<-j.started // wait until the service is fully started
 		return j.fetchDynamic(ctx, config)
 	}
 	return j.fetchStatic(config.GetJwks())
