@@ -26,10 +26,17 @@ ENVTEST       ?= sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 NAME    ?= authservice
 TARGETS ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 
-DOCKER_HUB            ?= gcr.io/tetrate-internal-containers
-DOCKER_TAG            ?= $(shell git rev-parse HEAD)
+# DOCKER_HUB is exported so that it can be referenced in e2e docker compose files
+export DOCKER_HUB     ?= $(GO_MODULE:github.com/%=ghcr.io/%)
 DOCKER_TARGETS        ?= linux-amd64 linux-arm64
 DOCKER_BUILDER_NAME   ?= $(NAME)-builder
+
+ifneq ($(strip $(VERSION)),)
+# Remove the suffix as we want N.N.N instead of vN.N.N
+DOCKER_TAG ?= $(strip $(VERSION:v%=%))
+else
+DOCKER_TAG ?= $(shell git rev-parse HEAD)
+endif
 
 export ARCH := $(shell uname -m)
 ifeq ($(ARCH),x86_64)

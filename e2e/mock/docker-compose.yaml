@@ -31,7 +31,7 @@ services:
 
   # This is the `authservice` image that should be up-to-date when running the tests.
   ext-authz:
-    image: gcr.io/tetrate-internal-containers/authservice:latest-${ARCH:-amd64}
+    image: ${DOCKER_HUB}/authservice:latest-${ARCH:-amd64}
     platform: linux/${ARCH:-amd64}
     volumes:
       - type: bind
