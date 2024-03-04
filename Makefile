@@ -138,6 +138,7 @@ docker-%: docker-pre $(OUTDIR)/$(NAME)-static-%
 		--load \
 		-f Dockerfile \
 		--platform $(PLATFORM) \
+		--build-arg REPO=https://$(GO_MODULE) \
 		-t $(DOCKER_HUB)/$(NAME):latest-$(ARCH) \
 		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH) \
 		.
@@ -151,6 +152,7 @@ docker-push: docker-pre  ## Build and push the multi-arch Docker images
 		$(if $(USE_INSECURE_REGISTRY),$(INSECURE_REGISTRY_ARG),--push) \
 		-f Dockerfile \
 		--platform $(PLATFORMS) \
+		--build-arg REPO=https://$(GO_MODULE) \
 		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG) \
 		.
 
