@@ -37,4 +37,4 @@ docker run \
     -e GOPRIVATE="$(go env GOPRIVATE)" \
     -w /source \
     "${BUILD_IMAGE}" \
-    /bin/bash -c "${*:2}"
+    /bin/bash -c "git config --global --add safe.directory /source ; ${*:2}"

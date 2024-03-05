@@ -35,18 +35,15 @@ static: $(TARGETS:%=$(OUTDIR)/$(NAME)-static-%)  ## Build all the static binarie
 .PHONY: fips
 fips: $(FIPS_TARGETS:%=$(OUTDIR)/$(NAME)-fips-%)  ## Build all the FIPS static binaries
 
-$(OUTDIR):
-	@mkdir -p $@
-
 $(OUTDIR)/$(NAME)-%: GOOS=$(word 1,$(subst -, ,$(subst $(NAME)-,,$(@F))))
 $(OUTDIR)/$(NAME)-%: GOARCH=$(word 2,$(subst -, ,$(subst $(NAME)-,,$(@F))))
-$(OUTDIR)/$(NAME)-%: $(OUTDIR)
+$(OUTDIR)/$(NAME)-%:
 	@echo "Build $(@F)"
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(BUILD_OPTS) -o $@ $(PKG)
 
 $(OUTDIR)/$(NAME)-static-%: GOOS=$(word 1,$(subst -, ,$(subst $(NAME)-static-,,$(@F))))
 $(OUTDIR)/$(NAME)-static-%: GOARCH=$(word 2,$(subst -, ,$(subst $(NAME)-static-,,$(@F))))
-$(OUTDIR)/$(NAME)-static-%: $(OUTDIR)
+$(OUTDIR)/$(NAME)-static-%:
 	@echo "Build $(@F)"
 	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(BUILD_OPTS) \
 		-ldflags '-s -w -extldflags "-static"' -tags "netgo" \
@@ -54,8 +51,8 @@ $(OUTDIR)/$(NAME)-static-%: $(OUTDIR)
 
 $(OUTDIR)/$(NAME)-fips-%: GOOS=$(word 1,$(subst -, ,$(subst $(NAME)-fips-,,$(@F))))
 $(OUTDIR)/$(NAME)-fips-%: GOARCH=$(word 2,$(subst -, ,$(subst $(NAME)-fips-,,$(@F))))
-$(OUTDIR)/$(NAME)-fips-%: $(OUTDIR)
-ifneq ($(OS),Darwin)
+$(OUTDIR)/$(NAME)-fips-%:
+ifneq ($(BUILD_FIPS_IN_DOCKER),true)
 	@echo "Build $(@F)"
 	@GOEXPERIMENT=boringcrypto CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(BUILD_OPTS) \
 		-ldflags '-linkmode=external -s -w -extldflags "-static"' -tags "netgo" \
@@ -152,11 +149,11 @@ docker-fips: docker-pre $(DOCKER_TARGETS:%=docker/fips/%)  ## Build the FIPS Doc
 
 .SECONDEXPANSION:
 docker/%: PLATFORM=$(subst -,/,$(notdir $(*)))
-docker/%: ARCH=$(notdir $(subst -,/,$(PLATFORM)))
+docker/%: DOCKER_ARCH=$(notdir $(subst -,/,$(PLATFORM)))
 docker/%: FLAVOR=$(subst /,,$(dir $(*)))
 docker/%: TAG_SUFFIX=$(if $(subst static,,${FLAVOR}),-fips)
 docker/%: $(OUTDIR)/$(NAME)-$$(FLAVOR)-$$(notdir %)
-	@echo "Building Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)$(TAG_SUFFIX)"
+	@echo "Building Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(DOCKER_ARCH)$(TAG_SUFFIX)"
 	@docker buildx build \
 		$(DOCKER_BUILD_ARGS) \
 		--builder $(DOCKER_BUILDER_NAME) \
@@ -165,8 +162,8 @@ docker/%: $(OUTDIR)/$(NAME)-$$(FLAVOR)-$$(notdir %)
 		--platform $(PLATFORM) \
 		--build-arg REPO=https://$(GO_MODULE) \
 		--build-arg FLAVOR=$(FLAVOR) \
-		-t $(DOCKER_HUB)/$(NAME):latest-$(ARCH)$(TAG_SUFFIX) \
-		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)$(TAG_SUFFIX) \
+		-t $(DOCKER_HUB)/$(NAME):latest-$(DOCKER_ARCH)$(TAG_SUFFIX) \
+		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(DOCKER_ARCH)$(TAG_SUFFIX) \
 		.
 
 .PHONY: docker-push

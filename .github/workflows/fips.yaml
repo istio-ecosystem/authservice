@@ -26,12 +26,17 @@ env:
   GOPROXY: https://proxy.golang.org
 
 jobs:
-  fips:
+  fips-build:
     runs-on: ubuntu-latest
+    env:
+      BUILD_FIPS_IN_DOCKER: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64,arm64
       - run: make fips
       - run: make docker-fips

@@ -39,7 +39,12 @@ else
 DOCKER_TAG ?= $(shell git rev-parse HEAD)
 endif
 
+# In non-Linux systems, use Docker to build FIPS-compliant binaries.
 OS := $(shell uname)
+ifeq ($(OS),Darwin)
+BUILD_FIPS_IN_DOCKER ?= true
+endif
+
 export ARCH := $(shell uname -m)
 ifeq ($(ARCH),x86_64)
 export ARCH := amd64
