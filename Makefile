@@ -64,7 +64,6 @@ else
 	@$(ROOT)/run-in-docker.sh $(GOOS)/$(GOARCH) make $@
 endif
 
-
 .PHONY: clean
 clean: clean/e2e  ## Clean the build artifacts
 	@rm -rf $(OUTDIR)
@@ -215,6 +214,13 @@ check:  ## CI blocks merge until this passes. If this fails, run "make check" lo
 		git diff; \
 		exit 1; \
 	fi
+
+.PHONY: dist
+dist:  ## Package the release binaries
+	@mkdir -p $(OUTDIR)/dist
+	@cd $(OUTDIR) && for f in $(NAME)-*; do \
+		tar cvzf dist/$$f.tar.gz $$f; \
+	done
 
 .PHONY: help
 help:  ## Display this help
