@@ -33,3 +33,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - run: make docker-push
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: bin/authservice-*
+          draft: true
+          generate_release_notes: true
