@@ -32,6 +32,9 @@ build: $(TARGETS:%=$(OUTDIR)/$(NAME)-%)  ## Build all the binaries
 .PHONY: static
 static: $(TARGETS:%=$(OUTDIR)/$(NAME)-static-%)  ## Build all the static binaries
 
+.PHONY: fips
+fips: $(FIPS_TARGETS:%=$(OUTDIR)/$(NAME)-fips-%)  ## Build all the FIPS static binaries
+
 $(OUTDIR):
 	@mkdir -p $@
 
@@ -48,6 +51,22 @@ $(OUTDIR)/$(NAME)-static-%: $(OUTDIR)
 	@CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(BUILD_OPTS) \
 		-ldflags '-s -w -extldflags "-static"' -tags "netgo" \
 		-o $@ $(PKG)
+
+$(OUTDIR)/$(NAME)-fips-%: GOOS=$(word 1,$(subst -, ,$(subst $(NAME)-fips-,,$(@F))))
+$(OUTDIR)/$(NAME)-fips-%: GOARCH=$(word 2,$(subst -, ,$(subst $(NAME)-fips-,,$(@F))))
+$(OUTDIR)/$(NAME)-fips-%: $(OUTDIR)
+ifneq ($(OS),Darwin)
+	@echo "Build $(@F)"
+	@GOEXPERIMENT=boringcrypto CGO_ENABLED=1 GOOS=$(GOOS) GOARCH=$(GOARCH) go build $(BUILD_OPTS) \
+		-ldflags '-linkmode=external -s -w -extldflags "-static"' -tags "netgo" \
+		-o $@ $(PKG)
+	@echo "Verifying FIPS symbols are present"
+	@strings $@ | grep -q _Cfunc__goboringcrypto_ || (echo "FIPS symbols not found" && exit 1)
+else
+# Run the FIPS build in a Linux container if the host OS is not Linux
+	@$(ROOT)/run-in-docker.sh $(GOOS)/$(GOARCH) make $@
+endif
+
 
 .PHONY: clean
 clean: clean/e2e  ## Clean the build artifacts
@@ -114,7 +133,7 @@ force-e2e:
 ##@ Docker targets
 
 .PHONY: docker-pre
-docker-pre: $(DOCKER_TARGETS:%=$(OUTDIR)/$(NAME)-static-%)
+docker-pre:
 	@docker buildx inspect $(DOCKER_BUILDER_NAME) || \
 		docker buildx create --name $(DOCKER_BUILDER_NAME) \
 			--driver docker-container --driver-opt network=host \
@@ -126,12 +145,18 @@ PLATFORMS := $(subst -,/,$(subst $(space),$(comma),$(DOCKER_TARGETS)))
 INSECURE_REGISTRY_ARG := --output=type=registry,registry.insecure=true
 
 .PHONY: docker
-docker: $(DOCKER_TARGETS:%=docker-%)  ## Build the docker images
+docker: docker-pre $(DOCKER_TARGETS:%=docker/static/%)  ## Build the Docker images
 
-docker-%: PLATFORM=$(subst -,/,$(*))
-docker-%: ARCH=$(notdir $(subst -,/,$(PLATFORM)))
-docker-%: docker-pre $(OUTDIR)/$(NAME)-static-%
-	@echo "Building Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)"
+.PHONY: docker-fips
+docker-fips: docker-pre $(DOCKER_TARGETS:%=docker/fips/%)  ## Build the FIPS Docker images
+
+.SECONDEXPANSION:
+docker/%: PLATFORM=$(subst -,/,$(notdir $(*)))
+docker/%: ARCH=$(notdir $(subst -,/,$(PLATFORM)))
+docker/%: FLAVOR=$(subst /,,$(dir $(*)))
+docker/%: TAG_SUFFIX=$(if $(subst static,,${FLAVOR}),-fips)
+docker/%: $(OUTDIR)/$(NAME)-$$(FLAVOR)-$$(notdir %)
+	@echo "Building Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)$(TAG_SUFFIX)"
 	@docker buildx build \
 		$(DOCKER_BUILD_ARGS) \
 		--builder $(DOCKER_BUILDER_NAME) \
@@ -139,13 +164,20 @@ docker-%: docker-pre $(OUTDIR)/$(NAME)-static-%
 		-f Dockerfile \
 		--platform $(PLATFORM) \
 		--build-arg REPO=https://$(GO_MODULE) \
-		-t $(DOCKER_HUB)/$(NAME):latest-$(ARCH) \
-		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH) \
+		--build-arg FLAVOR=$(FLAVOR) \
+		-t $(DOCKER_HUB)/$(NAME):latest-$(ARCH)$(TAG_SUFFIX) \
+		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(ARCH)$(TAG_SUFFIX) \
 		.
 
 .PHONY: docker-push
-docker-push: docker-pre  ## Build and push the multi-arch Docker images
-	@echo "Pushing Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)"
+docker-push: docker-pre $(DOCKER_TARGETS:%=$(OUTDIR)/$(NAME)-static-%) docker-push/static ## Build and push the multi-arch Docker images
+
+.PHONY: docker-push-fips
+docker-push-fips: docker-pre $(DOCKER_TARGETS:%=$(OUTDIR)/$(NAME)-fips-%) docker-push/fips ## Build and push the multi-arch FIPS Docker images
+
+docker-push/%: TAG_SUFFIX=$(if $(subst static,,$(*)),-fips)
+docker-push/%:
+	@echo "Pushing Docker image $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)$(TAG_SUFFIX)"
 	@docker buildx build \
 		$(DOCKER_BUILD_ARGS) \
 		--builder $(DOCKER_BUILDER_NAME) \
@@ -153,7 +185,8 @@ docker-push: docker-pre  ## Build and push the multi-arch Docker images
 		-f Dockerfile \
 		--platform $(PLATFORMS) \
 		--build-arg REPO=https://$(GO_MODULE) \
-		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG) \
+		--build-arg FLAVOR=$(@F) \
+		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)$(TAG_SUFFIX) \
 		.
 
 ##@ Other targets

@@ -14,6 +14,7 @@
 
 ROOT      := $(shell git rev-parse --show-toplevel)
 GO_MODULE := $(shell sed -ne 's/^module //gp' $(ROOT)/go.mod)
+NAME      ?= authservice
 
 -include $(ROOT)/.makerc  # Pick up any local overrides.
 
@@ -23,8 +24,8 @@ LICENSER      ?= github.com/liamawhite/licenser@v0.6.1-0.20210729145742-be6c77bf
 KIND          ?= sigs.k8s.io/kind@v0.18.0
 ENVTEST       ?= sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
-NAME    ?= authservice
-TARGETS ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
+TARGETS      ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
+FIPS_TARGETS := $(filter linux-%,$(TARGETS))
 
 # DOCKER_HUB is exported so that it can be referenced in e2e docker compose files
 export DOCKER_HUB     ?= $(GO_MODULE:github.com/%=ghcr.io/%)
@@ -38,6 +39,7 @@ else
 DOCKER_TAG ?= $(shell git rev-parse HEAD)
 endif
 
+OS := $(shell uname)
 export ARCH := $(shell uname -m)
 ifeq ($(ARCH),x86_64)
 export ARCH := amd64

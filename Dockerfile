@@ -17,10 +17,11 @@ FROM scratch
 ARG TARGETARCH
 ARG TARGETOS
 ARG REPO
+ARG FLAVOR
 
 LABEL org.opencontainers.image.source=${REPO}
 LABEL org.opencontainers.image.description="Move OIDC token acquisition out of your app code and into the Istio mesh"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
-ADD bin/authservice-static-${TARGETOS}-${TARGETARCH} /usr/local/bin/authservice
+ADD bin/authservice-${FLAVOR}-${TARGETOS}-${TARGETARCH} /usr/local/bin/authservice
 ENTRYPOINT ["/usr/local/bin/authservice"]
