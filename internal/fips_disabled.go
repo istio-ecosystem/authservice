@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build boringcrypto
+//go:build !boringcrypto
 
-package main
+package internal
 
-import (
-	"crypto/boring"
-	"fmt"
-)
-
-// This line will only be printed in the output if boringcrypto is enabled.
-func init() {
-	fmt.Println("FIPS: boringcrypto enabled:", boring.Enabled())
+// LogFIPS logs whether FIPS is enabled or not.
+func LogFIPS() {
+	Logger(Default).Info("FIPS: boringcrypto", "enabled", false)
 }

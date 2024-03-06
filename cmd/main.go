@@ -50,6 +50,10 @@ func main() {
 		}
 		return nil
 	})
+	fipsLog := run.NewPreRunner("fips", func() error {
+		internal.LogFIPS()
+		return nil
+	})
 
 	g := run.Group{Logger: internal.Logger(internal.Default)}
 
@@ -59,6 +63,7 @@ func main() {
 		logging,           // Set up the logging system
 		secretCtrl,        // watch for secret updates and update the configuration
 		configLog,         // log the configuration
+		fipsLog,           // log whether FIPS is enabled
 		jwks,              // start the JWKS provider
 		sessions,          // start the session store
 		authzServer,       // start the server
