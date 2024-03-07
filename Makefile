@@ -161,6 +161,7 @@ docker/%: $(OUTDIR)/$(NAME)-$$(FLAVOR)-$$(notdir %)
 		--platform $(PLATFORM) \
 		--build-arg REPO=https://$(GO_MODULE) \
 		--build-arg FLAVOR=$(FLAVOR) \
+		$(subst org.,--label org.,$(DOCKER_METADATA)) \
 		-t $(DOCKER_HUB)/$(NAME):latest-$(DOCKER_ARCH)$(TAG_SUFFIX) \
 		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)-$(DOCKER_ARCH)$(TAG_SUFFIX) \
 		.
@@ -182,6 +183,8 @@ docker-push/%:
 		--platform $(PLATFORMS) \
 		--build-arg REPO=https://$(GO_MODULE) \
 		--build-arg FLAVOR=$(@F) \
+		$(subst org.,--label org.,$(DOCKER_METADATA)) \
+		$(subst org.,--annotation index:org.,$(DOCKER_METADATA)) \
 		-t $(DOCKER_HUB)/$(NAME):$(DOCKER_TAG)$(TAG_SUFFIX) \
 		.
 

@@ -32,12 +32,22 @@ export DOCKER_HUB     ?= $(GO_MODULE:github.com/%=ghcr.io/%)
 DOCKER_TARGETS        ?= linux-amd64 linux-arm64
 DOCKER_BUILDER_NAME   ?= $(NAME)-builder
 
+REVISION := $(shell git rev-parse HEAD)
 ifneq ($(strip $(VERSION)),)
 # Remove the suffix as we want N.N.N instead of vN.N.N
 DOCKER_TAG ?= $(strip $(VERSION:v%=%))
 else
-DOCKER_TAG ?= $(shell git rev-parse HEAD)
+DOCKER_TAG ?= $(REVISION)
 endif
+
+# Docker metadata
+DOCKER_METADATA := \
+	org.opencontainers.image.title=$(NAME) \
+	org.opencontainers.image.description="Move OIDC token acquisition out of your app code and into the Istio mesh" \
+	org.opencontainers.image.licenses="Apache-2.0" \
+	org.opencontainers.image.source=https://$(GO_MODULE) \
+	org.opencontainers.image.version=$(DOCKER_TAG) \
+	org.opencontainers.image.revision=$(REVISION)
 
 # In non-Linux systems, use Docker to build FIPS-compliant binaries.
 OS := $(shell uname)
