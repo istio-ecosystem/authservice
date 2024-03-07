@@ -27,7 +27,7 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
-	"github.com/lestrrat-go/jwx/jws"
+	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
@@ -621,7 +621,7 @@ func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, 
 		return false, codes.Internal
 	}
 
-	if _, err := jws.VerifySet([]byte(idTokenString), jwtSet); err != nil {
+	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet)); err != nil {
 		log.Error("error verifying id token with fetched jwks", err)
 		return false, codes.Internal
 	}

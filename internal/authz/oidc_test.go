@@ -29,14 +29,15 @@ import (
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/test/bufconn"
 
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 	"github.com/tetrateio/authservice-go/internal"
 	inthttp "github.com/tetrateio/authservice-go/internal/http"
@@ -193,7 +194,7 @@ func TestOIDCProcess(t *testing.T) {
 
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
-	bytes, err := json.Marshal(newKeySet(jwkPub))
+	bytes, err := json.Marshal(newKeySet(t, jwkPub))
 	require.NoError(t, err)
 	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
@@ -203,7 +204,9 @@ func TestOIDCProcess(t *testing.T) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
 	tlsPool := internal.NewTLSConfigPool(context.Background())
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool,
+		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
+		oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -882,13 +885,13 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	tlsPool := internal.NewTLSConfigPool(context.Background())
 
 	jwkPriv, jwkPub := newKeyPair(t)
-	bytes, err := json.Marshal(newKeySet(jwkPub))
+	bytes, err := json.Marshal(newKeySet(t, jwkPub))
 	require.NoError(t, err)
 	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
 	}
 
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool),
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
@@ -1350,7 +1353,8 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 	clock := oidc.Clock{}
 	tlsPool := internal.NewTLSConfigPool(context.Background())
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	_, err := NewOIDCHandler(dynamicOIDCConfig, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	_, err := NewOIDCHandler(dynamicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
 
@@ -1371,7 +1375,8 @@ func TestNewOIDCHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			_, err := NewOIDCHandler(tt.config, tlsPool, oidc.NewJWKSProvider(tlsPool), sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+			_, err := NewOIDCHandler(tt.config, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+				sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -1404,10 +1409,10 @@ const (
 	keyAlg = jwa.RS256
 )
 
-func newKeySet(keys ...jwk.Key) jwk.Set {
+func newKeySet(t *testing.T, keys ...jwk.Key) jwk.Set {
 	jwks := jwk.NewSet()
 	for _, k := range keys {
-		jwks.Add(k)
+		require.NoError(t, jwks.AddKey(k))
 	}
 	return jwks
 }
@@ -1416,10 +1421,12 @@ func newKeyPair(t *testing.T) (jwk.Key, jwk.Key) {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	priv, err := jwk.New(rsaKey)
+	priv, err := jwk.FromRaw(rsaKey)
+	require.NoError(t, err)
+	err = priv.Set(jwk.KeyIDKey, keyID)
 	require.NoError(t, err)
 
-	pub, err := jwk.New(rsaKey.PublicKey)
+	pub, err := jwk.FromRaw(rsaKey.PublicKey)
 	require.NoError(t, err)
 
 	err = pub.Set(jwk.KeyIDKey, keyID)
@@ -1431,9 +1438,9 @@ func newKeyPair(t *testing.T) (jwk.Key, jwk.Key) {
 }
 
 func newJWT(t *testing.T, key jwk.Key, builder *jwt.Builder) string {
-	token, err := builder.Build()
+	token, err := builder.Claim(jwk.KeyIDKey, key.KeyID()).Build()
 	require.NoError(t, err)
-	signed, err := jwt.Sign(token, keyAlg, key)
+	signed, err := jwt.Sign(token, jwt.WithKey(keyAlg, key))
 	require.NoError(t, err)
 	return string(signed)
 }
@@ -1540,6 +1547,14 @@ func requireStandardResponseHeaders(t *testing.T, resp *envoy.CheckResponse) {
 		if header.GetHeader().GetKey() == inthttp.HeaderPragma {
 			require.EqualValues(t, inthttp.HeaderPragmaNoCache, header.GetHeader().GetValue())
 		}
+	}
+}
+
+func newConfigFor(oidc *oidcv1.OIDCConfig) *configv1.Config {
+	return &configv1.Config{
+		Chains: []*configv1.FilterChain{
+			{Filters: []*configv1.Filter{{Type: &configv1.Filter_Oidc{Oidc: oidc}}}},
+		},
 	}
 }
 

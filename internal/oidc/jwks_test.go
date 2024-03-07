@@ -26,13 +26,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
+	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 	"github.com/tetrateio/authservice-go/internal"
 )
@@ -79,10 +81,11 @@ var (
 
 func TestStaticJWKSProvider(t *testing.T) {
 	tlsPool := internal.NewTLSConfigPool(context.Background())
+	cfg := &configv1.Config{}
 
 	t.Run("invalid", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		cache := NewJWKSProvider(tlsPool)
+		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
@@ -97,7 +100,7 @@ func TestStaticJWKSProvider(t *testing.T) {
 
 	t.Run("single-key", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		cache := NewJWKSProvider(tlsPool)
+		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
@@ -110,16 +113,16 @@ func TestStaticJWKSProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, jwks.Len())
 
-		key, ok := jwks.Get(0)
+		key, ok := jwks.LookupKeyID("62a93512c9ee4c7f8067b5a216dade2763d32a47")
 		require.True(t, ok)
-		require.Equal(t, "RS256", key.Algorithm())
+		require.Equal(t, jwa.RS256, key.Algorithm())
 		require.Equal(t, jwa.KeyType("RSA"), key.KeyType())
 		require.Equal(t, "62a93512c9ee4c7f8067b5a216dade2763d32a47", key.KeyID())
 	})
 
 	t.Run("multiple-keys", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		cache := NewJWKSProvider(tlsPool)
+		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
@@ -132,15 +135,15 @@ func TestStaticJWKSProvider(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, jwks.Len())
 
-		key, ok := jwks.Get(0)
+		key, ok := jwks.LookupKeyID("62a93512c9ee4c7f8067b5a216dade2763d32a47")
 		require.True(t, ok)
-		require.Equal(t, "RS256", key.Algorithm())
+		require.Equal(t, jwa.RS256, key.Algorithm())
 		require.Equal(t, jwa.KeyType("RSA"), key.KeyType())
 		require.Equal(t, "62a93512c9ee4c7f8067b5a216dade2763d32a47", key.KeyID())
 
-		key, ok = jwks.Get(1)
+		key, ok = jwks.LookupKeyID("b3319a147514df7ee5e4bcdee51350cc890cc89e")
 		require.True(t, ok)
-		require.Equal(t, "RS256", key.Algorithm())
+		require.Equal(t, jwa.RS256, key.Algorithm())
 		require.Equal(t, jwa.KeyType("RSA"), key.KeyType())
 		require.Equal(t, "b3319a147514df7ee5e4bcdee51350cc890cc89e", key.KeyID())
 	})
@@ -149,11 +152,22 @@ func TestStaticJWKSProvider(t *testing.T) {
 func TestDynamicJWKSProvider(t *testing.T) {
 	var (
 		pub  = newKey(t)
-		jwks = newKeySet(pub)
+		jwks = newKeySet(t, pub)
 
 		tlsPool  = internal.NewTLSConfigPool(context.Background())
-		newCache = func(t *testing.T) JWKSProvider {
-			cache := NewJWKSProvider(tlsPool)
+		newCache = func(t *testing.T, oidc *oidcv1.OIDCConfig) JWKSProvider {
+			cfg := &configv1.Config{
+				Chains: []*configv1.FilterChain{
+					{
+						Filters: []*configv1.Filter{
+							{Type: &configv1.Filter_Mock{Mock: &mockv1.MockConfig{}}},
+							{Type: &configv1.Filter_Oidc{Oidc: oidc}},
+						},
+					},
+				},
+			}
+
+			cache := NewJWKSProvider(cfg, tlsPool)
 			g := run.Group{Logger: telemetry.NoopLogger()}
 			g.Register(cache)
 			go func() { _ = g.Run() }()
@@ -166,8 +180,6 @@ func TestDynamicJWKSProvider(t *testing.T) {
 
 	t.Run("invalid url", func(t *testing.T) {
 		server := newTestServer(t, jwks)
-		cache := newCache(t)
-
 		config := &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
@@ -175,6 +187,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 				},
 			},
 		}
+		cache := newCache(t, config)
 
 		_, err := cache.Get(context.Background(), config)
 
@@ -184,8 +197,6 @@ func TestDynamicJWKSProvider(t *testing.T) {
 
 	t.Run("cache load", func(t *testing.T) {
 		server := newTestServer(t, jwks)
-		cache := newCache(t)
-
 		config := &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
@@ -195,6 +206,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 			},
 			SkipVerifyPeerCert: structpb.NewBoolValue(true),
 		}
+		cache := newCache(t, config)
 
 		keys, err := cache.Get(context.Background(), config)
 		require.NoError(t, err)
@@ -204,8 +216,6 @@ func TestDynamicJWKSProvider(t *testing.T) {
 
 	t.Run("cached results", func(t *testing.T) {
 		server := newTestServer(t, jwks)
-		cache := newCache(t)
-
 		config := &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
@@ -214,6 +224,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 				},
 			},
 		}
+		cache := newCache(t, config)
 
 		for i := 0; i < 5; i++ {
 			keys, err := cache.Get(context.Background(), config)
@@ -225,8 +236,6 @@ func TestDynamicJWKSProvider(t *testing.T) {
 
 	t.Run("cache refresh", func(t *testing.T) {
 		server := newTestServer(t, jwks)
-		cache := newCache(t)
-
 		config := &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 				JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
@@ -235,11 +244,12 @@ func TestDynamicJWKSProvider(t *testing.T) {
 				},
 			},
 		}
+		cache := newCache(t, config)
 
 		// Load the entry in the cache and remove it to let the background refresher refresh it
 		_, err := cache.Get(context.Background(), config)
 		require.NoError(t, err)
-		jwks.Remove(pub)
+		require.NoError(t, jwks.RemoveKey(pub))
 
 		// Wait for the refresh period and check that the JWKS has been refreshed
 		require.Eventually(t, func() bool {
@@ -275,10 +285,10 @@ func newTestServer(t *testing.T, jwks jwk.Set) *server {
 
 const keyID = "test"
 
-func newKeySet(keys ...jwk.Key) jwk.Set {
+func newKeySet(t *testing.T, keys ...jwk.Key) jwk.Set {
 	jwks := jwk.NewSet()
 	for _, k := range keys {
-		jwks.Add(k)
+		require.NoError(t, jwks.AddKey(k))
 	}
 	return jwks
 }
@@ -287,7 +297,7 @@ func newKey(t *testing.T) jwk.Key {
 	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
-	pub, err := jwk.New(rsaKey.PublicKey)
+	pub, err := jwk.FromRaw(rsaKey.PublicKey)
 	require.NoError(t, err)
 
 	err = pub.Set(jwk.KeyIDKey, keyID)

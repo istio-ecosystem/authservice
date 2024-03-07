@@ -21,10 +21,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwk"
+	"github.com/lestrrat-go/httprc"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 
+	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
 	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
 	"github.com/tetrateio/authservice-go/internal"
 )
@@ -50,15 +52,17 @@ type JWKSProvider interface {
 // DefaultJWKSProvider provides a JWKS set
 type DefaultJWKSProvider struct {
 	log     telemetry.Logger
-	cache   *jwk.AutoRefresh
+	cache   *jwk.Cache
+	config  *configv1.Config
 	tlsPool internal.TLSConfigPool
 	started chan struct{}
 }
 
 // NewJWKSProvider returns a new JWKSProvider.
-func NewJWKSProvider(tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
+func NewJWKSProvider(cfg *configv1.Config, tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
 	return &DefaultJWKSProvider{
 		log:     internal.Logger(internal.JWKS),
+		config:  cfg,
 		tlsPool: tlsPool,
 		started: make(chan struct{}),
 	}
@@ -68,21 +72,17 @@ func NewJWKSProvider(tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
 func (j *DefaultJWKSProvider) Name() string { return "JWKS" }
 
 func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
-	ch := make(chan jwk.AutoRefreshError)
-	j.cache = jwk.NewAutoRefresh(ctx)
-	j.cache.ErrorSink(ch)
-	defer func() { close(ch) }()
+	errSink := httprc.ErrSinkFunc(func(err error) {
+		j.log.Debug("jwks auto refresh error", "error", err)
+	})
+	j.cache = jwk.NewCache(ctx,
+		jwk.WithErrSink(errSink),
+		jwk.WithRefreshWindow(getRefreshWindow(j.config)),
+	)
 
 	close(j.started) // signal channel start
-
-	for {
-		select {
-		case err := <-ch:
-			j.log.Debug("jwks auto refresh error", "error", err)
-		case <-ctx.Done():
-			return nil
-		}
-	}
+	<-ctx.Done()
+	return nil
 }
 
 // Get the JWKS for the given OIDC configuration
@@ -117,15 +117,17 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 
 		log.Info("configuring JWKS auto refresh", "jwks", jwksConfig.JwksUri, "interval", refreshInterval, "skip_verify", config.GetSkipVerifyPeerCert())
 
-		j.cache.Configure(jwksConfig.JwksUri,
+		if err = j.cache.Register(jwksConfig.JwksUri,
 			jwk.WithHTTPClient(client),
 			jwk.WithRefreshInterval(refreshInterval),
-		)
+		); err != nil {
+			return nil, fmt.Errorf("error registering JWKS: %w", err)
+		}
 	}
 
 	log.Debug("fetching JWKS", "jwks", jwksConfig.JwksUri)
 
-	jwks, err := j.cache.Fetch(ctx, jwksConfig.JwksUri)
+	jwks, err := j.cache.Get(ctx, jwksConfig.JwksUri)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrJWKSFetch, err)
 	}
@@ -141,4 +143,26 @@ func (j *DefaultJWKSProvider) fetchStatic(raw string) (jwk.Set, error) {
 		return nil, fmt.Errorf("%w: %v", ErrJWKSParse, err)
 	}
 	return jwks, nil
+}
+
+// getRefreshWindow returns the smallest refresh window for all the OIDC configurations.
+// This is needed because the cache needs to be initialized with a default window small enough to
+// accommodate all the configured intervals.
+func getRefreshWindow(cfg *configv1.Config) time.Duration {
+	refreshWindow := DefaultFetchInterval
+
+	for _, fc := range cfg.Chains {
+		for _, f := range fc.Filters {
+			if f.GetOidc() == nil {
+				continue
+			}
+
+			interval := time.Duration(f.GetOidc().GetJwksFetcher().GetPeriodicFetchIntervalSec()) * time.Second
+			if interval > 0 && interval < refreshWindow {
+				refreshWindow = interval
+			}
+		}
+	}
+
+	return refreshWindow
 }

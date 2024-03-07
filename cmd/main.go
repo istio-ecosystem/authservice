@@ -35,7 +35,7 @@ func main() {
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
 		tlsPool     = internal.NewTLSConfigPool(lifecycle.Context())
-		jwks        = oidc.NewJWKSProvider(tlsPool)
+		jwks        = oidc.NewJWKSProvider(&configFile.Config, tlsPool)
 		sessions    = oidc.NewSessionStoreFactory(&configFile.Config)
 		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, tlsPool, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)

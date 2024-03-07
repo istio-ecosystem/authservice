@@ -17,7 +17,7 @@ package oidc
 import (
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 // TokenResponse contains information about the tokens returned by the Identity Provider.
@@ -33,5 +33,5 @@ func (t *TokenResponse) ParseIDToken() (jwt.Token, error) { return ParseToken(t.
 
 // ParseToken parses the token string and returns the token and an error if any.
 func ParseToken(token string) (jwt.Token, error) {
-	return jwt.Parse([]byte(token), jwt.WithValidate(false))
+	return jwt.Parse([]byte(token), jwt.WithValidate(false), jwt.WithVerify(false))
 }

@@ -1,4 +1,4 @@
-# authservice
+# authservice-go
 
 [![CI](https://github.com/tetrateio/authservice-go/actions/workflows/ci.yaml/badge.svg)](https://github.com/tetrateio/authservice-go/actions/workflows/ci.yaml)
 [![codecov](https://codecov.io/gh/tetrateio/authservice-go/graph/badge.svg?token=JTLsQloZo9)](https://codecov.io/gh/tetrateio/authservice-go)
@@ -11,8 +11,8 @@ project from C++ to Go.
 
 ## Introduction
 
-`authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
-to the Istio mesh. `authservice` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
+`authservice-go` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+to the Istio mesh. `authservice-go` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
 including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
 Together, they allow developers to protect their APIs and web apps without any application code required.
 
@@ -31,7 +31,7 @@ Some of the features it provides:
 
 ## How does authservice work?
 
-[This flowchart](https://miro.com/app/board/o9J_kvus6b4=/) explains how `authservice`
+[This flowchart](https://miro.com/app/board/o9J_kvus6b4=/) explains how `authservice-go`
 makes decisions at different points in the login lifecycle.
 
 ## Contributing

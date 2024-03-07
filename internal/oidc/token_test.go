@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/jwa"
-	"github.com/lestrrat-go/jwx/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,6 +47,6 @@ func newToken() string {
 		Subject("user").
 		Expiration(time.Now().Add(time.Hour)).
 		Build()
-	signed, _ := jwt.Sign(token, jwa.HS256, []byte("key"))
+	signed, _ := jwt.Sign(token, jwt.WithKey(jwa.HS256, []byte("key")))
 	return string(signed)
 }
