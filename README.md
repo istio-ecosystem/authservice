@@ -1,7 +1,7 @@
-# authservice-go
+# authservice
 
-[![CI](https://github.com/tetrateio/authservice-go/actions/workflows/ci.yaml/badge.svg)](https://github.com/tetrateio/authservice-go/actions/workflows/ci.yaml)
-[![codecov](https://codecov.io/gh/tetrateio/authservice-go/graph/badge.svg?token=JTLsQloZo9)](https://codecov.io/gh/tetrateio/authservice-go)
+[![CI](https://github.com/istio-ecosystem/authservice/actions/workflows/ci.yaml/badge.svg)](https://github.com/istio-ecosystem/authservice/actions/workflows/ci.yaml)
+[![codecov](https://codecov.io/gh/tetrateio/authservice/graph/badge.svg?token=JTLsQloZo9)](https://codecov.io/gh/tetrateio/authservice)
 
 An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
 focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
@@ -11,8 +11,8 @@ project from C++ to Go.
 
 ## Introduction
 
-`authservice-go` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
-to the Istio mesh. `authservice-go` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
+`authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
+to the Istio mesh. `authservice` is compatible with any standard OIDC Provider as well as other Istio End-user Auth features,
 including [Authentication Policy](https://istio.io/docs/tasks/security/authn-policy/) and [RBAC](https://istio.io/docs/tasks/security/rbac-groups/).
 Together, they allow developers to protect their APIs and web apps without any application code required.
 
@@ -31,7 +31,7 @@ Some of the features it provides:
 
 ## How does authservice work?
 
-[This flowchart](https://miro.com/app/board/o9J_kvus6b4=/) explains how `authservice-go`
+[This flowchart](https://miro.com/app/board/o9J_kvus6b4=/) explains how `authservice`
 makes decisions at different points in the login lifecycle.
 
 ## Contributing

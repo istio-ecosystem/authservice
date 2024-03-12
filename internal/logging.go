@@ -24,7 +24,7 @@ import (
 	"github.com/tetratelabs/telemetry/scope"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 )
 
 const (

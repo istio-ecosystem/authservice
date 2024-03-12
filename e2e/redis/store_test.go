@@ -24,7 +24,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tetrateio/authservice-go/internal/oidc"
+	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
 const redisURL = "redis://localhost:6379"

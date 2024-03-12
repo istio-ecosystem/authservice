@@ -26,7 +26,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
 const (

@@ -23,9 +23,9 @@ import (
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
-	"github.com/tetrateio/authservice-go/internal"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 type (

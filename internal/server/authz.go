@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	"github.com/tetrateio/authservice-go/internal"
-	"github.com/tetrateio/authservice-go/internal/authz"
-	"github.com/tetrateio/authservice-go/internal/oidc"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	"github.com/istio-ecosystem/authservice/internal"
+	"github.com/istio-ecosystem/authservice/internal/authz"
+	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
 // EnvoyXRequestID is the header name for the request id

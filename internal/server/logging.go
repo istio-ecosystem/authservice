@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/tetrateio/authservice-go/internal"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // LogMiddleware is a gRPC middleware that logs all the requests and responses.

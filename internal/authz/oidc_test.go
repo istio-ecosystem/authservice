@@ -37,11 +37,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/test/bufconn"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
-	"github.com/tetrateio/authservice-go/internal"
-	inthttp "github.com/tetrateio/authservice-go/internal/http"
-	"github.com/tetrateio/authservice-go/internal/oidc"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal"
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
+	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
 var (

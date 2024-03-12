@@ -26,7 +26,7 @@ import (
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/test/bufconn"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 )
 
 func TestHealthServer(t *testing.T) {

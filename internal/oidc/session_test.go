@@ -23,9 +23,9 @@ import (
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
 func TestSessionStoreFactory(t *testing.T) {

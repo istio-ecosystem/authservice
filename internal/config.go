@@ -26,8 +26,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
 const ScopeOIDC = "openid"

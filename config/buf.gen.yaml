@@ -16,7 +16,7 @@ version: v1
 managed:
   enabled: true
   go_package_prefix:
-    default: github.com/tetrateio/authservice-go/config/gen/go
+    default: github.com/istio-ecosystem/authservice/config/gen/go
     except:
       - buf.build/envoyproxy/protoc-gen-validate
 plugins:

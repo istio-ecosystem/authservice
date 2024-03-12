@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
+	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
 )
 
 func TestProcessMock(t *testing.T) {

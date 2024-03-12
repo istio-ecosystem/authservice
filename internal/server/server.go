@@ -22,8 +22,8 @@ import (
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	"github.com/tetrateio/authservice-go/internal"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // RegisterGrpc is an interface for registering gRPC registerHandlers.

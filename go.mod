@@ -1,4 +1,4 @@
-module github.com/tetrateio/authservice-go
+module github.com/istio-ecosystem/authservice
 
 go 1.21.8
 

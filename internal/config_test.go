@@ -25,9 +25,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
 type errCheck struct {

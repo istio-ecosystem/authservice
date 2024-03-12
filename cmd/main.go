@@ -23,10 +23,10 @@ import (
 	"github.com/tetratelabs/run/pkg/signal"
 	"github.com/tetratelabs/telemetry"
 
-	"github.com/tetrateio/authservice-go/internal"
-	"github.com/tetrateio/authservice-go/internal/k8s"
-	"github.com/tetrateio/authservice-go/internal/oidc"
-	"github.com/tetrateio/authservice-go/internal/server"
+	"github.com/istio-ecosystem/authservice/internal"
+	"github.com/istio-ecosystem/authservice/internal/k8s"
+	"github.com/istio-ecosystem/authservice/internal/oidc"
+	"github.com/istio-ecosystem/authservice/internal/server"
 )
 
 func main() {

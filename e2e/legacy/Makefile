@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Variables exported to parameterize the image used in the docker-compose.yaml
-# This allows running the same setup with the authservice-go and the legacy authservice images.
+# This allows running the same setup with the authservice and the legacy authservice images.
 
 ifneq ($(E2E_SUITE_MODE),legacy)
 export E2E_IMAGE    ?= $(DOCKER_HUB)/$(NAME):latest-$(ARCH)

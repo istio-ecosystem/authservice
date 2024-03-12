@@ -23,7 +23,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/telemetry"
 
-	"github.com/tetrateio/authservice-go/internal"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 var (

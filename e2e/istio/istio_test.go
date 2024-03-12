@@ -18,7 +18,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/tetrateio/authservice-go/e2e"
+	"github.com/istio-ecosystem/authservice/e2e"
 )
 
 const (

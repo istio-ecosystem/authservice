@@ -22,8 +22,8 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
-	"github.com/tetrateio/authservice-go/internal"
+	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 var _ Handler = (*mockHandler)(nil)

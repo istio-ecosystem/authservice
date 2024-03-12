@@ -23,8 +23,8 @@ import (
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/codes"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	mockv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/mock"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
 )
 
 func TestUnmatchedRequests(t *testing.T) {

@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	configv1 "github.com/tetrateio/authservice-go/config/gen/go/v1"
-	oidcv1 "github.com/tetrateio/authservice-go/config/gen/go/v1/oidc"
-	"github.com/tetrateio/authservice-go/internal"
+	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 const clientSecretKey = "client-secret"

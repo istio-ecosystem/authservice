@@ -21,7 +21,7 @@ import (
 
 	"github.com/tetratelabs/telemetry"
 
-	"github.com/tetrateio/authservice-go/internal"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 var _ SessionStore = (*memoryStore)(nil)
