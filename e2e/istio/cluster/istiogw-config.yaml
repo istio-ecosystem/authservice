@@ -34,4 +34,4 @@ service:
 # Clear the default resources to allow it to run in very constrained local environments
 # without explicitly requesting more memory than the one that might be available in the
 # local Kind cluster.
-resources: null
+resources: {}
