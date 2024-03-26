@@ -5,9 +5,6 @@
 An implementation of [Envoy](https://envoyproxy.io) [External Authorization](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter),
 focused on delivering authN/Z solutions for [Istio](https://istio.io) and [Kubernetes](https://kubernetes.io).
 
-This project is a port of the [istio-ecosystem/authservice](https://github.com/istio-ecosystem/authservice)
-project from C++ to Go.
-
 ## Introduction
 
 `authservice` helps delegate the [OIDC Authorization Code Grant Flow](https://openid.net/specs/openid-connect-core-1_0.html#CodeFlowAuth)
