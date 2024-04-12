@@ -194,7 +194,12 @@ func TestOIDCProcess(t *testing.T) {
 
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
-	bytes, err := json.Marshal(newKeySet(t, jwkPub))
+	noAlgJwkPriv, noAlgJwkPub := newKeyPair(t)
+	noAlgJwkPriv.Set(jwk.KeyIDKey, noAlgKeyId)
+	noAlgJwkPub.Set(jwk.KeyIDKey, noAlgKeyId)
+	noAlgJwkPub.Remove(jwk.AlgorithmKey)
+
+	bytes, err := json.Marshal(newKeySet(t, jwkPub, noAlgJwkPub))
 	require.NoError(t, err)
 	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
@@ -349,6 +354,23 @@ func TestOIDCProcess(t *testing.T) {
 			storedAuthState: validAuthState,
 			mockTokensResponse: &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			},
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name:            "successfully retrieve new tokens when 'alg' is not specified in JWK",
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: &idpTokensResponse{
+				IDToken:     newJWT(t, noAlgJwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 			},
@@ -1405,8 +1427,9 @@ func modifyCallbackRequestPath(path string) *envoy.CheckRequest {
 }
 
 const (
-	keyID  = "test"
-	keyAlg = jwa.RS256
+	keyID      = "test"
+	keyAlg     = jwa.RS256
+	noAlgKeyId = "noAlgTest"
 )
 
 func newKeySet(t *testing.T, keys ...jwk.Key) jwk.Set {

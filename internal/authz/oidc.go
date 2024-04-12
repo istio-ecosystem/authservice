@@ -621,7 +621,7 @@ func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, 
 		return false, codes.Internal
 	}
 
-	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet)); err != nil {
+	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet, jws.WithInferAlgorithmFromKey(true))); err != nil {
 		log.Error("error verifying id token with fetched jwks", err)
 		return false, codes.Internal
 	}
