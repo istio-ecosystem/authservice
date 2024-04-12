@@ -15,6 +15,9 @@
 include ../suite-certs.mk
 include ../suite-k8s.mk
 
+# Version of Istio to install. If empty, the latest version will be installed.
+E2E_ISTIO_VERSION ?=
+
 .PHONY: gen-certs
 gen-certs: clean-certs ca/ca.authservice.internal certificate/http-echo.authservice.internal
 	@chmod -R a+r $(CERTS_DIR)
