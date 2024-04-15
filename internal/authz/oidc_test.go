@@ -194,6 +194,9 @@ func TestOIDCProcess(t *testing.T) {
 
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
+	// We remove the optional "alg" field from this key to test that we can
+	// properly validate against them. Some providers (e.g. Microsoft Identity)
+	// exclude the "alg" field from their keys.
 	noAlgJwkPriv, noAlgJwkPub := newKeyPair(t)
 	err := noAlgJwkPriv.Set(jwk.KeyIDKey, noAlgKeyID)
 	require.NoError(t, err)
