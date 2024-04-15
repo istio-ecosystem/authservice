@@ -194,7 +194,18 @@ func TestOIDCProcess(t *testing.T) {
 
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
-	bytes, err := json.Marshal(newKeySet(t, jwkPub))
+	// We remove the optional "alg" field from this key to test that we can
+	// properly validate against them. Some providers (e.g. Microsoft Identity)
+	// exclude the "alg" field from their keys.
+	noAlgJwkPriv, noAlgJwkPub := newKeyPair(t)
+	err := noAlgJwkPriv.Set(jwk.KeyIDKey, noAlgKeyID)
+	require.NoError(t, err)
+	err = noAlgJwkPub.Set(jwk.KeyIDKey, noAlgKeyID)
+	require.NoError(t, err)
+	err = noAlgJwkPub.Remove(jwk.AlgorithmKey)
+	require.NoError(t, err)
+
+	bytes, err := json.Marshal(newKeySet(t, jwkPub, noAlgJwkPub))
 	require.NoError(t, err)
 	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
@@ -349,6 +360,23 @@ func TestOIDCProcess(t *testing.T) {
 			storedAuthState: validAuthState,
 			mockTokensResponse: &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			},
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name:            "successfully retrieve new tokens when 'alg' is not specified in JWK",
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: &idpTokensResponse{
+				IDToken:     newJWT(t, noAlgJwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 			},
@@ -1405,8 +1433,9 @@ func modifyCallbackRequestPath(path string) *envoy.CheckRequest {
 }
 
 const (
-	keyID  = "test"
-	keyAlg = jwa.RS256
+	keyID      = "test"
+	keyAlg     = jwa.RS256
+	noAlgKeyID = "noAlgTest"
 )
 
 func newKeySet(t *testing.T, keys ...jwk.Key) jwk.Set {

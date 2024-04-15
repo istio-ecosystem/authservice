@@ -621,7 +621,9 @@ func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, 
 		return false, codes.Internal
 	}
 
-	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet)); err != nil {
+	// We use jws.WithInferAlgorithmFromKey(true) in case the keys are missing the "alg" value;
+	// some providers (e.g. Microsoft Identity) exclude the "alg" value from their keys.
+	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet, jws.WithInferAlgorithmFromKey(true))); err != nil {
 		log.Error("error verifying id token with fetched jwks", err)
 		return false, codes.Internal
 	}
