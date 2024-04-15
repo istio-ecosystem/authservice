@@ -195,9 +195,12 @@ func TestOIDCProcess(t *testing.T) {
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
 	noAlgJwkPriv, noAlgJwkPub := newKeyPair(t)
-	noAlgJwkPriv.Set(jwk.KeyIDKey, noAlgKeyId)
-	noAlgJwkPub.Set(jwk.KeyIDKey, noAlgKeyId)
-	noAlgJwkPub.Remove(jwk.AlgorithmKey)
+	err := noAlgJwkPriv.Set(jwk.KeyIDKey, noAlgKeyID)
+	require.NoError(t, err)
+	err = noAlgJwkPub.Set(jwk.KeyIDKey, noAlgKeyID)
+	require.NoError(t, err)
+	err = noAlgJwkPub.Remove(jwk.AlgorithmKey)
+	require.NoError(t, err)
 
 	bytes, err := json.Marshal(newKeySet(t, jwkPub, noAlgJwkPub))
 	require.NoError(t, err)
@@ -1429,7 +1432,7 @@ func modifyCallbackRequestPath(path string) *envoy.CheckRequest {
 const (
 	keyID      = "test"
 	keyAlg     = jwa.RS256
-	noAlgKeyId = "noAlgTest"
+	noAlgKeyID = "noAlgTest"
 )
 
 func newKeySet(t *testing.T, keys ...jwk.Key) jwk.Set {
