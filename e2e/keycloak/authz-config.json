@@ -22,8 +22,7 @@
               "header": "x-access-token"
             },
             "logout": {
-              "path": "/logout",
-              "redirect_uri": "https://host.docker.internal:9443/realms/master/protocol/openid-connect/logout"
+              "path": "/logout"
             },
             "redis_session_store_config": {
               "server_uri": "redis://redis:6379"

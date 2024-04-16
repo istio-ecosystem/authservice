@@ -17,6 +17,7 @@ package authz
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,6 +47,10 @@ var (
 		{Header: &corev3.HeaderValue{Key: inthttp.HeaderCacheControl, Value: inthttp.HeaderCacheControlNoCache}},
 		{Header: &corev3.HeaderValue{Key: inthttp.HeaderPragma, Value: inthttp.HeaderPragmaNoCache}},
 	}
+
+	// ErrMissingLogoutRedirectURI is returned when the logout redirect uri is missing because it was not explicitly
+	// configured or the OIDC Discovery did not return it.
+	ErrMissingLogoutRedirectURI = errors.New("missing logout redirect uri")
 )
 
 // oidc handler is an implementation of the Handler interface that implements
@@ -838,6 +843,13 @@ func loadWellKnownConfig(client *http.Client, cfg *oidcv1.OIDCConfig) error {
 		}
 	}
 	cfg.GetJwksFetcher().JwksUri = wellKnownConfig.JWKSURL
+
+	if cfg.GetLogout() != nil && cfg.GetLogout().GetRedirectUri() == "" {
+		if wellKnownConfig.EndSessionEndpoint == "" {
+			return ErrMissingLogoutRedirectURI
+		}
+		cfg.GetLogout().RedirectUri = wellKnownConfig.EndSessionEndpoint
+	}
 
 	return nil
 }
