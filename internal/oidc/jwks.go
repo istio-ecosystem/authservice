@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/lestrrat-go/httprc"
@@ -29,6 +28,7 @@ import (
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 )
 
 var (
@@ -102,14 +102,11 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 	jwksConfig := config.GetJwksFetcher()
 
 	if !j.cache.IsRegistered(jwksConfig.JwksUri) {
-		transport := http.DefaultTransport.(*http.Transport).Clone()
-
-		var err error
-		if transport.TLSClientConfig, err = j.tlsPool.LoadTLSConfig(config); err != nil {
-			return nil, fmt.Errorf("error loading TLS config: %w", err)
+		client, err := inthttp.NewHTTPClient(config, j.tlsPool, internal.Logger(internal.IDP))
+		if err != nil {
+			return nil, err
 		}
 
-		client := &http.Client{Transport: transport}
 		refreshInterval := time.Duration(jwksConfig.PeriodicFetchIntervalSec) * time.Second
 		if refreshInterval == 0 {
 			refreshInterval = DefaultFetchInterval

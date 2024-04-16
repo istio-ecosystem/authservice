@@ -1370,7 +1370,7 @@ func TestAreTokensExpired(t *testing.T) {
 				tokResp.AccessTokenExpiresAt = tt.accessTokenExpiration
 			}
 
-			got, err := h.(*oidcHandler).areRequiredTokensExpired(tokResp)
+			got, err := h.(*oidcHandler).areRequiredTokensExpired(h.(*oidcHandler).log, tokResp)
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})

@@ -152,6 +152,8 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 		return nil, err
 	}
 
+	log.Debug("token response", "token_response", tokenResponse)
+
 	return tokenResponse, nil
 }
 
@@ -198,6 +200,8 @@ func (r *redisStore) GetAuthorizationState(ctx context.Context, sessionID string
 	if err := r.refreshExpiration(ctx, sessionID, state.TimeAdded); err != nil {
 		return nil, err
 	}
+
+	log.Debug("authorization state", "state", state.AuthorizationState())
 
 	return state.AuthorizationState(), nil
 }

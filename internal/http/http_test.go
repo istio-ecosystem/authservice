@@ -15,10 +15,17 @@
 package http
 
 import (
+	"context"
 	"encoding/base64"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/types/known/structpb"
+
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 func TestGetPathQueryFragment(t *testing.T) {
@@ -131,4 +138,54 @@ func TestBasicAuthHeader(t *testing.T) {
 			require.Equal(t, tt.id+":"+tt.secret, string(got2))
 		})
 	}
+}
+
+func TestNewHTTPClient(t *testing.T) {
+	t.Run("proxy-skip-verify", func(t *testing.T) {
+		cfg := &oidcv1.OIDCConfig{
+			ProxyUri:           "http://localhost:8080",
+			SkipVerifyPeerCert: &structpb.Value{Kind: &structpb.Value_BoolValue{BoolValue: true}},
+		}
+		pool := internal.NewTLSConfigPool(context.Background())
+
+		client, err := NewHTTPClient(cfg, pool, nil)
+		require.NoError(t, err)
+		require.IsType(t, &http.Transport{}, client.Transport)
+		require.NotNil(t, client.Transport.(*http.Transport).Proxy)
+		require.True(t, client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify)
+	})
+
+	t.Run("invalid-tls", func(t *testing.T) {
+		cfg := &oidcv1.OIDCConfig{
+			TrustedCaConfig: &oidcv1.OIDCConfig_TrustedCertificateAuthorityFile{
+				TrustedCertificateAuthorityFile: "unexisting",
+			},
+		}
+		pool := internal.NewTLSConfigPool(context.Background())
+
+		_, err := NewHTTPClient(cfg, pool, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("disabled-logger", func(t *testing.T) {
+		cfg := &oidcv1.OIDCConfig{}
+		pool := internal.NewTLSConfigPool(context.Background())
+		log := telemetry.NoopLogger()
+		log.SetLevel(telemetry.LevelInfo)
+
+		client, err := NewHTTPClient(cfg, pool, log)
+		require.NoError(t, err)
+		require.IsType(t, &http.Transport{}, client.Transport)
+	})
+
+	t.Run("enabled-logger", func(t *testing.T) {
+		cfg := &oidcv1.OIDCConfig{}
+		pool := internal.NewTLSConfigPool(context.Background())
+		log := telemetry.NoopLogger()
+		log.SetLevel(telemetry.LevelDebug)
+
+		client, err := NewHTTPClient(cfg, pool, log)
+		require.NoError(t, err)
+		require.IsType(t, &LoggingRoundTripper{}, client.Transport)
+	})
 }

@@ -70,7 +70,7 @@ type oidcHandler struct {
 func NewOIDCHandler(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, jwks oidc.JWKSProvider,
 	sessions oidc.SessionStoreFactory, clock oidc.Clock, sessionGen oidc.SessionGenerator) (Handler, error) {
 
-	client, err := getHTTPClient(cfg, tlsPool)
+	client, err := inthttp.NewHTTPClient(cfg, tlsPool, internal.Logger(internal.IDP))
 	if err != nil {
 		return nil, err
 	}
@@ -89,23 +89,6 @@ func NewOIDCHandler(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, jwks
 		sessionGen: sessionGen,
 		httpClient: client,
 	}, nil
-}
-
-func getHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool) (*http.Client, error) {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-
-	var err error
-	if transport.TLSClientConfig, err = tlsPool.LoadTLSConfig(cfg); err != nil {
-		return nil, err
-	}
-
-	if cfg.ProxyUri != "" {
-		// config validation ensures that the proxy uri is valid
-		proxyURL, _ := url.Parse(cfg.ProxyUri)
-		transport.Proxy = http.ProxyURL(proxyURL)
-	}
-
-	return &http.Client{Transport: transport}, nil
 }
 
 // Process a CheckRequest and populate a CheckResponse according to the mockHandler configuration.
@@ -143,7 +126,8 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 				return nil
 			}
 		}
-		log.Info("logout complete. Redirecting to logout redirect uri")
+		log.Info("logout complete. Redirecting to logout redirect uri",
+			"uri", o.config.GetLogout().GetRedirectUri())
 		deny := newDenyResponse()
 		// add IDP logout location
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
@@ -156,7 +140,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If the request does not have a session_id cookie,
 	// then generate a session id, put it in a header, and redirect for login.
 	if sessionID == "" {
-		log.Info("no session cookie detected. Generating new session and sending user to re-authenticate.")
+		log.Info("no session cookie detected. Generating new session and sending user to re-authenticate")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), "")
 		return nil
 	}
@@ -185,7 +169,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If the user has a session_id cookie but there are no required tokens in the
 	// session store associated with it, then redirect for login.
 	if tokenResponse == nil {
-		log.Info("required tokens are not present. Sending user to re-authenticate.")
+		log.Info("required tokens are not present. Sending user to re-authenticate")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -193,14 +177,14 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If both ID & Access token are still unexpired,
 	// then allow the request to proceed (no need to intervene).
 	log.Debug("checking tokens expiration")
-	expired, err := o.areRequiredTokensExpired(tokenResponse)
+	expired, err := o.areRequiredTokensExpired(log, tokenResponse)
 	if err != nil {
 		log.Error("error checking token expiration", err)
 		setDenyResponse(resp, newDenyResponse(), codes.Internal)
 		return nil
 	}
 	if !expired {
-		log.Info("tokens not expired. Allowing request to proceed.")
+		log.Info("tokens not expired. Allowing request to proceed")
 		o.allowResponse(resp, tokenResponse)
 		return nil
 	}
@@ -210,7 +194,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	// If there is no refresh token,
 	// then direct the request to the identity provider for authentication
 	if tokenResponse.RefreshToken == "" {
-		log.Info("a token was expired, but session did not contain a refresh token. Sending user to re-authenticate.")
+		log.Info("a token was expired, but session did not contain a refresh token. Sending user to re-authenticate")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -221,7 +205,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	log.Debug("attempting token refresh")
 	refreshedTokens := o.refreshToken(ctx, log, tokenResponse, tokenResponse.RefreshToken, sessionID)
 	if refreshedTokens == nil {
-		log.Info("token refresh failed. Sending user to re-authenticate.")
+		log.Info("token refresh failed. Sending user to re-authenticate")
 		o.redirectToIDP(ctx, log, resp, req.GetAttributes().GetRequest().GetHttp(), sessionID)
 		return nil
 	}
@@ -231,7 +215,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		return nil
 	}
 
-	log.Info("token refresh successful. Allowing request to proceed.")
+	log.Info("token refresh successful. Allowing request to proceed")
 	o.allowResponse(resp, refreshedTokens)
 	return nil
 }
@@ -327,7 +311,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	}
 
 	if stateFromStore == nil {
-		log.Info("missing state, nonce, and original url requested by user in the store. Cannot redirect.")
+		log.Info("missing state, nonce, and original url requested by user in the store. Cannot redirect")
 		deny := newDenyResponse()
 		deny.Body = "Oops, your session has expired. Please try again."
 		deny.Status = &typev3.HttpStatus{Code: typev3.StatusCode_BadRequest}
@@ -760,17 +744,24 @@ func encodeHeaderValue(preamble string, value string) string {
 }
 
 // areRequiredTokensExpired checks if the required tokens are expired.
-func (o *oidcHandler) areRequiredTokensExpired(tokens *oidc.TokenResponse) (bool, error) {
+func (o *oidcHandler) areRequiredTokensExpired(log telemetry.Logger, tokens *oidc.TokenResponse) (bool, error) {
 	idToken, err := tokens.ParseIDToken()
 	if err != nil {
 		return false, fmt.Errorf("parsing id token: %w", err)
 	}
 
-	if idToken.Expiration().Before(o.clock.Now()) {
+	now := o.clock.Now()
+	if idToken.Expiration().Before(now) {
+		log.Info("id token is expired", "exp", idToken.Expiration(), "expired_for", now.Sub(idToken.Expiration()))
 		return true, nil
 	}
-	if o.config.GetAccessToken() != nil && tokens.AccessToken != "" && !tokens.AccessTokenExpiresAt.IsZero() {
-		return tokens.AccessTokenExpiresAt.Before(o.clock.Now()), nil
+	if o.config.GetAccessToken() != nil &&
+		tokens.AccessToken != "" &&
+		!tokens.AccessTokenExpiresAt.IsZero() &&
+		tokens.AccessTokenExpiresAt.Before(now) {
+		log.Info("access token is expired", "exp", tokens.AccessTokenExpiresAt,
+			"expired_for", now.Sub(tokens.AccessTokenExpiresAt))
+		return true, nil
 	}
 	return false, nil
 }
