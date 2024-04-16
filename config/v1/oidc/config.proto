@@ -66,8 +66,9 @@ message LogoutConfig {
   // of the service application, or to the
   // [logout endpoint of the OIDC Provider](https://openid.net/specs/openid-connect-session-1_0.html#RPLogout).
   // As with all redirects, the user's browser will perform a GET to this URI.
-  // Required.
-  string redirect_uri = 2 [(validate.rules).string.min_len = 1];
+  // Required when the OIDC discovery is not used or when the OIDC discovery does not provide the
+  // `end_session_endpoint`.
+  string redirect_uri = 2;
 }
 
 // The configuration of an OpenID Connect filter that can be used to retrieve identity and access tokens

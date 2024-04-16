@@ -36,6 +36,7 @@ import (
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/proto"
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
@@ -168,9 +169,19 @@ var (
 			ClientSecret: "test-client-secret",
 		},
 		Scopes: []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{Path: "/logout"},
 	}
 
 	wellKnownURIs = `
+{
+	"issuer": "http://idp-test-server",
+	"authorization_endpoint": "http://idp-test-server/authorize",
+	"end_session_endpoint": "http://idp-test-server/endsession",
+	"token_endpoint": "http://idp-test-server/token",
+	"jwks_uri": "http://idp-test-server/jwks"
+}`
+
+	wellKnownURIsNoEndSessionEndpoint = `
 {
 	"issuer": "http://idp-test-server",
 	"authorization_endpoint": "http://idp-test-server/authorize",
@@ -343,7 +354,7 @@ func TestOIDCProcess(t *testing.T) {
 
 	// The following subset of tests is testing the callback requests, so there's expected communication with the IDP server.
 
-	idpServer := newServer()
+	idpServer := newServer(wellKnownURIs)
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
 
 	callbackTests := []struct {
@@ -964,7 +975,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 		})
 	}
 
-	idpServer := newServer()
+	idpServer := newServer(wellKnownURIs)
 	idpServer.statusCode = http.StatusOK
 	idpServer.tokensResponse = &idpTokensResponse{
 		IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
@@ -1068,7 +1079,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.NoError(t, err)
 
-	idpServer := newServer()
+	idpServer := newServer(wellKnownURIs)
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
 
 	ctx := context.Background()
@@ -1367,21 +1378,33 @@ func TestAreTokensExpired(t *testing.T) {
 }
 
 func TestLoadWellKnownConfig(t *testing.T) {
-	idpServer := newServer()
+	idpServer := newServer(wellKnownURIs)
 	idpServer.Start()
 	t.Cleanup(idpServer.Stop)
 
-	require.NoError(t, loadWellKnownConfig(idpServer.newHTTPClient(), dynamicOIDCConfig))
-	require.Equal(t, dynamicOIDCConfig.AuthorizationUri, "http://idp-test-server/authorize")
-	require.Equal(t, dynamicOIDCConfig.TokenUri, "http://idp-test-server/token")
-	require.Equal(t, dynamicOIDCConfig.GetJwksFetcher().GetJwksUri(), "http://idp-test-server/jwks")
+	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
+	require.NoError(t, loadWellKnownConfig(idpServer.newHTTPClient(), cfg))
+	require.Equal(t, cfg.AuthorizationUri, "http://idp-test-server/authorize")
+	require.Equal(t, cfg.TokenUri, "http://idp-test-server/token")
+	require.Equal(t, cfg.GetJwksFetcher().GetJwksUri(), "http://idp-test-server/jwks")
+	require.Equal(t, cfg.GetLogout().GetRedirectUri(), "http://idp-test-server/endsession")
+}
+
+func TestLoadWellKnownConfigMissingLogoutRedirectURI(t *testing.T) {
+	idpServer := newServer(wellKnownURIsNoEndSessionEndpoint)
+	idpServer.Start()
+	t.Cleanup(idpServer.Stop)
+
+	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
+	require.ErrorIs(t, loadWellKnownConfig(idpServer.newHTTPClient(), cfg), ErrMissingLogoutRedirectURI)
 }
 
 func TestLoadWellKnownConfigError(t *testing.T) {
 	clock := oidc.Clock{}
 	tlsPool := internal.NewTLSConfigPool(context.Background())
+	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	_, err := NewOIDCHandler(dynamicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+	_, err := NewOIDCHandler(cfg, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
@@ -1597,7 +1620,7 @@ type idpServer struct {
 	statusCode     int
 }
 
-func newServer() *idpServer {
+func newServer(wellKnownPayload string) *idpServer {
 	s := &http.Server{}
 	idpServer := &idpServer{server: s, listener: bufconn.Listen(1024)}
 
@@ -1616,7 +1639,7 @@ func newServer() *idpServer {
 	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(wellKnownURIs))
+		_, _ = w.Write([]byte(wellKnownPayload))
 	})
 	s.Handler = handler
 	return idpServer
