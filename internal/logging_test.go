@@ -59,7 +59,7 @@ func TestLoggingSetup(t *testing.T) {
 		{"l1:debug", telemetry.LevelDebug, telemetry.LevelInfo, false},
 		{"l1:debug,l2:debug", telemetry.LevelDebug, telemetry.LevelDebug, false},
 		{"invalid:debug,l2:error", telemetry.LevelInfo, telemetry.LevelError, false},
-		{"all:none,l1:debug", telemetry.LevelNone, telemetry.LevelNone, false},
+		{"all:none,l1:debug", telemetry.LevelDebug, telemetry.LevelNone, false},
 		{"", telemetry.LevelInfo, telemetry.LevelInfo, false},
 		{",", telemetry.LevelInfo, telemetry.LevelInfo, true},
 		{":", telemetry.LevelInfo, telemetry.LevelInfo, true},

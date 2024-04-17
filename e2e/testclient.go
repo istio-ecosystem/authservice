@@ -22,38 +22,17 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
+	"github.com/tetratelabs/telemetry"
+	"github.com/tetratelabs/telemetry/function"
 	"golang.org/x/net/html"
+
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 )
-
-// LoggingRoundTripper is a http.RoundTripper that logs requests and responses.
-type LoggingRoundTripper struct {
-	LogFunc  func(...any)
-	LogBody  bool
-	Delegate http.RoundTripper
-}
-
-// RoundTrip logs all the requests and responses using the configured settings.
-func (l LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if l.LogFunc != nil {
-		if dump, derr := httputil.DumpRequest(req, l.LogBody); derr == nil {
-			l.LogFunc(string(dump))
-		}
-	}
-
-	res, err := l.Delegate.RoundTrip(req)
-	if err == nil && l.LogFunc != nil {
-		if dump, derr := httputil.DumpResponse(res, l.LogBody); derr == nil {
-			l.LogFunc(string(dump))
-		}
-	}
-
-	return res, err
-}
 
 // CookieTracker is a http.RoundTripper that tracks cookies received from the server.
 type CookieTracker struct {
@@ -91,7 +70,6 @@ type OIDCTestClient struct {
 	customCA     *x509.CertPool   // Custom TLS configuration, if needed
 	mappings     *AddressMappings // Custom address mappings
 	logFunc      func(...any)     // Logging function to log all requests and responses
-	logBody      bool             // Whether to log the request and response bodies
 }
 
 // Option is a functional option for configuring the OIDCTestClient.
@@ -113,10 +91,9 @@ func WithCustomCA(caCert string) Option {
 }
 
 // WithLoggingOptions configures the OIDCTestClient to log requests and responses.
-func WithLoggingOptions(logFunc func(...any), logBody bool) Option {
+func WithLoggingOptions(logFunc func(...any)) Option {
 	return func(o *OIDCTestClient) error {
 		o.logFunc = logFunc
-		o.logBody = logBody
 		return nil
 	}
 }
@@ -171,7 +148,7 @@ func WithBaseURL(idpBaseURL string) Option {
 func NewOIDCTestClient(opts ...Option) (*OIDCTestClient, error) {
 	var (
 		defaultTransport = http.DefaultTransport.(*http.Transport).Clone()
-		logging          = &LoggingRoundTripper{Delegate: defaultTransport}
+		logging          = &inthttp.LoggingRoundTripper{Delegate: defaultTransport}
 		cookieTracker    = &CookieTracker{Cookies: make(map[string]*http.Cookie), Delegate: logging}
 		client           = &OIDCTestClient{http: &http.Client{Transport: cookieTracker}}
 	)
@@ -182,8 +159,11 @@ func NewOIDCTestClient(opts ...Option) (*OIDCTestClient, error) {
 		}
 	}
 
-	logging.LogFunc = client.logFunc
-	logging.LogBody = client.logBody
+	logging.Log = function.NewLogger(func(_ telemetry.Level, msg string, _ error, values function.Values) {
+		args := append([]any{msg}, slices.Concat(values.FromMethod, values.FromContext, values.FromLogger)...)
+		client.logFunc(args...)
+	})
+	logging.Log.SetLevel(telemetry.LevelDebug)
 
 	defaultTransport.TLSClientConfig = &tls.Config{RootCAs: client.customCA}
 	if client.mappings != nil {

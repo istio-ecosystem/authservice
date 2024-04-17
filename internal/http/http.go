@@ -16,7 +16,14 @@ package http
 
 import (
 	"encoding/base64"
+	"net/http"
+	"net/url"
 	"strings"
+
+	"github.com/tetratelabs/telemetry"
+
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // GetPathQueryFragment splits the given path into path, query, and fragment.
@@ -80,6 +87,36 @@ func EncodeCookieHeader(name string, value string, directives []string) string {
 	return b.String()
 }
 
+// BasicAuthHeader returns the value of the Authorization header for the given id and secret.
 func BasicAuthHeader(id string, secret string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(id+":"+secret))
+}
+
+// NewHTTPClient creates a new HTTP client with the given OIDC configuration and TLS pool.
+// If a logger is provided, it will log the requests and responses at debug level.
+func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, log telemetry.Logger) (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+
+	var err error
+	if transport.TLSClientConfig, err = tlsPool.LoadTLSConfig(cfg); err != nil {
+		return nil, err
+	}
+
+	if cfg.ProxyUri != "" {
+		// config validation ensures that the proxy uri is valid
+		proxyURL, _ := url.Parse(cfg.ProxyUri)
+		transport.Proxy = http.ProxyURL(proxyURL)
+	}
+
+	if log != nil && log.Level() >= telemetry.LevelDebug {
+		return &http.Client{
+			Transport: &LoggingRoundTripper{
+				Log:      log,
+				Delegate: transport,
+			},
+		}, nil
+
+	}
+
+	return &http.Client{Transport: transport}, nil
 }

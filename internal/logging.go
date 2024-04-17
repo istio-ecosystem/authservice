@@ -32,6 +32,7 @@ const (
 	Config   = "config"
 	Default  = "default"
 	Health   = "health"
+	IDP      = "idp"
 	JWKS     = "jwks"
 	Requests = "requests"
 	Server   = "server"
@@ -45,6 +46,7 @@ var scopes = map[string]string{
 	Config:   "Configuration messages",
 	Default:  "Default",
 	Health:   "Health server messages",
+	IDP:      "Identity provider requests/responses",
 	JWKS:     "JWKS update and parse messages",
 	Requests: "Logs all requests and responses received by the server",
 	Server:   "Server request handling messages",
@@ -158,14 +160,15 @@ func setLogLevels(log telemetry.Logger, logLevelMap map[string]telemetry.Level) 
 		for _, logger := range scope.List() {
 			logger.SetLevel(level)
 		}
-	} else {
-		for k, l := range logLevelMap {
-			logger, ok := scope.Find(k)
-			if ok {
-				logger.SetLevel(l)
-			} else {
-				log.Info("invalid logger", "logger", k)
-			}
+		delete(logLevelMap, "all")
+	}
+
+	for k, l := range logLevelMap {
+		logger, ok := scope.Find(k)
+		if ok {
+			logger.SetLevel(l)
+		} else {
+			log.Info("invalid logger", "logger", k)
 		}
 	}
 }

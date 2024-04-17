@@ -70,6 +70,7 @@ func (m *memoryStore) GetTokenResponse(ctx context.Context, sessionID string) (*
 		return nil, nil
 	}
 
+	log.Debug("token response", "token_response", s.tokenResponse)
 	s.accessed = m.clock.Now()
 	return s.tokenResponse, nil
 }
@@ -96,6 +97,7 @@ func (m *memoryStore) GetAuthorizationState(ctx context.Context, sessionID strin
 		return nil, nil
 	}
 
+	log.Debug("authorization state", "state", s.authorizationState)
 	s.accessed = m.clock.Now()
 	return s.authorizationState, nil
 }
