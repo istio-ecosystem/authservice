@@ -40,8 +40,20 @@ type WellKnownConfig struct {
 	TokenRevocationEndpoint  string   `json:"token_revocation_endpoint"`
 }
 
+var (
+	// wellKnownConfigs is a map of issuer URL to the OIDC well-known configuration
+	// It is used to cache well-known configurations as they usually don't change. URLs are usually stable, and the only
+	// things that are subject to change are the signing keys, but those are already watched periodically by the JWKS fetcher.
+	wellKnownConfigs = make(map[string]WellKnownConfig)
+)
+
 // GetWellKnownConfig retrieves the OIDC well-known configuration from the given issuer URL.
 func GetWellKnownConfig(client *http.Client, url string) (WellKnownConfig, error) {
+	cfg, ok := wellKnownConfigs[url]
+	if ok {
+		return cfg, nil
+	}
+
 	// Make a GET request to the well-known configuration endpoint
 	response, err := client.Get(url)
 	if err != nil {
@@ -55,10 +67,10 @@ func GetWellKnownConfig(client *http.Client, url string) (WellKnownConfig, error
 	}
 
 	// Decode the JSON response into the OIDCConfig struct
-	var cfg WellKnownConfig
 	if err = json.NewDecoder(response.Body).Decode(&cfg); err != nil {
 		return WellKnownConfig{}, err
 	}
 
+	wellKnownConfigs[url] = cfg
 	return cfg, nil
 }

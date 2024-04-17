@@ -1396,6 +1396,7 @@ func TestLoadWellKnownConfigMissingLogoutRedirectURI(t *testing.T) {
 	t.Cleanup(idpServer.Stop)
 
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
+	cfg.ConfigurationUri = "http://missing-logout/.well-known/openid-configuration"
 	require.ErrorIs(t, loadWellKnownConfig(idpServer.newHTTPClient(), cfg), ErrMissingLogoutRedirectURI)
 }
 
@@ -1403,6 +1404,7 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 	clock := oidc.Clock{}
 	tlsPool := internal.NewTLSConfigPool(context.Background())
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
+	cfg.ConfigurationUri = "http://stopped-server/.well-known/openid-configuration"
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	_, err := NewOIDCHandler(cfg, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
