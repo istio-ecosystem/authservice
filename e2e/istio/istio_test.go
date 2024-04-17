@@ -39,7 +39,7 @@ func (i *IstioSuite) TestIstioEnforcement() {
 			// Initialize the test OIDC client that will keep track of the state of the OIDC login process
 			// Initialize it for each test to not reuse the session between them
 			client, err := e2e.NewOIDCTestClient(
-				e2e.WithLoggingOptions(i.T().Log, true),
+				e2e.WithLoggingOptions(i.T().Log),
 				e2e.WithCustomCA(testCAFile),
 				// Map the keycloak cluster DNS name to the local address where the service is exposed
 				e2e.WithCustomAddressMappings(map[string]string{

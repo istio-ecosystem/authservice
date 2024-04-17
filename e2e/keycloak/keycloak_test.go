@@ -51,7 +51,7 @@ var (
 func TestOIDCUsesTheConfiguredProxy(t *testing.T) {
 	client, err := e2e.NewOIDCTestClient(
 		e2e.WithCustomCA(testCAFile),
-		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithLoggingOptions(t.Log),
 		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
@@ -82,7 +82,7 @@ func TestOIDC(t *testing.T) {
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
 	client, err := e2e.NewOIDCTestClient(
 		e2e.WithCustomCA(testCAFile),
-		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithLoggingOptions(t.Log),
 		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
@@ -109,7 +109,7 @@ func TestOIDCRefreshTokens(t *testing.T) {
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
 	client, err := e2e.NewOIDCTestClient(
 		e2e.WithCustomCA(testCAFile),
-		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithLoggingOptions(t.Log),
 		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
 	require.NoError(t, err)
@@ -163,7 +163,7 @@ func TestOIDCLogout(t *testing.T) {
 	// Initialize the test OIDC client that will keep track of the state of the OIDC login process
 	client, err := e2e.NewOIDCTestClient(
 		e2e.WithCustomCA(testCAFile),
-		e2e.WithLoggingOptions(t.Log, true),
+		e2e.WithLoggingOptions(t.Log),
 		e2e.WithBaseURL(idpBaseURLHost),
 		e2e.WithCustomAddressMappings(customAddressMappings),
 	)
