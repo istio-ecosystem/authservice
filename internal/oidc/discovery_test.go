@@ -53,7 +53,7 @@ func TestWellKnownConfig(t *testing.T) {
 		{"ok", "http://example.com/.well-known/openid-configuration", validWellKnownJSON, false, validWellKnown},
 		{"not-found", "http://example.com/not-found", validWellKnownJSON, true, WellKnownConfig{}},
 		{"invalid-url", "invalid", validWellKnownJSON, true, WellKnownConfig{}},
-		{"invalid-json", "http://example.com/.well-known/openid-configuration", invalidWellKnownJSON, true, WellKnownConfig{}},
+		{"invalid-json", "http://example2.com/.well-known/openid-configuration", invalidWellKnownJSON, true, WellKnownConfig{}},
 	}
 
 	for _, tt := range tests {
@@ -72,6 +72,25 @@ func TestWellKnownConfig(t *testing.T) {
 			require.Equal(t, tt.wantConfig, got)
 		})
 	}
+}
+
+func TestWellKnownConfigCache(t *testing.T) {
+	s := newServer()
+	s.wellKnownConfig = validWellKnownJSON
+	s.Start()
+	c := s.newHTTPClient()
+
+	got, err := GetWellKnownConfig(c, "http://example.com/.well-known/openid-configuration")
+	require.NoError(t, err)
+	require.Equal(t, validWellKnown, got)
+
+	// Stop the server and run the well-known request again.
+	// It should succeed and return the cached value.
+	s.Stop()
+
+	got, err = GetWellKnownConfig(c, "http://example.com/.well-known/openid-configuration")
+	require.NoError(t, err)
+	require.Equal(t, validWellKnown, got)
 }
 
 type idpServer struct {
