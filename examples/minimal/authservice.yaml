@@ -1,0 +1,89 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: authservice
+  labels:
+    app: authservice
+spec:
+  ports:
+    # Main port where the authservice listens for gRPC requests.
+    # This is the port that needs to be set when configuring the `extensionProviders`
+    # in the Istio configuration.ß
+    - port: 10003
+      targetPort: 10003
+      name: grpc-authservice
+      protocol: TCP
+    - port: 10004
+      targetPort: 10004
+      name: grpc-health
+      protocol: TCP
+  selector:
+    app: authservice
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: authservice
+  labels:
+    app: authservice
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: authservice
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: authservice
+        version: v1
+    spec:
+      serviceAccountName: authservice
+      containers:
+        - name: authservice
+          image: ghcr.io/istio-ecosystem/authservice/authservice:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: authz
+              containerPort: 10003
+              protocol: TCP
+            - name: health
+              containerPort: 10004
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/authservice
+          livenessProbe:
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            tcpSocket:
+              port: 10003
+          readinessProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            httpGet:
+              port: 10004
+              path: /healthz
+      volumes:
+        - name: config
+          configMap:
+            name: authservice-config
