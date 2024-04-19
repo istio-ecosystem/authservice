@@ -12,20 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Set a policy to make sure all requests targeting services in the namespace where
+# this policy is applied, contain a token issued by the OIDC provider.
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: example-authn
+spec:
+  jwtRules:
+    - issuer: "OIDC_PROVIDER_ISSUER"
+      jwksUri: "http://OIDC_PROVIDER_JWKS_URI" # can be omitted if the issuer has a well-known endpoint
+      forwardOriginalToken: true
+---
+# Set a policy to enforce that the token is present. The policy allows any subject, but it can be
+# further refined with constraints based on the JWT token claims.
 apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
-  name: authservice
-  # Applying this policy to the application namespace will intercept all requests
-  # that get to the sidecars in the namespace and forward them to the Authservice.
+  name: example-authz
 spec:
-  action: CUSTOM
-  provider:
-    # Name defined in the extensionProviders property in the MeshConfig
-    # (the `istio` ConfigMap in the istio-system namespace)
-    name: authservice-grpc
-  # A single empty rule will force all requests to be forwarded to the external
-  # authorization backend, as long as the workload is captured by the selectors
-  # configured above.
+  action: ALLOW
   rules:
-    - {}
+    - from:
+        - source:
+            requestPrincipals: ["*"]
