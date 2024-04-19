@@ -1,0 +1,38 @@
+# Copyright 2024 Tetrate
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Set a policy to make sure all requests targeting services in the namespace where
+# this policy is applied, contain a token issued by the OIDC provider.
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: example-authn
+spec:
+  jwtRules:
+    - issuer: "OIDC_PROVIDER_ISSUER"
+      jwksUri: "http://OIDC_PROVIDER_JWKS_URI" # can be omitted if the issuer has a well-known endpoint
+      forwardOriginalToken: true
+---
+# Set a policy to enforce that the token is present. The policy allows any subject, but it can be
+# further refined with constraints based on the JWT token claims.
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: example-authz
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            requestPrincipals: ["*"]
