@@ -20,7 +20,7 @@ managed:
     except:
       - buf.build/envoyproxy/protoc-gen-validate
 plugins:
-  - plugin: buf.build/protocolbuffers/go
+  - plugin: buf.build/protocolbuffers/go:v1.34.1
     out: gen/go
     opt:
       - paths=source_relative
