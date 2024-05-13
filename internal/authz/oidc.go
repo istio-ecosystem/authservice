@@ -528,7 +528,7 @@ func performIDPRequest(log telemetry.Logger, client *http.Client, uri string, fo
 // https://openid.net/specs/openid-connect-core-1_0.html#TokenResponse
 func isValidIDPNewTokensResponse(log telemetry.Logger, config *oidcv1.OIDCConfig, tokenResponse *idpTokensResponse) bool {
 	// token_type must be Bearer
-	if tokenResponse.TokenType != "Bearer" {
+	if !strings.EqualFold(tokenResponse.TokenType, "Bearer") {
 		log.Info("token type is not Bearer in token response", "token-type", tokenResponse.TokenType)
 		return false
 	}
@@ -553,7 +553,7 @@ func isValidIDPNewTokensResponse(log telemetry.Logger, config *oidcv1.OIDCConfig
 // https://openid.net/specs/openid-connect-core-1_0.html#RefreshTokenResponse
 func isValidIDPRefreshTokenResponse(log telemetry.Logger, tokenResponse *idpTokensResponse) bool {
 	// token_type must be Bearer
-	if tokenResponse.TokenType != "Bearer" {
+	if !strings.EqualFold(tokenResponse.TokenType, "Bearer") {
 		log.Info("token type is not Bearer in token response", "token-type", tokenResponse.TokenType)
 		return false
 	}

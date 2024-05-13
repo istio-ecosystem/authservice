@@ -869,6 +869,24 @@ func TestOIDCProcess(t *testing.T) {
 			},
 		},
 		{
+			name:                "IDP server returns lowercase 'bearer' token, succeeds",
+			req:                 withSessionHeader,
+			storedTokenResponse: expiredTokenResponse,
+			mockTokensResponse: &idpTokensResponse{
+				IDToken:     validIDToken,
+				AccessToken: "access-token",
+				TokenType:   "bearer",
+				ExpiresIn:   10,
+			},
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				require.NotNil(t, resp.GetOkResponse())
+				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
 			name:                "succeed",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
