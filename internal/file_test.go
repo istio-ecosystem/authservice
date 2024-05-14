@@ -50,9 +50,9 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			fileReader: newMockReader("test", "original", nil),
 			genUpdates: func(reader *mockReader) {
 				reader.setData([]byte("update 1"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 1"))
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 			},
 			interval:      watcherInterval,
 			wantCallbacks: 2,
@@ -64,13 +64,13 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			fileReader: newMockReader("test", "original", nil),
 			genUpdates: func(reader *mockReader) {
 				reader.setData([]byte("update 1"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 1"))
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 			},
 			interval:      watcherInterval,
 			wantCallbacks: 2,
@@ -85,7 +85,7 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 				// no waiting for the read to happen and performing next update
 				// reader.waitForRead()
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 			},
 			interval:      watcherInterval,
 			wantCallbacks: 1,
@@ -103,14 +103,14 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			fileReader: newMockReader("test", "original", nil),
 			genUpdates: func(reader *mockReader) {
 				reader.setData([]byte("update 1"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 1"))
 				reader.setErr(errors.New("error reading file"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 1"))
 				// stop error
 				reader.setErr(nil)
 				// even if an error happens, next updates should be notified
 				reader.setData([]byte("update 2"))
-				reader.waitForRead()
+				reader.waitForRead([]byte("update 2"))
 			},
 			interval:      watcherInterval,
 			wantCallbacks: 2,
@@ -158,7 +158,7 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 				require.False(t, ok)
 			}
 
-			tt.fileReader.waitForRead() // Wait for the first read to happen, the one synchronous
+			tt.fileReader.waitForRead(got) // Wait for the first read to happen, the one synchronous
 			require.Equal(t, tt.want, string(got))
 			require.NoError(t, err)
 
@@ -199,7 +199,7 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			mu1.Unlock()
 		})
 		require.NoError(t, err)
-		file1.waitForRead() // Wait for the first read to happen
+		file1.waitForRead([]byte("original1")) // Wait for the first read to happen
 
 		file2 := newMockReader("test2", "original2", nil)
 		got2, err := fw.WatchFile(file2, watcherInterval, func(data []byte) {
@@ -209,14 +209,14 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			mu2.Unlock()
 		})
 		require.NoError(t, err)
-		file2.waitForRead() // Wait for the first read to happen
+		file2.waitForRead([]byte("original2")) // Wait for the first read to happen
 
 		file1.setData([]byte("update 1-1"))
-		file1.waitForRead()
+		file1.waitForRead([]byte("update 1-1"))
 		file2.setData([]byte("update 2-1"))
-		file2.waitForRead()
+		file2.waitForRead([]byte("update 2-1"))
 		file1.setData([]byte("update 1-2"))
-		file1.waitForRead()
+		file1.waitForRead([]byte("update 1-2"))
 
 		// ensure no more updates are notified before verifying the results
 		cancel()
@@ -250,7 +250,7 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			muU.Unlock()
 		})
 		require.NoError(t, err)
-		file1.waitForRead() // Wait for the first read to happen
+		file1.waitForRead([]byte("original")) // Wait for the first read to happen
 
 		wg := sync.WaitGroup{}
 		wg.Add(2) // 2 callbacks to be notified
@@ -263,12 +263,12 @@ func TestFileWatcher_WatchFile(t *testing.T) {
 			muO.Unlock()
 		})
 		require.NoError(t, err)
-		file1.waitForRead() // Wait for the first read to happen again
+		file1.waitForRead([]byte("override")) // Wait for the first read to happen again
 
 		file1.setData([]byte("update 1"))
-		file1.waitForRead()
+		file1.waitForRead([]byte("update 1"))
 		file1.setData([]byte("update 2"))
-		file1.waitForRead()
+		file1.waitForRead([]byte("update 2"))
 
 		// ensure no more updates are notified before verifying the results
 		cancel()
@@ -293,7 +293,7 @@ type mockReader struct {
 
 	// reads is used to signal that a read happened, it should be buffered to avoid deadlocks.
 	// It is used to know if a read happened but there's no need to block reads happening if no one is waiting for them.
-	reads chan struct{}
+	reads chan []byte
 }
 
 func newMockReader(id, data string, err error) *mockReader {
@@ -301,7 +301,7 @@ func newMockReader(id, data string, err error) *mockReader {
 		id:       id,
 		fileData: []byte(data),
 		err:      err,
-		reads:    make(chan struct{}, 50),
+		reads:    make(chan []byte, 50),
 	}
 }
 
@@ -310,11 +310,11 @@ func (m *mockReader) ID() string {
 }
 
 func (m *mockReader) Read() ([]byte, error) {
-	// Notify that a read happened
-	defer func() { m.reads <- struct{}{} }()
-
 	m.m.Lock()
 	defer m.m.Unlock()
+
+	// Notify that a read happened
+	defer func() { m.reads <- m.fileData }()
 
 	if m.err != nil {
 		return nil, m.err
@@ -335,6 +335,13 @@ func (m *mockReader) setErr(err error) {
 	m.err = err
 }
 
-func (m *mockReader) waitForRead() {
-	<-m.reads
+// waitForRead blocks until the file data is the same as the expected.
+// So it ensures that when it is invoked after setData, it will wait for this same
+// data to be returned by the Read method.
+func (m *mockReader) waitForRead(expected []byte) {
+	readData := <-m.reads // wait for at least first read
+	// then if the read data is not the same as the expected data, wait for the next read
+	for string(readData) != string(expected) {
+		readData = <-m.reads
+	}
 }
