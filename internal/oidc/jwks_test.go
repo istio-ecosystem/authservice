@@ -155,7 +155,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		jwks = newKeySet(t, pub)
 
 		tlsPool  = internal.NewTLSConfigPool(context.Background())
-		newCache = func(t *testing.T, oidc *oidcv1.OIDCConfig) JWKSProvider {
+		newCache = func(_ *testing.T, oidc *oidcv1.OIDCConfig) JWKSProvider {
 			cfg := &configv1.Config{
 				Chains: []*configv1.FilterChain{
 					{
