@@ -1645,7 +1645,7 @@ func newServer(wellKnownPayload string) *idpServer {
 	idpServer := &idpServer{server: s, listener: bufconn.Listen(1024)}
 
 	handler := http.NewServeMux()
-	handler.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(idpServer.statusCode)
 
@@ -1656,7 +1656,7 @@ func newServer(wellKnownPayload string) *idpServer {
 			}
 		}
 	})
-	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(wellKnownPayload))

@@ -104,7 +104,7 @@ func newServer() *idpServer {
 	idpServer := &idpServer{server: s, listener: bufconn.Listen(1024)}
 
 	handler := http.NewServeMux()
-	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+	handler.HandleFunc("/.well-known/openid-configuration", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if idpServer.wellKnownConfig != "" {

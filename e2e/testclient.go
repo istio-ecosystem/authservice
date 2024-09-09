@@ -113,7 +113,7 @@ func (a *AddressMappings) DialContext(ctx context.Context, network, addr string)
 
 // DialTLSContext is a custom dialer that resolves specific host:port to specific target addresses.
 func (a *AddressMappings) DialTLSContext(tlsConfig *tls.Config) func(context.Context, string, string) (net.Conn, error) {
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(_ context.Context, network, addr string) (net.Conn, error) {
 		cfg := tlsConfig.Clone()
 		if resolved, ok := a.addresses[addr]; ok {
 			// Use the original hostname for the SNI, to avoid certificate verification errors

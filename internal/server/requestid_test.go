@@ -37,7 +37,7 @@ func TestPropagateRequestId(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			_, _ = PropagateRequestID(ctx, tt.req, nil, func(ctx context.Context, req interface{}) (interface{}, error) {
+			_, _ = PropagateRequestID(ctx, tt.req, nil, func(ctx context.Context, _ interface{}) (interface{}, error) {
 				kvs := telemetry.KeyValuesFromContext(ctx)
 				require.Equal(t, tt.want, kvs)
 				return nil, nil

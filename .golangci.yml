@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-run:
-  skip-files:
+issues:
+  exclude-files:
     - ".*\\.pb.*\\.go"
 linters:
   enable:
@@ -29,20 +29,16 @@ linters:
     - unused
     - staticcheck
     - gosimple
-    - megacheck
   disable:
-    - interfacer # deprecated since it "is prone to bad suggestions"
     - goimports # already run in `make format`
-    - deadcode # Deprecated. Author abandoned it.
-    - structcheck # Deprecated. Author abandoned it.
-    - varcheck # Deprecated. Author abandoned it.
 linters-settings:
   lll:
     line-length: 160
   goconst:
     min-occurrences: 4
   govet:
-    check-shadowing: true
+    enable:
+      - shadow
   revive:
     ignore-generated-header: false
     severity: error
