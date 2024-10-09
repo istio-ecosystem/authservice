@@ -203,7 +203,7 @@ lint: $(GOLANGCI_LINT_CONFIG) config/lint  ## Lint checks for all Go code
 .PHONY: format
 format: go.mod  ## Format all Go code
 	@echo "Formatting code"
-	@go run $(LICENSER) apply -r "Tetrate"
+	@@go run $(SWEYES) header fix
 	@go run $(GOSIMPORTS) -local $(GO_MODULE) -w .
 	@gofmt -w .
 
