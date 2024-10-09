@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"net/url"
@@ -31,6 +30,7 @@ import (
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/tetratelabs/telemetry"
+	"golang.org/x/oauth2"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 

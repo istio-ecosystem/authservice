@@ -131,14 +131,17 @@ func TestSessionGenerator(t *testing.T) {
 		require.NotEqual(t, sg.GenerateSessionID(), sg.GenerateSessionID())
 		require.NotEqual(t, sg.GenerateState(), sg.GenerateState())
 		require.NotEqual(t, sg.GenerateNonce(), sg.GenerateNonce())
+		require.NotEqual(t, sg.GenerateCodeVerifier(), sg.GenerateCodeVerifier())
 	})
 	t.Run("static", func(t *testing.T) {
 		sg := NewStaticGenerator("sessionid", "nonce", "state", "codeverifier")
 		require.Equal(t, sg.GenerateSessionID(), sg.GenerateSessionID())
 		require.Equal(t, sg.GenerateState(), sg.GenerateState())
 		require.Equal(t, sg.GenerateNonce(), sg.GenerateNonce())
+		require.Equal(t, sg.GenerateCodeVerifier(), sg.GenerateCodeVerifier())
 		require.Equal(t, "sessionid", sg.GenerateSessionID())
 		require.Equal(t, "state", sg.GenerateState())
 		require.Equal(t, "nonce", sg.GenerateNonce())
+		require.Equal(t, "codeverifier", sg.GenerateCodeVerifier())
 	})
 }

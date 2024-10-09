@@ -16,13 +16,13 @@ package oidc
 
 import (
 	"context"
-	"golang.org/x/oauth2"
 	"math/rand"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
+	"golang.org/x/oauth2"
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
