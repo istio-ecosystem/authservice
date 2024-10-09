@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUF ?= github.com/bufbuild/buf/cmd/buf@v1.17.0
+BUF ?= github.com/bufbuild/buf/cmd/buf@v1.32.2
 
 PROTO_SOURCES := $(shell find . -name '*.proto')
 
 .PHONY: build
 build: $(PROTO_SOURCES) ## Generate the Go code from the protobuf definitions
 	@echo "Generating Go code from protobuf definitions"
-	@go run $(BUF) mod update
 	@go run $(BUF) build
 	@go run $(BUF) generate
 	@go mod tidy

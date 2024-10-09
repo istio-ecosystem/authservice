@@ -18,7 +18,7 @@ NAME      ?= authservice
 
 -include $(ROOT)/.makerc  # Pick up any local overrides.
 
-GOLANGCI_LINT ?= github.com/golangci/golangci-lint/cmd/golangci-lint@v1.60.3
+GOLANGCI_LINT ?= github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 GOSIMPORTS    ?= github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
 LICENSER      ?= github.com/liamawhite/licenser@v0.6.1-0.20210729145742-be6c77bf6a1f
 KIND          ?= sigs.k8s.io/kind@v0.18.0

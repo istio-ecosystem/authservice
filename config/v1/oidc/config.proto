@@ -132,7 +132,9 @@ message OIDCConfig {
   // The OIDC client ID assigned to the filter to be used in the
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
   // Required.
-  string client_id = 5 [(validate.rules).string.min_len = 1];
+  // The client ID is used to authenticate to the Token endpoint using HTTP Basic Auth and it
+  // must not contain a colon (":") character.
+  string client_id = 5 [(validate.rules).string = {min_len: 1, not_contains: ":"}];
 
   // This message defines a reference to a Kubernetes Secret resource.
   message SecretReference {

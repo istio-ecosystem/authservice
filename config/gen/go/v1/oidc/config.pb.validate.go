@@ -419,6 +419,17 @@ func (m *OIDCConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if strings.Contains(m.GetClientId(), ":") {
+		err := OIDCConfigValidationError{
+			field:  "ClientId",
+			reason: "value contains substring \":\"",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	// no validation rules for CookieNamePrefix
 
 	if m.GetIdToken() == nil {
