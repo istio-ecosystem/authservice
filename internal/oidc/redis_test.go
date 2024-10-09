@@ -91,6 +91,7 @@ func TestRedisAuthorizationState(t *testing.T) {
 		State:        "state",
 		Nonce:        "nonce",
 		RequestedURL: "requested_url",
+		CodeVerifier: "code_verifier",
 	}
 	require.NoError(t, store.SetAuthorizationState(ctx, "s1", as))
 

@@ -16,6 +16,7 @@ package oidc
 
 import (
 	"context"
+	"golang.org/x/oauth2"
 	"math/rand"
 	"time"
 
@@ -136,6 +137,7 @@ type SessionGenerator interface {
 	GenerateSessionID() string
 	GenerateNonce() string
 	GenerateState() string
+	GenerateCodeVerifier() string
 }
 
 var (
@@ -151,9 +153,10 @@ type (
 
 	// staticGenerator is a session generator that uses static strings.
 	staticGenerator struct {
-		sessionID string
-		nonce     string
-		state     string
+		sessionID    string
+		nonce        string
+		state        string
+		codeVerifier string
 	}
 )
 
@@ -176,6 +179,10 @@ func (r randomGenerator) GenerateState() string {
 	return r.generate(32)
 }
 
+func (r randomGenerator) GenerateCodeVerifier() string {
+	return oauth2.GenerateVerifier()
+}
+
 func (r *randomGenerator) generate(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, n)
@@ -186,11 +193,12 @@ func (r *randomGenerator) generate(n int) string {
 }
 
 // NewStaticGenerator creates a new static session generator.
-func NewStaticGenerator(sessionID, nonce, state string) SessionGenerator {
+func NewStaticGenerator(sessionID, nonce, state, codeVerifier string) SessionGenerator {
 	return &staticGenerator{
-		sessionID: sessionID,
-		nonce:     nonce,
-		state:     state,
+		sessionID:    sessionID,
+		nonce:        nonce,
+		state:        state,
+		codeVerifier: codeVerifier,
 	}
 }
 
@@ -204,4 +212,8 @@ func (s staticGenerator) GenerateNonce() string {
 
 func (s staticGenerator) GenerateState() string {
 	return s.state
+}
+
+func (s staticGenerator) GenerateCodeVerifier() string {
+	return s.codeVerifier
 }

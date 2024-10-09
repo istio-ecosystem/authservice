@@ -40,12 +40,13 @@ const (
 	keyState             = "state"
 	keyNonce             = "nonce"
 	keyRequestedURL      = "requested_url"
+	keyCodeVerifier      = "code_verifier"
 	keyTimeAdded         = "time_added"
 )
 
 var (
 	tokenResponseKeys      = []string{keyIDToken, keyAccessToken, keyRefreshToken, keyAccessTokenExpiry, keyTimeAdded}
-	authorizationStateKeys = []string{keyState, keyNonce, keyRequestedURL, keyTimeAdded}
+	authorizationStateKeys = []string{keyState, keyNonce, keyRequestedURL, keyTimeAdded, keyCodeVerifier}
 )
 
 // redisStore is an in-memory implementation of the SessionStore interface that stores
@@ -165,6 +166,7 @@ func (r *redisStore) SetAuthorizationState(ctx context.Context, sessionID string
 		keyState:        authorizationState.State,
 		keyNonce:        authorizationState.Nonce,
 		keyRequestedURL: authorizationState.RequestedURL,
+		keyCodeVerifier: authorizationState.CodeVerifier,
 	}
 
 	if err := r.client.HMSet(ctx, sessionID, state).Err(); err != nil {
@@ -193,7 +195,7 @@ func (r *redisStore) GetAuthorizationState(ctx context.Context, sessionID string
 		return nil, err
 	}
 
-	if state.State == "" || state.Nonce == "" || state.RequestedURL == "" {
+	if state.State == "" || state.Nonce == "" || state.RequestedURL == "" || state.CodeVerifier == "" {
 		return nil, nil
 	}
 
@@ -286,6 +288,7 @@ type (
 		State        string    `redis:"state"`
 		Nonce        string    `redis:"nonce"`
 		RequestedURL string    `redis:"requested_url"`
+		CodeVerifier string    `redis:"code_verifier"`
 		TimeAdded    time.Time `redis:"time_added"`
 	}
 )
@@ -304,5 +307,6 @@ func (r redisAuthState) AuthorizationState() *AuthorizationState {
 		State:        r.State,
 		Nonce:        r.Nonce,
 		RequestedURL: r.RequestedURL,
+		CodeVerifier: r.CodeVerifier,
 	}
 }

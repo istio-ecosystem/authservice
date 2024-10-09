@@ -85,6 +85,7 @@ func TestRedisAuthorizationState(t *testing.T) {
 		State:        "state",
 		Nonce:        "nonce",
 		RequestedURL: "https://example.com",
+		CodeVerifier: "code_verifier",
 	}
 	require.NoError(t, store.SetAuthorizationState(ctx, "s1", as))
 
@@ -126,6 +127,7 @@ func TestSessionExpiration(t *testing.T) {
 			State:        "state",
 			Nonce:        "nonce",
 			RequestedURL: "https://example.com",
+			CodeVerifier: "code_verifier",
 		}
 		require.NoError(t, store.SetAuthorizationState(ctx, "s1", as))
 		require.Eventually(t, func() bool {

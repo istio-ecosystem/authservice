@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"net/url"
@@ -237,9 +238,10 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 	}
 
 	var (
-		sessionID = o.sessionGen.GenerateSessionID()
-		nonce     = o.sessionGen.GenerateNonce()
-		state     = o.sessionGen.GenerateState()
+		sessionID    = o.sessionGen.GenerateSessionID()
+		nonce        = o.sessionGen.GenerateNonce()
+		state        = o.sessionGen.GenerateState()
+		codeVerifier = o.sessionGen.GenerateCodeVerifier()
 	)
 
 	// Store the authorization state
@@ -251,6 +253,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 		State:        state,
 		Nonce:        nonce,
 		RequestedURL: requestedURL,
+		CodeVerifier: codeVerifier,
 	}); err != nil {
 		log.Error("error storing the new authorization state", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
@@ -259,12 +262,14 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 
 	// Generate the redirect URL
 	query := url.Values{
-		"response_type": []string{"code"},
-		"client_id":     []string{o.config.GetClientId()},
-		"redirect_uri":  []string{o.config.GetCallbackUri()},
-		"scope":         []string{strings.Join(o.config.GetScopes(), " ")},
-		"state":         []string{state},
-		"nonce":         []string{nonce},
+		"response_type":         []string{"code"},
+		"client_id":             []string{o.config.GetClientId()},
+		"redirect_uri":          []string{o.config.GetCallbackUri()},
+		"scope":                 []string{strings.Join(o.config.GetScopes(), " ")},
+		"state":                 []string{state},
+		"nonce":                 []string{nonce},
+		"code_challenge":        []string{oauth2.S256ChallengeFromVerifier(codeVerifier)},
+		"code_challenge_method": []string{"S256"},
 	}
 	redirectURL := o.config.GetAuthorizationUri() + "?" + query.Encode()
 
@@ -328,9 +333,10 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 
 	// build body
 	form := url.Values{
-		"grant_type":   []string{"authorization_code"},
-		"code":         []string{codeFromReq},
-		"redirect_uri": []string{o.config.GetCallbackUri()},
+		"grant_type":    []string{"authorization_code"},
+		"code":          []string{codeFromReq},
+		"redirect_uri":  []string{o.config.GetCallbackUri()},
+		"code_verifier": []string{stateFromStore.CodeVerifier},
 	}
 
 	// build headers
