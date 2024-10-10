@@ -19,4 +19,5 @@ type AuthorizationState struct {
 	State        string
 	Nonce        string
 	RequestedURL string
+	CodeVerifier string
 }

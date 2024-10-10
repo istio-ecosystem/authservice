@@ -34,6 +34,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/telemetry"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/proto"
@@ -125,10 +126,11 @@ var (
 	yesterday = time.Now().Add(-24 * time.Hour)
 	tomorrow  = time.Now().Add(24 * time.Hour)
 
-	sessionID    = "test-session-id"
-	newSessionID = "new-session-id"
-	newNonce     = "new-nonce"
-	newState     = "new-state"
+	sessionID       = "test-session-id"
+	newSessionID    = "new-session-id"
+	newNonce        = "new-nonce"
+	newState        = "new-state"
+	newCodeVerifier = "new-code-verifier"
 
 	basicOIDCConfig = &oidcv1.OIDCConfig{
 		IdToken: &oidcv1.TokenConfig{
@@ -190,12 +192,14 @@ var (
 }`
 
 	wantRedirectParams = url.Values{
-		"response_type": {"code"},
-		"client_id":     {"test-client-id"},
-		"redirect_uri":  {"https://localhost:443/callback"},
-		"scope":         {"openid email"},
-		"state":         {newState},
-		"nonce":         {newNonce},
+		"response_type":         {"code"},
+		"client_id":             {"test-client-id"},
+		"redirect_uri":          {"https://localhost:443/callback"},
+		"scope":                 {"openid email"},
+		"state":                 {newState},
+		"nonce":                 {newNonce},
+		"code_challenge":        {oauth2.S256ChallengeFromVerifier(newCodeVerifier)},
+		"code_challenge_method": {"S256"},
 	}
 
 	wantRedirectBaseURI = "http://idp-test-server/auth"
@@ -228,7 +232,7 @@ func TestOIDCProcess(t *testing.T) {
 	tlsPool := internal.NewTLSConfigPool(context.Background())
 	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
-		oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -949,7 +953,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	}
 
 	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
-		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
 	ctx := context.Background()
@@ -1094,7 +1098,8 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
 	tlsPool := internal.NewTLSConfigPool(context.Background())
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock,
+		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
 	idpServer := newServer(wellKnownURIs)
@@ -1425,7 +1430,7 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 	cfg.ConfigurationUri = "http://stopped-server/.well-known/openid-configuration"
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	_, err := NewOIDCHandler(cfg, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
-		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
 
@@ -1447,7 +1452,7 @@ func TestNewOIDCHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 
 			_, err := NewOIDCHandler(tt.config, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
-				sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState))
+				sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
