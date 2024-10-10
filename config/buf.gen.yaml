@@ -24,7 +24,7 @@ plugins:
     out: gen/go
     opt:
       - paths=source_relative
-  - plugin: buf.build/bufbuild/validate-go
+  - plugin: buf.build/bufbuild/validate-go:v1.0.4
     out: gen/go
     opt:
       - paths=source_relative

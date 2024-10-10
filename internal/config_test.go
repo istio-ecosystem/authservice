@@ -47,7 +47,10 @@ func (e errCheck) Check(t *testing.T, err error) {
 	}
 }
 
-const msgLengthValidation = "value length must be at least 1 runes"
+const (
+	msgLengthValidation = "value length must be at least 1 runes"
+	msgInvalidClientID  = `invalid OIDCConfig.ClientId: value contains substring ":"`
+)
 
 func TestValidateConfig(t *testing.T) {
 	tests := []struct {
@@ -64,6 +67,7 @@ func TestValidateConfig(t *testing.T) {
 		{"multiple-oidc", "testdata/multiple-oidc.json", errCheck{is: ErrMultipleOIDCConfig}},
 		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"invalid-oidc-uris", "testdata/invalid-oidc-uris.json", errCheck{is: ErrRequiredURL}},
+		{"invalid-oidc-client-id", "testdata/invalid-oidc-client-id.json", errCheck{msg: msgInvalidClientID}},
 		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
 		{"invalid-callback-uri", "testdata/invalid-callback.json", errCheck{is: ErrMustNotBeRootPath}},
 		{"invalid-logout-path", "testdata/invalid-logout.json", errCheck{is: ErrMustNotBeRootPath}},

@@ -15,7 +15,7 @@
 version: v1
 name: buf.build/authservice/config
 deps:
-  - buf.build/envoyproxy/protoc-gen-validate:6607b10f00ed4a3d98f906807131c44a
+  - buf.build/envoyproxy/protoc-gen-validate
 lint:
   use:
     - DEFAULT
