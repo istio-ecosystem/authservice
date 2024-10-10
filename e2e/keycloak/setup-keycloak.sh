@@ -51,6 +51,7 @@ set -ex
     -s clientId="${CLIENT_ID}" \
     -s secret="${CLIENT_SECRET}" \
     -s "redirectUris=[\"${REDIRECT_URL}\"]" \
+    -s "attributes={\"pkce.code.challenge.method\":\"S256\"}" \
     -s consentRequired=false \
     --server "${KEYCLOAK_SERVER}" \
     --realm "${REALM}" \
