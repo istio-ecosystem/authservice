@@ -18,12 +18,6 @@ NAME      ?= authservice
 
 -include $(ROOT)/.makerc  # Pick up any local overrides.
 
-GOLANGCI_LINT ?= github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
-GOSIMPORTS    ?= github.com/rinchsan/gosimports/cmd/gosimports@v0.3.8
-SWEYES        ?= github.com/apache/skywalking-eyes/cmd/license-eye@v0.6.0
-KIND          ?= sigs.k8s.io/kind@v0.18.0
-ENVTEST       ?= sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-
 TARGETS      ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 FIPS_TARGETS := $(filter linux-%,$(TARGETS))
 

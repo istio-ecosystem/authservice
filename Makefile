@@ -100,7 +100,7 @@ config/lint:  ## Lint the Config Proto generated code
 
 .PHONY: test
 test:  ## Run all the tests
-	@KUBEBUILDER_ASSETS="$(shell go run $(ENVTEST) use -p path)" \
+	@KUBEBUILDER_ASSETS="$(shell go tool setup-envtest use -p path)" \
 		go test $(TEST_OPTS) $(TEST_PKGS)
 
 COVERAGE_OPTS ?=
@@ -108,7 +108,7 @@ COVERAGE_OPTS ?=
 coverage: ## Creates coverage report for all projects
 	@echo "Running test coverage"
 	@mkdir -p $(OUTDIR)/$@
-	@KUBEBUILDER_ASSETS="$(shell go run $(ENVTEST) use -p path)" \
+	@KUBEBUILDER_ASSETS="$(shell go tool setup-envtest use -p path)" \
 		go test $(COVERAGE_OPTS) \
 			-timeout 30s \
 			-coverprofile $(OUTDIR)/$@/coverage.out \
@@ -198,13 +198,13 @@ GOLANGCI_LINT_CONFIG ?= .golangci.yml
 .PHONY: lint
 lint: $(GOLANGCI_LINT_CONFIG) config/lint  ## Lint checks for all Go code
 	@echo "Linting Go code"
-	@go run $(GOLANGCI_LINT) run $(LINT_OPTS) --build-tags "$(TEST_TAGS)" --config $(GOLANGCI_LINT_CONFIG)
+	@go tool golangci-lint run $(LINT_OPTS) --build-tags "$(TEST_TAGS)" --config $(GOLANGCI_LINT_CONFIG)
 
 .PHONY: format
 format: go.mod  ## Format all Go code
 	@echo "Formatting code"
-	@@go run $(SWEYES) header fix
-	@go run $(GOSIMPORTS) -local $(GO_MODULE) -w .
+	@go tool license-eye header fix
+	@go tool gosimports -local $(GO_MODULE) -w .
 	@gofmt -w .
 
 .PHONY: check

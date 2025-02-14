@@ -16,8 +16,12 @@ package internal
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"os"
 	"testing"
 	"time"
@@ -33,75 +37,16 @@ const (
 	invalidCAPem      = `<invalid ca.pem>`
 	firstCertDNSName  = "first"
 	secondCertDNSName = "second"
-
-	firstCAPem = `-----BEGIN CERTIFICATE-----
-MIICMjCCAdygAwIBAgIUfjMuIL07OwG1Q13HGhaDJbdKgRYwDQYJKoZIhvcNAQEL
-BQAwWjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoM
-B1RldHJhdGUxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ4wDAYDVQQDDAVmaXJzdDAg
-Fw0yNDAyMjUwNzU5MjhaGA8zMDA0MDQyODA3NTkyOFowWjELMAkGA1UEBhMCVVMx
-EzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoMB1RldHJhdGUxFDASBgNVBAsM
-C0VuZ2luZWVyaW5nMQ4wDAYDVQQDDAVmaXJzdDBcMA0GCSqGSIb3DQEBAQUAA0sA
-MEgCQQDFT3pCjZyxnQ5o46GlBd7e6yredUuGdYhaLPjkcDZw5LTdy/WdJ8MRsUdJ
-uh0v5HSpDsd6yIiP8SF20WgfbYpfAgMBAAGjeDB2MB0GA1UdDgQWBBQUQOM/blzh
-GpovGudMO43BZSKjTjAfBgNVHSMEGDAWgBQUQOM/blzhGpovGudMO43BZSKjTjAS
-BgNVHRMBAf8ECDAGAQH/AgEBMA4GA1UdDwEB/wQEAwIC5DAQBgNVHREECTAHggVm
-aXJzdDANBgkqhkiG9w0BAQsFAANBAG0Gwgwaxe+OnpFOdDi0QFILN10EFl0BsNjz
-JROKsQSnX5sGlYdVcb0TBAf8MojqNZvq78C1fCXkDus3g3AZyLM=
------END CERTIFICATE-----`
-
-	firstCertPem = `-----BEGIN CERTIFICATE-----
-MIICDjCCAbigAwIBAgIUQPCzOs6M9RxopgX0HL8uJKDoBpowDQYJKoZIhvcNAQEL
-BQAwWjELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoM
-B1RldHJhdGUxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ4wDAYDVQQDDAVmaXJzdDAg
-Fw0yNDAyMjUwNzU5MjhaGA8zMDA0MDQyODA3NTkyOFowWjELMAkGA1UEBhMCVVMx
-EzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoMB1RldHJhdGUxFDASBgNVBAsM
-C0VuZ2luZWVyaW5nMQ4wDAYDVQQDDAVmaXJzdDBcMA0GCSqGSIb3DQEBAQUAA0sA
-MEgCQQCm/7/RmxYPmRmtoWmD4U6Gv9x96ApW3Wf2yvl5o7J4StvgRSreTBjQO59N
-ERwfhAcNV+SRZWIXtodmhryCcbNzAgMBAAGjVDBSMBAGA1UdEQQJMAeCBWZpcnN0
-MB0GA1UdDgQWBBRczCCJnGGmj/mK8ncpBM4cYX4hoDAfBgNVHSMEGDAWgBQUQOM/
-blzhGpovGudMO43BZSKjTjANBgkqhkiG9w0BAQsFAANBAEynBzYcUtn1LgUnbXnq
-UCQC5/a5NavSwD+uujen++9luWxZP5BDLIuqWVEkVeavaRD8WTNi6pB/4Kok3/h7
-mrU=
------END CERTIFICATE-----`
-
-	secondCAPem = `-----BEGIN CERTIFICATE-----
-MIICNTCCAd+gAwIBAgIUSNiQbnskpJz9qXIy3ZvyeBr5DgswDQYJKoZIhvcNAQEL
-BQAwWzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoM
-B1RldHJhdGUxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ8wDQYDVQQDDAZzZWNvbmQw
-IBcNMjQwMjI1MDc1ODA4WhgPMzAwNDA0MjgwNzU4MDhaMFsxCzAJBgNVBAYTAlVT
-MRMwEQYDVQQIDApDYWxpZm9ybmlhMRAwDgYDVQQKDAdUZXRyYXRlMRQwEgYDVQQL
-DAtFbmdpbmVlcmluZzEPMA0GA1UEAwwGc2Vjb25kMFwwDQYJKoZIhvcNAQEBBQAD
-SwAwSAJBAMz0bgSTGkUT4BevyrQUBI11ISf4sORB4iIOBeZxF9T3+k7fOqCieok7
-KquH6X7gsmL/A15qU0XCsVZWZ9ro9/UCAwEAAaN5MHcwHQYDVR0OBBYEFMO6IIAi
-fGtfQdEJpC+IrTQqcbfoMB8GA1UdIwQYMBaAFMO6IIAifGtfQdEJpC+IrTQqcbfo
-MBIGA1UdEwEB/wQIMAYBAf8CAQEwDgYDVR0PAQH/BAQDAgLkMBEGA1UdEQQKMAiC
-BnNlY29uZDANBgkqhkiG9w0BAQsFAANBADGCBvNWs7L+uMYHvfk5Uy+P6eoIJKok
-LeXeAdsKK+0F9xCmnNfuinTJ1ioZ47e7fFS2XGfO8qSmmb0wVnK/9Ig=
------END CERTIFICATE-----`
-
-	secondCertPem = `-----BEGIN CERTIFICATE-----
-MIICETCCAbugAwIBAgIUXHZGY3lT62cY3Y/ccIoRAp7P5mkwDQYJKoZIhvcNAQEL
-BQAwWzELMAkGA1UEBhMCVVMxEzARBgNVBAgMCkNhbGlmb3JuaWExEDAOBgNVBAoM
-B1RldHJhdGUxFDASBgNVBAsMC0VuZ2luZWVyaW5nMQ8wDQYDVQQDDAZzZWNvbmQw
-IBcNMjQwMjI1MDc1ODA4WhgPMzAwNDA0MjgwNzU4MDhaMFsxCzAJBgNVBAYTAlVT
-MRMwEQYDVQQIDApDYWxpZm9ybmlhMRAwDgYDVQQKDAdUZXRyYXRlMRQwEgYDVQQL
-DAtFbmdpbmVlcmluZzEPMA0GA1UEAwwGc2Vjb25kMFwwDQYJKoZIhvcNAQEBBQAD
-SwAwSAJBAOgoDZ6wH/7lbqGphAOlJqRJcWeaN4jB8BEc/MejG1UL75uFnwXDmwDH
-KNU1e3VygpWyFwrrBKde4DEMBKnBdPsCAwEAAaNVMFMwEQYDVR0RBAowCIIGc2Vj
-b25kMB0GA1UdDgQWBBTxli7ulcoMhJPUGTNS0qclcCd41DAfBgNVHSMEGDAWgBTD
-uiCAInxrX0HRCaQviK00KnG36DANBgkqhkiG9w0BAQsFAANBAIdc1uTnNDMdROp4
-fIGuGu2HAHkqnBhOHh71Xd/WD/9kjPGUQNzRZUYaWs9EGz95VvcrSIPPMU8tLhIt
-dabJiLY=
------END CERTIFICATE-----`
 )
 
 func TestLoadTLSConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	var (
-		validFile   = tmpDir + "/valid.pem"
-		invalidFile = tmpDir + "/invalid.pem"
+		validFile     = tmpDir + "/valid.pem"
+		invalidFile   = tmpDir + "/invalid.pem"
+		firstCAPem, _ = genCAAndCert(t, firstCertDNSName)
 	)
-	require.NoError(t, os.WriteFile(validFile, []byte(firstCAPem), 0644))
+	require.NoError(t, os.WriteFile(validFile, firstCAPem, 0644))
 	require.NoError(t, os.WriteFile(invalidFile, []byte(invalidCAPem), 0644))
 
 	tests := []struct {
@@ -125,7 +70,7 @@ func TestLoadTLSConfig(t *testing.T) {
 		},
 		{
 			name:     "valid trusted CA string config",
-			config:   &oidc.OIDCConfig{TrustedCaConfig: &oidc.OIDCConfig_TrustedCertificateAuthority{TrustedCertificateAuthority: firstCAPem}},
+			config:   &oidc.OIDCConfig{TrustedCaConfig: &oidc.OIDCConfig_TrustedCertificateAuthority{TrustedCertificateAuthority: string(firstCAPem)}},
 			wantTLS:  true,
 			wantPool: true,
 		},
@@ -191,15 +136,18 @@ func TestLoadTLSConfig(t *testing.T) {
 }
 
 func TestTLSConfigPoolUpdates(t *testing.T) {
+	firstCAPem, firstCertPem := genCAAndCert(t, firstCertDNSName)
+	secondCAPem, secondCertPem := genCAAndCert(t, secondCertDNSName)
+
 	tmpDir := t.TempDir()
 	var caFile1 = tmpDir + "/ca1.pem"
-	require.NoError(t, os.WriteFile(caFile1, []byte(firstCAPem), 0644))
+	require.NoError(t, os.WriteFile(caFile1, firstCAPem, 0644))
 
-	block, _ := pem.Decode([]byte(firstCertPem))
+	block, _ := pem.Decode(firstCertPem)
 	cert1, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
-	block, _ = pem.Decode([]byte(secondCertPem))
+	block, _ = pem.Decode(secondCertPem)
 	cert2, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
@@ -227,7 +175,7 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// update the CA file content
-	require.NoError(t, os.WriteFile(caFile1, []byte(secondCAPem), 0644))
+	require.NoError(t, os.WriteFile(caFile1, secondCAPem, 0644))
 	time.Sleep(intervalAndHalf)
 
 	// load the TLS config again
@@ -268,7 +216,7 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 	require.NoError(t, err)
 
 	// update the CA file content to be valid again and verify the new CA is loaded
-	require.NoError(t, os.WriteFile(caFile1, []byte(firstCAPem), 0644))
+	require.NoError(t, os.WriteFile(caFile1, firstCAPem, 0644))
 	time.Sleep(intervalAndHalf)
 
 	// load the TLS config again
@@ -280,19 +228,23 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 }
 
 func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
-	tmpDir := t.TempDir()
 	var (
+		tmpDir = t.TempDir()
+
+		firstCAPem, firstCertPem   = genCAAndCert(t, firstCertDNSName)
+		secondCAPem, secondCertPem = genCAAndCert(t, secondCertDNSName)
+
 		caFile1 = tmpDir + "/ca1.pem"
 		caFile2 = tmpDir + "/ca2.pem"
 	)
-	require.NoError(t, os.WriteFile(caFile1, []byte(firstCAPem), 0644))
-	require.NoError(t, os.WriteFile(caFile2, []byte(secondCAPem), 0644))
+	require.NoError(t, os.WriteFile(caFile1, firstCAPem, 0644))
+	require.NoError(t, os.WriteFile(caFile2, secondCAPem, 0644))
 
-	block, _ := pem.Decode([]byte(firstCertPem))
+	block, _ := pem.Decode(firstCertPem)
 	cert1, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
-	block, _ = pem.Decode([]byte(secondCertPem))
+	block, _ = pem.Decode(secondCertPem)
 	cert2, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
@@ -332,7 +284,7 @@ func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
 	require.NoError(t, err)
 
 	// update the second file to contain the first CA
-	require.NoError(t, os.WriteFile(caFile2, []byte(firstCAPem), 0644))
+	require.NoError(t, os.WriteFile(caFile2, firstCAPem, 0644))
 	time.Sleep(intervalAndHalf(config2Interval))
 
 	// load the TLS config for config2 again
@@ -350,4 +302,49 @@ func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
 	require.NoError(t, err)
 	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS1.RootCAs, DNSName: firstCertDNSName})
 	require.NoError(t, err)
+}
+
+func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
+	defaultSubject := pkix.Name{
+		Organization: []string{"Tetrate"},
+		Country:      []string{"US"},
+		Locality:     []string{"San Francisco"},
+	}
+
+	caKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	require.NoError(t, err)
+
+	ca := x509.Certificate{
+		SerialNumber:          big.NewInt(2025),
+		Subject:               defaultSubject,
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(10 * time.Minute),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+	}
+
+	caDER, err := x509.CreateCertificate(rand.Reader, &ca, &ca, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	template := x509.Certificate{
+		SerialNumber:          big.NewInt(2025),
+		Subject:               defaultSubject,
+		DNSNames:              []string{dnsName},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().Add(5 * time.Minute),
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+
+	certKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	require.NoError(t, err)
+
+	der, err := x509.CreateCertificate(rand.Reader, &template, &ca, &certKey.PublicKey, caKey)
+	require.NoError(t, err)
+
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}),
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
