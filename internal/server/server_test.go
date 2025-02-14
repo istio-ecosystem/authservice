@@ -87,7 +87,7 @@ func NewTestServer(handlers ...func(s *grpc.Server)) *TestServer {
 
 // GRPCConn returns a gRPC connection that connects to the test server.
 func (s *TestServer) GRPCConn() (*grpc.ClientConn, error) {
-	return grpc.Dial("bufnet", s.dialOpts...)
+	return grpc.Dial("bufconn", s.dialOpts...) //nolint: staticcheck
 }
 
 // Start starts the server. This blocks until the server is stopped.
