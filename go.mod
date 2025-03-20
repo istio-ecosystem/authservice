@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/lestrrat-go/httprc v1.0.6
 	github.com/lestrrat-go/jwx/v2 v2.1.3
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tetratelabs/log v0.2.3
 	github.com/tetratelabs/run v0.3.0
