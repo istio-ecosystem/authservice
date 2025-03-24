@@ -32,7 +32,7 @@ func TestWithValues(t *testing.T) {
 	a = a.WithValues("three")
 	a = a.WithValues()
 
-	require.Equal(t, map[string]interface{}{"one": 1, "two": 2, "three": "(MISSING)"}, a.(*logrAdapter).kvs)
+	require.Equal(t, []any{"one", 1, "two", 2, "three", "(MISSING)"}, a.(*logrAdapter).kvs)
 }
 
 func TestWithName(t *testing.T) {
@@ -44,13 +44,15 @@ func TestWithName(t *testing.T) {
 
 func TestEnable(t *testing.T) {
 	logger := log.New()
+	a := logrAdapter{scope: logger}
+
 	logger.SetLevel(telemetry.LevelInfo)
-	a := logrAdapter{
-		scope: logger,
-	}
-	require.False(t, a.Enabled(int(telemetry.LevelDebug)))
-	require.True(t, a.Enabled(int(telemetry.LevelInfo)))
-	require.True(t, a.Enabled(int(telemetry.LevelError)))
+	require.False(t, a.Enabled(debugLevelThreshold))
+	require.True(t, a.Enabled(debugLevelThreshold-1))
+
+	logger.SetLevel(telemetry.LevelDebug)
+	require.True(t, a.Enabled(debugLevelThreshold))
+	require.True(t, a.Enabled(debugLevelThreshold-1))
 }
 
 func TestInfo(t *testing.T) {
@@ -83,7 +85,7 @@ func TestDebug(t *testing.T) {
 		scope: logger,
 	}
 
-	a.Info(0, "test", "one", 1, "two", 2)
+	a.Info(debugLevelThreshold, "test", "one", 1, "two", 2)
 
 	_ = w.Close()
 	out, _ := io.ReadAll(r)

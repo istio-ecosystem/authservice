@@ -26,7 +26,7 @@ const debugLevelThreshold = 5
 // logrAdapter is a type that adapts the log.Logger interface so it can be used with our loggers
 type logrAdapter struct {
 	scope telemetry.Logger
-	kvs   map[string]interface{}
+	kvs   []any
 }
 
 // NewLogrAdapter creates a new logger to bridge the logr.Logger to our logging system
@@ -38,19 +38,25 @@ func NewLogrAdapter(s telemetry.Logger) logr.Logger {
 func (l *logrAdapter) Init(_ logr.RuntimeInfo) {}
 
 func (l *logrAdapter) Enabled(level int) bool {
-	return int(l.scope.Level()) >= level
+	switch l.scope.Level() {
+	case telemetry.LevelDebug:
+		return true
+	case telemetry.LevelInfo | telemetry.LevelError:
+		return level < debugLevelThreshold
+	default: // telemetry.LevelNone
+		return false
+	}
 }
 
-func (l *logrAdapter) Info(_ int, msg string, kvs ...interface{}) {
+func (l *logrAdapter) Info(level int, msg string, kvs ...interface{}) {
 	if len(kvs)%2 != 0 {
 		kvs = append(kvs, "(MISSING)")
 	}
-	logger := l.scope.With(kvs...)
 
-	if l.scope.Level() > debugLevelThreshold {
-		logger.Debug(msg)
+	if level >= debugLevelThreshold {
+		l.scope.Debug(msg, append(l.kvs, kvs...)...)
 	} else {
-		logger.Info(msg)
+		l.scope.Info(msg, append(l.kvs, kvs...)...)
 	}
 }
 
@@ -58,8 +64,7 @@ func (l *logrAdapter) Error(err error, msg string, kvs ...interface{}) {
 	if len(kvs)%2 != 0 {
 		kvs = append(kvs, "(MISSING)")
 	}
-	logger := l.scope.With(kvs...)
-	logger.Error(msg, err)
+	l.scope.Error(msg, err, append(l.kvs, kvs...)...)
 }
 
 func (l *logrAdapter) WithName(string) logr.LogSink { return l }
@@ -68,19 +73,11 @@ func (l *logrAdapter) WithValues(kvs ...interface{}) logr.LogSink {
 	if len(kvs) == 0 {
 		return l
 	}
-
 	if len(kvs)%2 != 0 {
 		kvs = append(kvs, "(MISSING)")
 	}
-	all := make(map[string]interface{}, len(l.kvs)+len(kvs)/2)
-	for k, v := range l.kvs {
-		all[k] = v
-	}
-	for i := 0; i < len(kvs); i += 2 {
-		all[kvs[i].(string)] = kvs[i+1]
-	}
 	return &logrAdapter{
 		scope: l.scope,
-		kvs:   all,
+		kvs:   append(l.kvs, kvs...),
 	}
 }
