@@ -155,7 +155,6 @@ message OIDCConfig {
 
     // The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the
     // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
-    //
     // This is an Opaque secret. The client secret should be stored in the key "client-secret".
     // This filed is only valid when running in a Kubernetes cluster.
     SecretReference client_secret_ref = 21;
@@ -257,5 +256,6 @@ message OIDCConfig {
   // self-signed certificate for testing purposes, but basically should not be set to true
   // in any other cases.
   // Optional.
-  google.protobuf.Value skip_verify_peer_cert = 18; // keep this field out from the trusted_ca_config one of for backward compatibility.
+  // keep this field out from the trusted_ca_config one of for backward compatibility.
+  google.protobuf.Value skip_verify_peer_cert = 18;
 }

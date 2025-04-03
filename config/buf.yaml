@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: v1
+version: v2
 name: buf.build/authservice/config
 deps:
   - buf.build/envoyproxy/protoc-gen-validate
 lint:
   use:
-    - DEFAULT
+    - STANDARD
   except:
     - PACKAGE_DIRECTORY_MATCH
     - PACKAGE_VERSION_SUFFIX

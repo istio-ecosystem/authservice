@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-BUF ?= github.com/bufbuild/buf/cmd/buf@v1.32.2
+BUF ?= github.com/bufbuild/buf/cmd/buf@v1.51.0
 
 PROTO_SOURCES := $(shell find . -name '*.proto')
 
@@ -31,4 +31,4 @@ lint:  ## Lint the protobuf definitions
 .PHONY: clean
 clean:  ## Clean all generated code
 	@echo "Cleaning generated code"
-	@rm -rf gen
+	@rm -rf gen README.md

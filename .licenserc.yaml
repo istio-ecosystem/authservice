@@ -27,6 +27,7 @@ header:
     - '**/*.csr'
     - '**/*.srl'
     - '**/*.key'
+    - '**/*.tmpl'
     - '**/.gitignore'
     - '**/kubeconfig'
     - '**/bin/*'
