@@ -349,7 +349,8 @@ type OIDCConfig struct {
 	// self-signed certificate for testing purposes, but basically should not be set to true
 	// in any other cases.
 	// Optional.
-	SkipVerifyPeerCert *structpb.Value `protobuf:"bytes,18,opt,name=skip_verify_peer_cert,json=skipVerifyPeerCert,proto3" json:"skip_verify_peer_cert,omitempty"` // keep this field out from the trusted_ca_config one of for backward compatibility.
+	// keep this field out from the trusted_ca_config one of for backward compatibility.
+	SkipVerifyPeerCert *structpb.Value `protobuf:"bytes,18,opt,name=skip_verify_peer_cert,json=skipVerifyPeerCert,proto3" json:"skip_verify_peer_cert,omitempty"`
 }
 
 func (x *OIDCConfig) Reset() {
@@ -597,7 +598,6 @@ type OIDCConfig_ClientSecret struct {
 type OIDCConfig_ClientSecretRef struct {
 	// The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the
 	// [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
-	//
 	// This is an Opaque secret. The client secret should be stored in the key "client-secret".
 	// This filed is only valid when running in a Kubernetes cluster.
 	ClientSecretRef *OIDCConfig_SecretReference `protobuf:"bytes,21,opt,name=client_secret_ref,json=clientSecretRef,proto3,oneof"`

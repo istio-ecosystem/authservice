@@ -12,19 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: v1
+version: v2
 managed:
   enabled: true
-  go_package_prefix:
-    default: github.com/istio-ecosystem/authservice/config/gen/go
-    except:
-      - buf.build/envoyproxy/protoc-gen-validate
+  disable:
+    - file_option: go_package
+      module: buf.build/envoyproxy/protoc-gen-validate
+  override:
+    - file_option: go_package_prefix
+      value: github.com/istio-ecosystem/authservice/config/gen/go
 plugins:
-  - plugin: buf.build/protocolbuffers/go:v1.34.1
+  - remote: buf.build/protocolbuffers/go:v1.34.1
     out: gen/go
-    opt:
-      - paths=source_relative
-  - plugin: buf.build/bufbuild/validate-go:v1.0.4
+    opt: paths=source_relative
+  - remote: buf.build/bufbuild/validate-go:v1.0.4
     out: gen/go
-    opt:
-      - paths=source_relative
+    opt: paths=source_relative
+  # Use the latest version of the plugin.
+  # We can't use the buf remote plugin to sue custom templates. See: https://github.com/pseudomuto/protoc-gen-doc/issues/513
+  - local: ["go", "run", "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@129dc82aa469aeba41aef893b68ebde5b2568bb3"]
+    strategy: all
+    out: .
+    opt: docs.md.tmpl,README.md
