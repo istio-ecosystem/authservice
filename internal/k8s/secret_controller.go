@@ -211,7 +211,7 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	clientSecretBytes, ok := secret.Data[clientSecretKey]
 	if !ok || len(clientSecretBytes) == 0 {
-		s.log.Error("", errors.New("client-secret not found in secret"), "secret", secret)
+		s.log.Error("", errors.New("client-secret not found in secret"), "secret", changedSecret)
 		// Do not return an error here, as trying to process the secret again
 		// will not help when the data is not present.
 		return ctrl.Result{}, nil
@@ -219,7 +219,7 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	for _, oidcConfig := range oidcConfigs {
 		s.log.Info("updating client-secret data from secret",
-			"secret", secret, "client-id", oidcConfig.GetClientId())
+			"secret", changedSecret, "client-id", oidcConfig.GetClientId())
 
 		// Update the configuration with the loaded client secret
 		oidcConfig.ClientSecretConfig = &oidcv1.OIDCConfig_ClientSecret{
