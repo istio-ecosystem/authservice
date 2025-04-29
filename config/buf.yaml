@@ -13,15 +13,19 @@
 # limitations under the License.
 
 version: v2
-name: buf.build/authservice/config
+
+modules:
+  - path: .
+    name: buf.build/authservice/config
+
 deps:
   - buf.build/envoyproxy/protoc-gen-validate
+
 lint:
   use:
     - STANDARD
   except:
     - PACKAGE_DIRECTORY_MATCH
     - PACKAGE_VERSION_SUFFIX
-breaking:
-  use:
-    - FILE
+  disallow_comment_ignores: true
+
