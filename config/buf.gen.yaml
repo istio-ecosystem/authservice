@@ -29,7 +29,7 @@ plugins:
     out: gen/go
     opt: paths=source_relative
   # Use the latest version of the plugin.
-  # We can't use the buf remote plugin to sue custom templates. See: https://github.com/pseudomuto/protoc-gen-doc/issues/513
+  # We can't use the buf remote plugin to use custom templates. See: https://github.com/pseudomuto/protoc-gen-doc/issues/513
   - local: ["go", "run", "github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc@129dc82aa469aeba41aef893b68ebde5b2568bb3"]
     strategy: all
     out: .
