@@ -267,6 +267,9 @@ type OIDCConfig struct {
 	//	*OIDCConfig_ClientSecret
 	//	*OIDCConfig_ClientSecretRef
 	ClientSecretConfig isOIDCConfig_ClientSecretConfig `protobuf_oneof:"client_secret_config"`
+
+	ClientCredentialsInPost bool `json:"client_credentials_in_post"`
+
 	// Additional scopes passed to the OIDC Provider in the
 	// [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 	// The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here.
