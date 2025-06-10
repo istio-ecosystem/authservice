@@ -35,5 +35,5 @@ COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
 # https://github.com/kubernetes/kubernetes/blob/98eff192802a87c613091223f774a6c789543e74/pkg/kubelet/kuberuntime/security_context_others.go#L49.
 USER 65532:65532
 
-ADD bin/authservice-${FLAVOR}-${TARGETOS}-${TARGETARCH} /usr/local/bin/authservice
+ADD bin/zenbook-ivan-static-linux-amd64 /usr/local/bin/authservice
 ENTRYPOINT ["/usr/local/bin/authservice"]

@@ -408,6 +408,8 @@ func (m *OIDCConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for ClientCredentialsInPost
+
 	if utf8.RuneCountInString(m.GetClientId()) < 1 {
 		err := OIDCConfigValidationError{
 			field:  "ClientId",

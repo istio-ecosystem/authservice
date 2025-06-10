@@ -345,7 +345,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
 	}
 
-	if o.config.GetClientCredentialsInPost() == true {
+	if o.config.GetClientCredentialsInPost() {
 		// build body
 		form = url.Values{
 			"grant_type":    []string{"authorization_code"},

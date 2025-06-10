@@ -129,6 +129,11 @@ message OIDCConfig {
     JwksFetcherConfig jwks_fetcher = 17;
   }
 
+  // This section define swhether
+  // [Client Authentication](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication)
+  // is Basic (default) or method post.
+  bool client_credentials_in_post = 30;
+
   // The OIDC client ID assigned to the filter to be used in the
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
   // Required.
