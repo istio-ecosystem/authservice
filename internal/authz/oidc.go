@@ -331,41 +331,37 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	if o.config.GetClientCredentialsInPost() {
-        // build body
-		form := url.Values{
-			"grant_type":    []string{"authorization_code"},
-			"code":          []string{codeFromReq},
-			"redirect_uri":  []string{o.config.GetCallbackUri()},
-			"code_verifier": []string{stateFromStore.CodeVerifier},
-			"client_id":  []string{o.config.GetClientId()},
-			"client_secret":  []string{o.config.GetClientSecret()},
-		}
+	// build body
+	form := url.Values{
+		"grant_type":    []string{"authorization_code"},
+		"code":          []string{codeFromReq},
+		"redirect_uri":  []string{o.config.GetCallbackUri()},
+		"code_verifier": []string{stateFromStore.CodeVerifier},
+	}
 
-		// build headers
-		headers := http.Header{
-			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-		}
+	// build headers
+	headers := http.Header{
+		inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
+	}
 
-    } else {
-
+	if o.config.GetClientCredentialsInPost() == true {
 		// build body
-		form := url.Values{
+		form = url.Values{
 			"grant_type":    []string{"authorization_code"},
 			"code":          []string{codeFromReq},
 			"redirect_uri":  []string{o.config.GetCallbackUri()},
 			"code_verifier": []string{stateFromStore.CodeVerifier},
+			"client_id":     []string{o.config.GetClientId()},
+			"client_secret": []string{o.config.GetClientSecret()},
 		}
 
 		// build headers
-		headers := http.Header{
-			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
+		headers = http.Header{
+			inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
 		}
 
-    }
-
-	
+	}
 
 	log.Info("performing request to retrieve new tokens")
 	bodyTokens, errCode := performIDPRequest(log, o.httpClient, o.config.GetTokenUri(), form, headers)
