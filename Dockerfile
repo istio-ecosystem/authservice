@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Builder image used to create a non-root user and to pick the SSL CA certs from
-FROM alpine:3.18.0 as builder
+FROM alpine:3.18.0 AS builder
 RUN apk --update add ca-certificates
 RUN adduser --disabled-password --gecos "" --uid 65532 nonroot
 
