@@ -33,5 +33,7 @@ const (
 	HeaderSetCookieHTTPOnly       = "HttpOnly"
 	HeaderSetCookieSameSiteStrict = "SameSite=Strict"
 	HeaderSetCookieSameSiteLax    = "SameSite=Lax"
+	HeaderSetCookieSameSiteNone   = "SameSite=None"
 	HeaderSetCookieMaxAge         = "Max-Age"
+	HeaderSetCookiePartitioned    = "Partitioned"
 )
