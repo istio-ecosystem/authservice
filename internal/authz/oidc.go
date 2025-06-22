@@ -133,7 +133,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		// add IDP logout location
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
 		// add the set-cookie header to delete the session_id cookie
-		setSetCookieHeader(deny, generateSetCookieHeader(getCookieName(o.config), "deleted", 0))
+		setSetCookieHeader(deny, generateSetCookieHeader(o.config, getCookieName(o.config), "deleted", 0))
 		setDenyResponse(resp, deny, codes.Unauthenticated)
 		return nil
 	}
@@ -279,7 +279,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 
 	// add the set-cookie header
 	cookieName := getCookieName(o.config)
-	setSetCookieHeader(deny, generateSetCookieHeader(cookieName, sessionID, -1))
+	setSetCookieHeader(deny, generateSetCookieHeader(o.config, cookieName, sessionID, -1))
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
@@ -848,14 +848,35 @@ func (o *oidcHandler) areRequiredTokensExpired(log telemetry.Logger, tokens *oid
 }
 
 // generateSetCookieHeader generates the Set-Cookie header value with the given cookie name, value, and timeout.
-func generateSetCookieHeader(cookieName, cookieValue string, timeout time.Duration) string {
-	directives := getCookieDirectives(timeout)
+func generateSetCookieHeader(config *oidcv1.OIDCConfig, cookieName, cookieValue string, timeout time.Duration) string {
+	directives := getCookieDirectives(config, timeout)
 	return inthttp.EncodeCookieHeader(cookieName, cookieValue, directives)
 }
 
 // getCookieDirectives returns the directives to use in the Set-Cookie header depending on the timeout.
-func getCookieDirectives(timeout time.Duration) []string {
-	directives := []string{inthttp.HeaderSetCookieHTTPOnly, inthttp.HeaderSetCookieSecure, inthttp.HeaderSetCookieSameSiteLax, "Path=/"}
+func getCookieDirectives(config *oidcv1.OIDCConfig, timeout time.Duration) []string {
+	directives := []string{inthttp.HeaderSetCookieHTTPOnly, inthttp.HeaderSetCookieSecure, "Path=/"}
+
+	if config.CookieAttributes != nil {
+		switch config.CookieAttributes.SameSite {
+		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_LAX:
+			directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
+		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_STRICT:
+			directives = append(directives, inthttp.HeaderSetCookieSameSiteStrict)
+		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_NONE:
+			directives = append(directives, inthttp.HeaderSetCookieSameSiteNone)
+		default:
+			directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
+		}
+		if config.CookieAttributes.Domain != "" {
+			directives = append(directives, fmt.Sprintf("Domain=%s", config.CookieAttributes.Domain))
+		}
+		if config.CookieAttributes.Partitioned {
+			directives = append(directives, inthttp.HeaderSetCookiePartitioned)
+		}
+	} else {
+		directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
+	}
 	if timeout >= 0 {
 		directives = append(directives, fmt.Sprintf("%s=%d", inthttp.HeaderSetCookieMaxAge, int(timeout.Seconds())))
 	}

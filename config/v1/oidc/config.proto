@@ -191,6 +191,58 @@ message OIDCConfig {
   // Optional.
   string cookie_name_prefix = 8;
 
+  message CookieAttributes {
+    enum SameSite {
+      // If unspecified, Authservice will use `SAME_SITE_LAX` as the default.
+      SAME_SITE_UNSPECIFIED = 0;
+
+      // Lax allows the cookie to be sent with top-level cross-site GET
+      // subrequest navigations (e.g. links, images, etc.) to your protected
+      // environment, but not with cross-site POST requests or other methods.
+      SAME_SITE_LAX = 1;
+
+      // Strict will only include the cookie on same-site requests. This means
+      // the cookie will not be sent with any cross-site requests, including
+      // top-level subrequest navigations to your protected environment.
+      SAME_SITE_STRICT = 2;
+
+      // None means the cookie will be sent with all cross-site requests to
+      // your protected environment, regardless of the HTTP method.
+      // This is useful for cross-site requests that require authentication,
+      // such as when the Authservice is used in a cross-origin setup especially
+      // when requiring various subdomains of your environment to share the same
+      // session.
+      // When using this option, make sure you add Origin checking in your Istio
+      // Authorization Policies to restrict the domains you allow cross-site
+      // requests from.
+      SAME_SITE_NONE = 3;
+    }
+
+    // Which SameSite cookie attribute to use. Defaults to `SAME_SITE_LAX`.
+    SameSite same_site = 1 [(validate.rules).enum.defined_only = true];
+
+    // The domain for the cookie. If not set, the cookie will be set for the
+    // domain of the request the Authservice is processing. If you want the
+    // cookie to be shared across multiple subdomains, you can set this to the
+    // top-level domain (e.g. `example.com`), which will allow the cookie to be
+    // sent with requests to any subdomain of that domain (e.g.,
+    // `api.example.com`, `www.example.com`, etc.).
+    // This attribute only applies when `same_site` is set to `SAME_SITE_NONE`.
+    string domain = 2 [(validate.rules).string = {ignore_empty: true, hostname: true}];
+
+    // If partitioned is set to true, the cookie will be partitioned by the
+    // top-level site that the request is made to. This means that the cookie
+    // will not be shared across different top-level sites connecting to your
+    // protected environment, even if they share the same domain. This is useful
+    // for ensuring that the cookie is only sent with requests to the same
+    // top-level site that it was set for and provides tenancy between
+    // different top-level sites served by your protected environment.
+    bool partitioned = 3;
+  }
+
+  // Configure the cookie attributes to set for Authservice session cookies.
+  CookieAttributes cookie_attributes = 23;
+
   // The configuration for adding ID Tokens as headers to requests forwarded to a service.
   // Required.
   TokenConfig id_token = 9 [(validate.rules).message.required = true];

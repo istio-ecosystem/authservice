@@ -432,6 +432,35 @@ func (m *OIDCConfig) validate(all bool) error {
 
 	// no validation rules for CookieNamePrefix
 
+	if all {
+		switch v := interface{}(m.GetCookieAttributes()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, OIDCConfigValidationError{
+					field:  "CookieAttributes",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, OIDCConfigValidationError{
+					field:  "CookieAttributes",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCookieAttributes()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return OIDCConfigValidationError{
+				field:  "CookieAttributes",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if m.GetIdToken() == nil {
 		err := OIDCConfigValidationError{
 			field:  "IdToken",
@@ -1133,3 +1162,165 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_SecretReferenceValidationError{}
+
+// Validate checks the field values on OIDCConfig_CookieAttributes with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *OIDCConfig_CookieAttributes) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OIDCConfig_CookieAttributes with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// OIDCConfig_CookieAttributesMultiError, or nil if none found.
+func (m *OIDCConfig_CookieAttributes) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OIDCConfig_CookieAttributes) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if _, ok := OIDCConfig_CookieAttributes_SameSite_name[int32(m.GetSameSite())]; !ok {
+		err := OIDCConfig_CookieAttributesValidationError{
+			field:  "SameSite",
+			reason: "value must be one of the defined enum values",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if m.GetDomain() != "" {
+
+		if err := m._validateHostname(m.GetDomain()); err != nil {
+			err = OIDCConfig_CookieAttributesValidationError{
+				field:  "Domain",
+				reason: "value must be a valid hostname",
+				cause:  err,
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
+
+	// no validation rules for Partitioned
+
+	if len(errors) > 0 {
+		return OIDCConfig_CookieAttributesMultiError(errors)
+	}
+
+	return nil
+}
+
+func (m *OIDCConfig_CookieAttributes) _validateHostname(host string) error {
+	s := strings.ToLower(strings.TrimSuffix(host, "."))
+
+	if len(host) > 253 {
+		return errors.New("hostname cannot exceed 253 characters")
+	}
+
+	for _, part := range strings.Split(s, ".") {
+		if l := len(part); l == 0 || l > 63 {
+			return errors.New("hostname part must be non-empty and cannot exceed 63 characters")
+		}
+
+		if part[0] == '-' {
+			return errors.New("hostname parts cannot begin with hyphens")
+		}
+
+		if part[len(part)-1] == '-' {
+			return errors.New("hostname parts cannot end with hyphens")
+		}
+
+		for _, r := range part {
+			if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
+				return fmt.Errorf("hostname parts can only contain alphanumeric characters or hyphens, got %q", string(r))
+			}
+		}
+	}
+
+	return nil
+}
+
+// OIDCConfig_CookieAttributesMultiError is an error wrapping multiple
+// validation errors returned by OIDCConfig_CookieAttributes.ValidateAll() if
+// the designated constraints aren't met.
+type OIDCConfig_CookieAttributesMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OIDCConfig_CookieAttributesMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OIDCConfig_CookieAttributesMultiError) AllErrors() []error { return m }
+
+// OIDCConfig_CookieAttributesValidationError is the validation error returned
+// by OIDCConfig_CookieAttributes.Validate if the designated constraints
+// aren't met.
+type OIDCConfig_CookieAttributesValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OIDCConfig_CookieAttributesValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OIDCConfig_CookieAttributesValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OIDCConfig_CookieAttributesValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OIDCConfig_CookieAttributesValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OIDCConfig_CookieAttributesValidationError) ErrorName() string {
+	return "OIDCConfig_CookieAttributesValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e OIDCConfig_CookieAttributesValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOIDCConfig_CookieAttributes.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OIDCConfig_CookieAttributesValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OIDCConfig_CookieAttributesValidationError{}
