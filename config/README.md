@@ -6,7 +6,6 @@
 - [v1/oidc/config.proto](#v1_oidc_config-proto)
     - [LogoutConfig](#authservice-config-v1-oidc-LogoutConfig)
     - [OIDCConfig](#authservice-config-v1-oidc-OIDCConfig)
-    - [OIDCConfig.CookieAttributes](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes)
     - [OIDCConfig.JwksFetcherConfig](#authservice-config-v1-oidc-OIDCConfig-JwksFetcherConfig)
     - [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference)
     - [OIDCConfig.TokenExchange](#authservice-config-v1-oidc-OIDCConfig-TokenExchange)
@@ -15,7 +14,7 @@
     - [RedisConfig](#authservice-config-v1-oidc-RedisConfig)
     - [TokenConfig](#authservice-config-v1-oidc-TokenConfig)
   
-    - [OIDCConfig.CookieAttributes.SameSite](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite)
+    - [OIDCConfig.ClientAuthenticationMethod](#authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod)
   
 - [v1/mock/config.proto](#v1_mock_config-proto)
     - [MockConfig](#authservice-config-v1-mock-MockConfig)
@@ -72,12 +71,12 @@ via the standard authorization code grant flow from an OIDC Provider.
 | callback_uri | [string](#string) |  | This value will be used as the `redirect_uri` param of the authorization code grant [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider. Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to the service so that the Authservice can intercept the request and handle it (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)). Required. |
 | jwks | [string](#string) |  | The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in the OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). Note that this JSON value must be escaped when embedded in a json configmap (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)). Used during token verification. |
 | jwks_fetcher | [OIDCConfig.JwksFetcherConfig](#authservice-config-v1-oidc-OIDCConfig-JwksFetcherConfig) |  | Configuration to allow JWKs to be retrieved and updated asynchronously at regular intervals. |
+| method | [OIDCConfig.ClientAuthenticationMethod](#authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod) |  |  |
 | client_id | [string](#string) |  | The OIDC client ID assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. The client ID is used to authenticate to the Token endpoint using HTTP Basic Auth and it must not contain a colon (":") character. |
 | client_secret | [string](#string) |  | The OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This field keeps the client secret in plain text. Recommend to use `client_secret_ref` instead when running in a Kubernetes cluster. |
 | client_secret_ref | [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference) |  | The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This is an Opaque secret. The client secret should be stored in the key "client-secret". This filed is only valid when running in a Kubernetes cluster. |
 | scopes | [string](#string) | repeated | Additional scopes passed to the OIDC Provider in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). The `openid` scope is always sent to the OIDC Provider, and does not need to be specified here. Required, but an empty array is allowed. |
 | cookie_name_prefix | [string](#string) |  | A unique identifier of the Authservice's browser cookies. Can be any string. Needed when multiple services in the same domain are each protected by their own Authservice, in which case each service's Authservice should have a unique value to avoid cookie name conflicts. Also needed when an Authservice is configured with multiple `oidc` filters (across multiple `chains`), each sharing a Redis server for their session storage, to avoid having those `oidc` filters read/write the same sessions in Redis. Optional. |
-| cookie_attributes | [OIDCConfig.CookieAttributes](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes) |  | Configure the cookie attributes to set for Authservice session cookies. |
 | id_token | [TokenConfig](#authservice-config-v1-oidc-TokenConfig) |  | The configuration for adding ID Tokens as headers to requests forwarded to a service. Required. |
 | access_token | [TokenConfig](#authservice-config-v1-oidc-TokenConfig) |  | The configuration for adding Access Tokens as headers to requests forwarded to a service. Optional. |
 | logout | [LogoutConfig](#authservice-config-v1-oidc-LogoutConfig) |  | When specified, the Authservice will destroy the Authservice session when a request is made to the configured path. Optional. |
@@ -90,23 +89,6 @@ via the standard authorization code grant flow from an OIDC Provider.
 | redis_session_store_config | [RedisConfig](#authservice-config-v1-oidc-RedisConfig) |  | When specified, the Authservice will use the configured Redis server to store session data. Optional. |
 | skip_verify_peer_cert | [google.protobuf.Value](#google-protobuf-Value) |  | If set to true, the verification of the destination certificate will be skipped when making a request to the Token Endpoint. This option is useful when you want to use a self-signed certificate for testing purposes, but basically should not be set to true in any other cases. Optional. keep this field out from the trusted_ca_config one of for backward compatibility. |
 | token_exchange | [OIDCConfig.TokenExchange](#authservice-config-v1-oidc-OIDCConfig-TokenExchange) |  | When configured, the Authservice will exchange the OIDC access token for a service-specific token from the defined authorization server. This is useful to automatically exchange the access token obtained from the Identity Provider for a service-specific token issued by an internal authorization server. |
-
-
-
-
-
-
-<a name="authservice-config-v1-oidc-OIDCConfig-CookieAttributes"></a>
-
-### OIDCConfig.CookieAttributes
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| same_site | [OIDCConfig.CookieAttributes.SameSite](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite) |  | Which SameSite cookie attribute to use. Defaults to `SAME_SITE_LAX`. |
-| domain | [string](#string) |  | The domain for the cookie. If not set, the cookie will be set for the domain of the request the Authservice is processing. If you want the cookie to be shared across multiple subdomains, you can set this to the top-level domain (e.g. `example.com`), which will allow the cookie to be sent with requests to any subdomain of that domain (e.g., `api.example.com`, `www.example.com`, etc.). This attribute only applies when `same_site` is set to `SAME_SITE_NONE`. |
-| partitioned | [bool](#bool) |  | If partitioned is set to true, the cookie will be partitioned by the top-level site that the request is made to. This means that the cookie will not be shared across different top-level sites connecting to your protected environment, even if they share the same domain. This is useful for ensuring that the cookie is only sent with requests to the same top-level site that it was set for and provides tenancy between different top-level sites served by your protected environment. |
 
 
 
@@ -234,17 +216,20 @@ Defines how a token obtained through an OIDC flow is forwarded to services.
  <!-- end messages -->
 
 
-<a name="authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite"></a>
+<a name="authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod"></a>
 
-### OIDCConfig.CookieAttributes.SameSite
-
+### OIDCConfig.ClientAuthenticationMethod
+This section define swhether
+[Client Authentication](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication)
+is Basic (default) or method post.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
-| SAME_SITE_UNSPECIFIED | 0 | If unspecified, Authservice will use `SAME_SITE_LAX` as the default. |
-| SAME_SITE_LAX | 1 | Lax allows the cookie to be sent with top-level cross-site GET subrequest navigations (e.g. links, images, etc.) to your protected environment, but not with cross-site POST requests or other methods. |
-| SAME_SITE_STRICT | 2 | Strict will only include the cookie on same-site requests. This means the cookie will not be sent with any cross-site requests, including top-level subrequest navigations to your protected environment. |
-| SAME_SITE_NONE | 3 | None means the cookie will be sent with all cross-site requests to your protected environment, regardless of the HTTP method. This is useful for cross-site requests that require authentication, such as when the Authservice is used in a cross-origin setup especially when requiring various subdomains of your environment to share the same session. When using this option, make sure you add Origin checking in your Istio Authorization Policies to restrict the domains you allow cross-site requests from. |
+| CLIENT_AUTHENTICATION_METHOD_UNSPECIFIED | 0 |  |
+| CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST | 1 |  |
+| CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT | 2 |  |
+| CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT | 3 |  |
+| CLIENT_AUTHENTICATION_METHOD_BASIC | 4 |  |
 
 
  <!-- end enums -->

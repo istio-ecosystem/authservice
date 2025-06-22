@@ -432,35 +432,6 @@ func (m *OIDCConfig) validate(all bool) error {
 
 	// no validation rules for CookieNamePrefix
 
-	if all {
-		switch v := interface{}(m.GetCookieAttributes()).(type) {
-		case interface{ ValidateAll() error }:
-			if err := v.ValidateAll(); err != nil {
-				errors = append(errors, OIDCConfigValidationError{
-					field:  "CookieAttributes",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		case interface{ Validate() error }:
-			if err := v.Validate(); err != nil {
-				errors = append(errors, OIDCConfigValidationError{
-					field:  "CookieAttributes",
-					reason: "embedded message failed validation",
-					cause:  err,
-				})
-			}
-		}
-	} else if v, ok := interface{}(m.GetCookieAttributes()).(interface{ Validate() error }); ok {
-		if err := v.Validate(); err != nil {
-			return OIDCConfigValidationError{
-				field:  "CookieAttributes",
-				reason: "embedded message failed validation",
-				cause:  err,
-			}
-		}
-	}
-
 	if m.GetIdToken() == nil {
 		err := OIDCConfigValidationError{
 			field:  "IdToken",
@@ -735,6 +706,22 @@ func (m *OIDCConfig) validate(all bool) error {
 			}
 		}
 
+	default:
+		_ = v // ensures v is used
+	}
+	switch v := m.ClientAuthentication.(type) {
+	case *OIDCConfig_Method:
+		if v == nil {
+			err := OIDCConfigValidationError{
+				field:  "ClientAuthentication",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Method
 	default:
 		_ = v // ensures v is used
 	}
@@ -1175,6 +1162,7 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_SecretReferenceValidationError{}
+<<<<<<< HEAD
 
 // Validate checks the field values on OIDCConfig_CookieAttributes with the
 // rules defined in the proto definition for this message. If any rules are
@@ -1882,3 +1870,5 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{}
+=======
+>>>>>>> 727d485 (missing generated files)
