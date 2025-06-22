@@ -135,7 +135,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		// add IDP logout location
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
 		// add the set-cookie header to delete the session_id cookie
-		setSetCookieHeader(deny, generateSetCookieHeader(o.config, getCookieName(o.config), "deleted", 0))
+		setSetCookieHeader(deny, generateSetCookieHeader(getCookieName(o.config), "deleted", 0))
 		setDenyResponse(resp, deny, codes.Unauthenticated)
 		return nil
 	}
@@ -281,7 +281,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 
 	// add the set-cookie header
 	cookieName := getCookieName(o.config)
-	setSetCookieHeader(deny, generateSetCookieHeader(o.config, cookieName, sessionID, -1))
+	setSetCookieHeader(deny, generateSetCookieHeader(cookieName, sessionID, -1))
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
@@ -333,18 +333,18 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	// build body
-	form := url.Values{
-		"grant_type":    []string{"authorization_code"},
-		"code":          []string{codeFromReq},
-		"redirect_uri":  []string{o.config.GetCallbackUri()},
-		"code_verifier": []string{stateFromStore.CodeVerifier},
+	headers, error := buildAuthHeader(o.config)
+	if error != nil {
+		log.Error("error building auth header", error)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
-	// build headers
-	headers := http.Header{
-		inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
+	form, error := buildAuthParams(o.config, codeFromReq, stateFromReq)
+	if error != nil {
+		log.Error("error building form", error)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
 	log.Info("performing request to retrieve new tokens")
@@ -463,6 +463,81 @@ func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken stri
 	log.Info("performing token exchange request")
 
 	return performIDPRequest(log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
+}
+
+// buildAuthHeader builds the authorization header for the client according to the
+// client authentication method specified in the OIDCConfig.
+//
+// The function returns an error if the client authentication method is unspecified
+// or if the implementation for the specified method is not supported.
+func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
+
+	headers := http.Header{}
+	switch config.GetMethod() {
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
+	default:
+		headers = http.Header{
+			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
+
+		// Build post auth header
+		headers = http.Header{
+			inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
+		// Build jwt auth header
+		// TODO: implement jwt auth header
+		return nil, errors.New("not implemented")
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
+		// Build private key jwt auth header
+		// TODO: implement private key jwt auth header
+		return nil, errors.New("not implemented")
+
+	}
+
+	return headers, nil
+}
+
+func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifierFromReq string) (url.Values, error) {
+	params := url.Values{}
+	switch config.GetMethod() {
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
+	default:
+
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+		}
+
+		return params, nil
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
+		// Build post auth params
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+			"client_id":     []string{config.GetClientId()},
+			"client_secret": []string{config.GetClientSecret()},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
+		// Build jwt auth params
+		// TODO: implement jwt auth params
+		return nil, errors.New("not implemented")
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
+		// Build private key jwt auth params
+		// TODO: implement private key jwt auth params
+		return nil, errors.New("not implemented")
+	}
+	return params, nil
 }
 
 // refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
@@ -851,36 +926,14 @@ func (o *oidcHandler) areRequiredTokensExpired(log telemetry.Logger, tokens *oid
 }
 
 // generateSetCookieHeader generates the Set-Cookie header value with the given cookie name, value, and timeout.
-func generateSetCookieHeader(config *oidcv1.OIDCConfig, cookieName, cookieValue string, timeout time.Duration) string {
-	directives := getCookieDirectives(config, timeout)
+func generateSetCookieHeader(cookieName, cookieValue string, timeout time.Duration) string {
+	directives := getCookieDirectives(timeout)
 	return inthttp.EncodeCookieHeader(cookieName, cookieValue, directives)
 }
 
 // getCookieDirectives returns the directives to use in the Set-Cookie header depending on the timeout.
-func getCookieDirectives(config *oidcv1.OIDCConfig, timeout time.Duration) []string {
-	directives := []string{inthttp.HeaderSetCookieHTTPOnly, inthttp.HeaderSetCookieSecure, "Path=/"}
-
-	if config.CookieAttributes != nil {
-		switch config.CookieAttributes.SameSite {
-		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_LAX:
-			directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
-		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_STRICT:
-			directives = append(directives, inthttp.HeaderSetCookieSameSiteStrict)
-		case oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_NONE:
-			directives = append(directives, inthttp.HeaderSetCookieSameSiteNone)
-		default:
-			directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
-		}
-		if config.CookieAttributes.Domain != "" {
-			directives = append(directives, fmt.Sprintf("Domain=%s", config.CookieAttributes.Domain))
-		}
-		if config.CookieAttributes.Partitioned {
-			directives = append(directives, inthttp.HeaderSetCookiePartitioned)
-		}
-	} else {
-		directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
-	}
-
+func getCookieDirectives(timeout time.Duration) []string {
+	directives := []string{inthttp.HeaderSetCookieHTTPOnly, inthttp.HeaderSetCookieSecure, inthttp.HeaderSetCookieSameSiteLax, "Path=/"}
 	if timeout >= 0 {
 		directives = append(directives, fmt.Sprintf("%s=%d", inthttp.HeaderSetCookieMaxAge, int(timeout.Seconds())))
 	}
