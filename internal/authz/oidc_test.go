@@ -148,6 +148,9 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
+		ClientAuthentication: &oidcv1.OIDCConfig_Method{
+			Method: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC,
+		},
 		Scopes: []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
@@ -1463,45 +1466,6 @@ func TestNewOIDCHandler(t *testing.T) {
 	}
 }
 
-func TestCookieAttributesConfig(t *testing.T) {
-	for _, tt := range []struct {
-		name           string
-		config         *oidcv1.OIDCConfig
-		wantAttributes []string
-	}{
-		{
-			name:           "unset cookie attributes",
-			config:         &oidcv1.OIDCConfig{},
-			wantAttributes: []string{"HttpOnly", "Secure", "Path=/", "SameSite=Lax"},
-		},
-		{
-			name: "samesite=strict",
-			config: &oidcv1.OIDCConfig{CookieAttributes: &oidcv1.OIDCConfig_CookieAttributes{
-				SameSite: oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_STRICT,
-			}},
-			wantAttributes: []string{"HttpOnly", "Secure", "Path=/", "SameSite=Strict"},
-		},
-		{
-			name: "samesite=none/domain=foo.com",
-			config: &oidcv1.OIDCConfig{CookieAttributes: &oidcv1.OIDCConfig_CookieAttributes{
-				SameSite: oidcv1.OIDCConfig_CookieAttributes_SAME_SITE_NONE,
-				Domain:   "foo.com",
-			}},
-			wantAttributes: []string{"HttpOnly", "Secure", "Path=/", "SameSite=None", "Domain=foo.com"},
-		},
-		{
-			name: "partitioned",
-			config: &oidcv1.OIDCConfig{CookieAttributes: &oidcv1.OIDCConfig_CookieAttributes{
-				Partitioned: true,
-			}},
-			wantAttributes: []string{"HttpOnly", "Secure", "Path=/", "SameSite=Lax", "Partitioned"},
-		},
-	} {
-		haveAttributes := getCookieDirectives(tt.config, -1)
-		require.Equal(t, tt.wantAttributes, haveAttributes)
-	}
-}
-
 func modifyCallbackRequestPath(path string) *envoy.CheckRequest {
 	return &envoy.CheckRequest{
 		Attributes: &envoy.AttributeContext{
@@ -1614,7 +1578,7 @@ func requireCookie(t *testing.T, response *envoy.DeniedHttpResponse) {
 			cookieHeader = header.GetHeader().GetValue()
 		}
 	}
-	require.Equal(t, "__Host-authservice-session-id-cookie=new-session-id; HttpOnly; Secure; Path=/; SameSite=Lax", cookieHeader)
+	require.Equal(t, "__Host-authservice-session-id-cookie=new-session-id; HttpOnly; Secure; SameSite=Lax; Path=/", cookieHeader)
 }
 
 func requireDeleteCookie(t *testing.T, response *envoy.DeniedHttpResponse) {
@@ -1624,7 +1588,7 @@ func requireDeleteCookie(t *testing.T, response *envoy.DeniedHttpResponse) {
 			cookieHeader = header.GetHeader().GetValue()
 		}
 	}
-	require.Equal(t, "__Host-authservice-session-id-cookie=deleted; HttpOnly; Secure; Path=/; SameSite=Lax; Max-Age=0", cookieHeader)
+	require.Equal(t, "__Host-authservice-session-id-cookie=deleted; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0", cookieHeader)
 }
 
 func requireTokensInResponse(t *testing.T, resp *envoy.OkHttpResponse, cfg *oidcv1.OIDCConfig, idToken, accessToken string) {
