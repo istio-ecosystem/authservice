@@ -140,9 +140,7 @@ message OIDCConfig {
     CLIENT_AUTHENTICATION_METHOD_BASIC = 4;
   }
 
-  oneof client_authentication {
-    ClientAuthenticationMethod method = 30;
-  }
+  ClientAuthenticationMethod client_authentication_method = 30;
 
   // The OIDC client ID assigned to the filter to be used in the
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
