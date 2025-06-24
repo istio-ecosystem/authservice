@@ -148,10 +148,32 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		ClientAuthentication: &oidcv1.OIDCConfig_Method{
-			Method: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC,
+		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC,
+		Scopes:                     []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
 		},
-		Scopes: []string{"openid", "email"},
+	}
+
+	postOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST,
+		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
 			RedirectUri: "http://idp-test-server/logout?with-params",

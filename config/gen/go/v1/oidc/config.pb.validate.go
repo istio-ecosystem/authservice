@@ -408,6 +408,8 @@ func (m *OIDCConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for ClientAuthenticationMethod
+
 	if utf8.RuneCountInString(m.GetClientId()) < 1 {
 		err := OIDCConfigValidationError{
 			field:  "ClientId",
@@ -706,22 +708,6 @@ func (m *OIDCConfig) validate(all bool) error {
 			}
 		}
 
-	default:
-		_ = v // ensures v is used
-	}
-	switch v := m.ClientAuthentication.(type) {
-	case *OIDCConfig_Method:
-		if v == nil {
-			err := OIDCConfigValidationError{
-				field:  "ClientAuthentication",
-				reason: "oneof value cannot be a typed-nil",
-			}
-			if !all {
-				return err
-			}
-			errors = append(errors, err)
-		}
-		// no validation rules for Method
 	default:
 		_ = v // ensures v is used
 	}
