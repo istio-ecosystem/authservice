@@ -21,6 +21,7 @@
             "access_token": {
               "header": "x-access-token"
             },
+            "client_authentication_method" : "client_secret_basic",
             "logout": {
               "path": "/logout"
             },
