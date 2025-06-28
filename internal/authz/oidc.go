@@ -498,7 +498,11 @@ func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
 		// TODO: implement private key jwt auth header
 		return nil, errors.New("client authentication method private_key_jwt is not implemented")
 	default:
-		return nil, errors.New("client authentication requires at least one authentication method")
+		// Builds basic auth header
+		headers = http.Header{
+			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
+		}
 	}
 
 	return headers, nil
@@ -533,12 +537,23 @@ func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifier
 		// Build jwt auth params
 		// TODO: implement jwt auth params
 		return nil, errors.New("client authentication method client_secret_jwt is not implemented")
+
 	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
 		// Build private key jwt auth params
 		// TODO: implement private key jwt auth params
 		return nil, errors.New("client authentication method private_key_jwt is not implemented")
+
 	default:
-		return nil, errors.New("client authentication requires at least one authentication method")
+
+		// Build basic auth params
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+		}
+
+		return params, nil
 	}
 	return params, nil
 }
