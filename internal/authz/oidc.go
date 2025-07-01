@@ -331,18 +331,18 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	// build body
-	form := url.Values{
-		"grant_type":    []string{"authorization_code"},
-		"code":          []string{codeFromReq},
-		"redirect_uri":  []string{o.config.GetCallbackUri()},
-		"code_verifier": []string{stateFromStore.CodeVerifier},
+	headers, err := buildAuthHeader(o.config)
+	if err != nil {
+		log.Error("error building auth header", err)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
-	// build headers
-	headers := http.Header{
-		inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
+	form, err := buildAuthParams(o.config, codeFromReq, stateFromReq)
+	if err != nil {
+		log.Error("error building auth params", err)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
 	log.Info("performing request to retrieve new tokens")
@@ -394,6 +394,99 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		Header: &corev3.HeaderValue{Key: inthttp.HeaderLocation, Value: stateFromStore.RequestedURL},
 	})
 	setDenyResponse(resp, deny, codes.Unauthenticated)
+}
+
+// buildAuthHeader builds the authorization header for the client according to the
+// client authentication method specified in the OIDCConfig.
+//
+// The function returns an error if the client authentication method is unspecified
+// or if the implementation for the specified method is not supported.
+func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
+
+	var headers http.Header
+	switch config.GetClientAuthenticationMethod() {
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
+
+		// Build basic auth header
+		headers = http.Header{
+			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
+
+		// Build post auth header
+		headers = http.Header{
+			inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
+		// Build jwt auth header
+		// TODO: implement jwt auth header
+		return nil, errors.New("client authentication method client_secret_jwt is not implemented")
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
+		// Build private key jwt auth header
+		// TODO: implement private key jwt auth header
+		return nil, errors.New("client authentication method private_key_jwt is not implemented")
+	default:
+		// Builds basic auth header
+		headers = http.Header{
+			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
+		}
+	}
+
+	return headers, nil
+}
+
+func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifierFromReq string) (url.Values, error) {
+	var params url.Values
+	switch config.GetClientAuthenticationMethod() {
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
+
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+		}
+
+		return params, nil
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
+		// Build post auth params
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+			"client_id":     []string{config.GetClientId()},
+			"client_secret": []string{config.GetClientSecret()},
+		}
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
+		// Build jwt auth params
+		// TODO: implement jwt auth params
+		return nil, errors.New("client authentication method client_secret_jwt is not implemented")
+
+	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
+		// Build private key jwt auth params
+		// TODO: implement private key jwt auth params
+		return nil, errors.New("client authentication method private_key_jwt is not implemented")
+
+	default:
+
+		// Build basic auth params
+		params = url.Values{
+			"grant_type":    []string{"authorization_code"},
+			"code":          []string{codeFromReq},
+			"redirect_uri":  []string{config.GetCallbackUri()},
+			"code_verifier": []string{codeVerifierFromReq},
+		}
+
+		return params, nil
+	}
+	return params, nil
 }
 
 // refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
@@ -802,7 +895,6 @@ func getCookieDirectives(config *oidcv1.OIDCConfig, timeout time.Duration) []str
 	} else {
 		directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
 	}
-
 	if timeout >= 0 {
 		directives = append(directives, fmt.Sprintf("%s=%d", inthttp.HeaderSetCookieMaxAge, int(timeout.Seconds())))
 	}

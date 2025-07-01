@@ -148,7 +148,79 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
+		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC,
+		Scopes:                     []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
+	}
+
+	emptyAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
 		Scopes: []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
+	}
+
+	postOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST,
+		Scopes:                     []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
+	}
+
+	jwtAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT,
+		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
 			RedirectUri: "http://idp-test-server/logout?with-params",
@@ -205,7 +277,64 @@ var (
 	wantRedirectBaseURI = "http://idp-test-server/auth"
 )
 
-func TestOIDCProcess(t *testing.T) {
+func TestBasicClientAuthenticationMethod(t *testing.T) {
+
+	testOIDCProcessReusable(t, basicOIDCConfig)
+}
+
+func TestPostClientAuthenticationMethod(t *testing.T) {
+
+	testOIDCProcessReusable(t, postOIDCConfig)
+}
+
+func TestEmptyClientAuthenticationMethod(t *testing.T) {
+
+	testOIDCProcessReusable(t, emptyAuthMethodOIDCConfig)
+}
+
+func TestJWTClientAuthenticationMethodUnauthenticated(t *testing.T) {
+
+	jwkPriv, _ := newKeyPair(t)
+
+	clock := oidc.Clock{}
+	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
+	store := sessions.Get(jwtAuthMethodOIDCConfig)
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+	h, err := NewOIDCHandler(jwtAuthMethodOIDCConfig, tlsPool,
+		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
+		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
+	require.NoError(t, err)
+
+	idpServer := newServer(wellKnownURIs)
+	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
+
+	ctx := context.Background()
+
+	idpServer.Start()
+	t.Cleanup(func() {
+		idpServer.Stop()
+		require.NoError(t, store.RemoveSession(ctx, sessionID))
+	})
+
+	idpServer.tokensResponse = &idpTokensResponse{
+		IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+		AccessToken: "access-token",
+		TokenType:   "Bearer",
+	}
+	idpServer.statusCode = http.StatusOK
+
+	require.NoError(t, store.SetAuthorizationState(ctx, sessionID, validAuthState))
+
+	t.Run("callback request ", func(t *testing.T) {
+		resp := &envoy.CheckResponse{}
+		require.NoError(t, h.Process(ctx, callbackRequest, resp))
+		require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+		requireStandardResponseHeaders(t, resp)
+		requireStoredTokens(t, store, sessionID, false)
+	})
+}
+
+func testOIDCProcessReusable(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
@@ -222,7 +351,7 @@ func TestOIDCProcess(t *testing.T) {
 
 	bytes, err := json.Marshal(newKeySet(t, jwkPub, noAlgJwkPub))
 	require.NoError(t, err)
-	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
+	oidcConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
 	}
 
@@ -230,8 +359,8 @@ func TestOIDCProcess(t *testing.T) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
 	tlsPool := internal.NewTLSConfigPool(context.Background())
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool,
-		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
+	h, err := NewOIDCHandler(oidcConfig, tlsPool,
+		oidc.NewJWKSProvider(newConfigFor(oidcConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
@@ -309,7 +438,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
 				// The sessionID should not have been changed
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredState(t, store, newSessionID, false)
@@ -757,7 +886,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -774,7 +903,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -792,7 +921,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -848,7 +977,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDTokenWithoutNonce, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDTokenWithoutNonce, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -885,7 +1014,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -903,7 +1032,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
