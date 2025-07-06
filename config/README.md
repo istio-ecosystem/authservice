@@ -12,6 +12,7 @@
     - [RedisConfig](#authservice-config-v1-oidc-RedisConfig)
     - [TokenConfig](#authservice-config-v1-oidc-TokenConfig)
   
+    - [OIDCConfig.ClientAuthenticationMethod](#authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod)
     - [OIDCConfig.CookieAttributes.SameSite](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite)
   
 - [v1/mock/config.proto](#v1_mock_config-proto)
@@ -69,6 +70,7 @@ via the standard authorization code grant flow from an OIDC Provider.
 | callback_uri | [string](#string) |  | This value will be used as the `redirect_uri` param of the authorization code grant [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This URL must be one of the Redirection URI values for the Client pre-registered at the OIDC provider. Note: The Istio gateway's VirtualService must be prepared to ensure that this URL will get routed to the service so that the Authservice can intercept the request and handle it (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/bookinfo-gateway.yaml)). Required. |
 | jwks | [string](#string) |  | The JSON JWKS response from the OIDC provider’s `jwks_uri` URI which can be found in the OIDC provider's [configuration response](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). Note that this JSON value must be escaped when embedded in a json configmap (see [example](https://github.com/istio-ecosystem/authservice/blob/master/bookinfo-example/config/authservice-configmap-template.yaml)). Used during token verification. |
 | jwks_fetcher | [OIDCConfig.JwksFetcherConfig](#authservice-config-v1-oidc-OIDCConfig-JwksFetcherConfig) |  | Configuration to allow JWKs to be retrieved and updated asynchronously at regular intervals. |
+| client_authentication_method | [OIDCConfig.ClientAuthenticationMethod](#authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod) |  | Available [Client Authentication](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication) methods |
 | client_id | [string](#string) |  | The OIDC client ID assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). Required. The client ID is used to authenticate to the Token endpoint using HTTP Basic Auth and it must not contain a colon (":") character. |
 | client_secret | [string](#string) |  | The OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This field keeps the client secret in plain text. Recommend to use `client_secret_ref` instead when running in a Kubernetes cluster. |
 | client_secret_ref | [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference) |  | The Kubernetes secret that contains the OIDC client secret assigned to the filter to be used in the [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest). This is an Opaque secret. The client secret should be stored in the key "client-secret". This filed is only valid when running in a Kubernetes cluster. |
@@ -174,6 +176,21 @@ Defines how a token obtained through an OIDC flow is forwarded to services.
 
 
  <!-- end messages -->
+
+
+<a name="authservice-config-v1-oidc-OIDCConfig-ClientAuthenticationMethod"></a>
+
+### OIDCConfig.ClientAuthenticationMethod
+
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| CLIENT_AUTHENTICATION_METHOD_UNSPECIFIED | 0 |  |
+| CLIENT_AUTHENTICATION_METHOD_BASIC | 1 | Clients authenticate using the HTTP Basic authentication scheme |
+| CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST | 2 | Clients authenticate by including the Client Credentials in the request body |
+| CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT | 3 | Clients create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256 (currently not implemented) |
+| CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT | 4 | Clients that have registered a public key sign a JWT using that key (currently not implemented) |
+
 
 
 <a name="authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite"></a>
