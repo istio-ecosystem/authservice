@@ -138,15 +138,11 @@ message OIDCConfig {
     // Clients  authenticate by including the Client Credentials in the request body
     CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST = 2;
 
-
     // Clients create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256 (currently not implemented)
     CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT = 3;
 
-
     // Clients that have registered a public key sign a JWT using that key (currently not implemented)
     CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT = 4;
-
-    
   }
 
   // Available [Client Authentication](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication)
