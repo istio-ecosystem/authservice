@@ -15,7 +15,7 @@ require (
 	github.com/tetratelabs/run v0.3.0
 	github.com/tetratelabs/telemetry v0.8.2
 	golang.org/x/net v0.39.0
-	golang.org/x/oauth2 v0.26.0
+	golang.org/x/oauth2 v0.27.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.6
