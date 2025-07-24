@@ -95,11 +95,10 @@ func (s *SecretController) PreRun() error {
 
 	// Load the current namespace from the service account directory
 	if s.namespace == "" {
-		const namespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 		var data []byte
-		data, err = os.ReadFile(namespaceFile)
+		data, err = os.ReadFile(NamespacePath)
 		if err != nil {
-			return fmt.Errorf("error reading namespace file %s: %w", namespaceFile, err)
+			return fmt.Errorf("error reading namespace file %s: %w", NamespacePath, err)
 		}
 		s.namespace = string(data)
 	}

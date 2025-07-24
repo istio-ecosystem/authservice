@@ -22,12 +22,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
+	"github.com/istio-ecosystem/authservice/internal/k8s"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/tetratelabs/telemetry"
 	"golang.org/x/oauth2"
@@ -364,6 +366,18 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
+	if o.config.GetTokenExchange() != nil {
+		exchangedTokens, err := o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		if err != nil {
+			setDenyResponse(resp, newDenyResponse(), codes.Internal)
+			return
+		}
+		// Only update the access token. When the token expires, the original refresh token will be used
+		// to trigger the entire flow again
+		bodyTokens.AccessToken = exchangedTokens.AccessToken
+		bodyTokens.ExpiresIn = exchangedTokens.ExpiresIn
+	}
+
 	if err := store.ClearAuthorizationState(ctx, sessionID); err != nil {
 		log.Error("error clearing authorization state", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
@@ -396,6 +410,48 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
+// exchangeAccessToken exchanges the given access token for a new access token using the configured token exchange endpoint.
+func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken string) (*idpTokensResponse, error) {
+	cfg := o.config.GetTokenExchange()
+	headers := http.Header{inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded}}
+	if cfg.GetClientCredentials() != nil {
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())}
+	}
+	if bearerCfg := cfg.GetBearerTokenCredentials(); bearerCfg != nil {
+		bearer := bearerCfg.GetToken()
+		if bearer == "" {
+			bearerFile := bearerCfg.GetTokenPath()
+			if bearerFile == "" {
+				bearerFile = k8s.ServiceAccountTokenPath
+			}
+			log.Info("loading bearer token for token exchange", "file", bearerFile)
+			// Read the file at the exchange time. This shouldn't be frequent, and we always get the latest token.
+			b, err := os.ReadFile(bearerFile)
+			if err != nil {
+				return nil, err
+			}
+			bearer = string(b)
+		}
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BearerAuthHeader(bearer)}
+	}
+
+	form := url.Values{
+		"grant_type":           []string{"urn:ietf:params:oauth:grant-type:token-exchange"},
+		"requested_token_type": []string{"urn:ietf:params:oauth:token-type:access_token"},
+		"subject_token":        []string{accessToken},
+		"subject_token_type":   []string{"urn:ietf:params:oauth:token-type:access_token"},
+	}
+
+	log.Info("performing token exchange request")
+
+	bodyTokens, errCode := performIDPRequest(log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
+	if errCode != codes.OK {
+		return nil, fmt.Errorf("failed to perform token exchange request: %v", errCode)
+	}
+
+	return bodyTokens, nil
+}
+
 // refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
 func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, expiredTokens *oidc.TokenResponse, token, sessionID string) *oidc.TokenResponse {
 	store := o.sessions.Get(o.config)
@@ -426,6 +482,15 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 	if !isValidIDPRefreshTokenResponse(log, bodyTokens) {
 		//setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return nil
+	}
+
+	if o.config.GetTokenExchange() != nil && bodyTokens.AccessToken != "" {
+		exchangedTokens, err := o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		if err != nil {
+			return nil
+		}
+		bodyTokens.AccessToken = exchangedTokens.AccessToken
+		bodyTokens.ExpiresIn = exchangedTokens.ExpiresIn
 	}
 
 	// merge the new tokens with the stored ones

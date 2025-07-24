@@ -63,7 +63,7 @@ spec:
       serviceAccountName: keycloak
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:23.0.6
+          image: quay.io/keycloak/keycloak:26.3.1
           imagePullPolicy: IfNotPresent
           args:
             - "start-dev"
@@ -96,7 +96,7 @@ spec:
           command: ["sh", "-c", "until nc -v -z -w3 keycloak 8080; do sleep 2; done"]
       containers:
         - name: setup-keycloak
-          image: quay.io/keycloak/keycloak:23.0.6
+          image: quay.io/keycloak/keycloak:26.3.1
           command: ["bash", "/opt/keycloak/scripts/setup.sh"]
           env:
             - name: KEYCLOAK_ADMIN
@@ -150,6 +150,7 @@ data:
     -s clientId="${CLIENT_ID}" \
     -s secret="${CLIENT_SECRET}" \
     -s "redirectUris=[\"${REDIRECT_URL}\"]" \
+    -s "attributes={\"pkce.code.challenge.method\":\"S256\",\"standard.token.exchange.enabled\": \"true\"}" \
     -s consentRequired=false \
     --server "${KEYCLOAK_SERVER}" \
     --realm "${REALM}" \

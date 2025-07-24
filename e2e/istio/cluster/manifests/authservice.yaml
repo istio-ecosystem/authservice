@@ -163,6 +163,10 @@ data:
                 },
                 "redis_session_store_config": {
                   "server_uri": "redis://redis.redis.svc.cluster.local:6379"
+                },
+                "token_exchange": {
+                  "token_exchange_uri": "http://keycloak.keycloak:8080/realms/master/protocol/openid-connect/token",
+                  "client_credentials": {}
                 }
               }
             }

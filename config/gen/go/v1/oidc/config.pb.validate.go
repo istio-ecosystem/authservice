@@ -652,6 +652,35 @@ func (m *OIDCConfig) validate(all bool) error {
 		}
 	}
 
+	if all {
+		switch v := interface{}(m.GetTokenExchange()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, OIDCConfigValidationError{
+					field:  "TokenExchange",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, OIDCConfigValidationError{
+					field:  "TokenExchange",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTokenExchange()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return OIDCConfigValidationError{
+				field:  "TokenExchange",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	switch v := m.JwksConfig.(type) {
 	case *OIDCConfig_Jwks:
 		if v == nil {
@@ -1308,3 +1337,462 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_CookieAttributesValidationError{}
+
+// Validate checks the field values on OIDCConfig_TokenExchange with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *OIDCConfig_TokenExchange) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OIDCConfig_TokenExchange with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// OIDCConfig_TokenExchangeMultiError, or nil if none found.
+func (m *OIDCConfig_TokenExchange) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OIDCConfig_TokenExchange) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetTokenExchangeUri()) < 1 {
+		err := OIDCConfig_TokenExchangeValidationError{
+			field:  "TokenExchangeUri",
+			reason: "value length must be at least 1 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	oneofCredentialsPresent := false
+	switch v := m.Credentials.(type) {
+	case *OIDCConfig_TokenExchange_ClientCredentials_:
+		if v == nil {
+			err := OIDCConfig_TokenExchangeValidationError{
+				field:  "Credentials",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofCredentialsPresent = true
+
+		if all {
+			switch v := interface{}(m.GetClientCredentials()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchangeValidationError{
+						field:  "ClientCredentials",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchangeValidationError{
+						field:  "ClientCredentials",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetClientCredentials()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OIDCConfig_TokenExchangeValidationError{
+					field:  "ClientCredentials",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *OIDCConfig_TokenExchange_BearerTokenCredentials_:
+		if v == nil {
+			err := OIDCConfig_TokenExchangeValidationError{
+				field:  "Credentials",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofCredentialsPresent = true
+
+		if all {
+			switch v := interface{}(m.GetBearerTokenCredentials()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchangeValidationError{
+						field:  "BearerTokenCredentials",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchangeValidationError{
+						field:  "BearerTokenCredentials",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetBearerTokenCredentials()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OIDCConfig_TokenExchangeValidationError{
+					field:  "BearerTokenCredentials",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+	if !oneofCredentialsPresent {
+		err := OIDCConfig_TokenExchangeValidationError{
+			field:  "Credentials",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return OIDCConfig_TokenExchangeMultiError(errors)
+	}
+
+	return nil
+}
+
+// OIDCConfig_TokenExchangeMultiError is an error wrapping multiple validation
+// errors returned by OIDCConfig_TokenExchange.ValidateAll() if the designated
+// constraints aren't met.
+type OIDCConfig_TokenExchangeMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OIDCConfig_TokenExchangeMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OIDCConfig_TokenExchangeMultiError) AllErrors() []error { return m }
+
+// OIDCConfig_TokenExchangeValidationError is the validation error returned by
+// OIDCConfig_TokenExchange.Validate if the designated constraints aren't met.
+type OIDCConfig_TokenExchangeValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OIDCConfig_TokenExchangeValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OIDCConfig_TokenExchangeValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OIDCConfig_TokenExchangeValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OIDCConfig_TokenExchangeValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OIDCConfig_TokenExchangeValidationError) ErrorName() string {
+	return "OIDCConfig_TokenExchangeValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e OIDCConfig_TokenExchangeValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOIDCConfig_TokenExchange.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OIDCConfig_TokenExchangeValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OIDCConfig_TokenExchangeValidationError{}
+
+// Validate checks the field values on
+// OIDCConfig_TokenExchange_ClientCredentials with the rules defined in the
+// proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OIDCConfig_TokenExchange_ClientCredentials) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// OIDCConfig_TokenExchange_ClientCredentials with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// OIDCConfig_TokenExchange_ClientCredentialsMultiError, or nil if none found.
+func (m *OIDCConfig_TokenExchange_ClientCredentials) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OIDCConfig_TokenExchange_ClientCredentials) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return OIDCConfig_TokenExchange_ClientCredentialsMultiError(errors)
+	}
+
+	return nil
+}
+
+// OIDCConfig_TokenExchange_ClientCredentialsMultiError is an error wrapping
+// multiple validation errors returned by
+// OIDCConfig_TokenExchange_ClientCredentials.ValidateAll() if the designated
+// constraints aren't met.
+type OIDCConfig_TokenExchange_ClientCredentialsMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OIDCConfig_TokenExchange_ClientCredentialsMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OIDCConfig_TokenExchange_ClientCredentialsMultiError) AllErrors() []error { return m }
+
+// OIDCConfig_TokenExchange_ClientCredentialsValidationError is the validation
+// error returned by OIDCConfig_TokenExchange_ClientCredentials.Validate if
+// the designated constraints aren't met.
+type OIDCConfig_TokenExchange_ClientCredentialsValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) ErrorName() string {
+	return "OIDCConfig_TokenExchange_ClientCredentialsValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e OIDCConfig_TokenExchange_ClientCredentialsValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOIDCConfig_TokenExchange_ClientCredentials.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OIDCConfig_TokenExchange_ClientCredentialsValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OIDCConfig_TokenExchange_ClientCredentialsValidationError{}
+
+// Validate checks the field values on
+// OIDCConfig_TokenExchange_BearerTokenCredentials with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// OIDCConfig_TokenExchange_BearerTokenCredentials with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError, or nil if none found.
+func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.BearerToken.(type) {
+	case *OIDCConfig_TokenExchange_BearerTokenCredentials_Token:
+		if v == nil {
+			err := OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{
+				field:  "BearerToken",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Token
+	case *OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath:
+		if v == nil {
+			err := OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{
+				field:  "BearerToken",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for TokenPath
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError(errors)
+	}
+
+	return nil
+}
+
+// OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError is an error
+// wrapping multiple validation errors returned by
+// OIDCConfig_TokenExchange_BearerTokenCredentials.ValidateAll() if the
+// designated constraints aren't met.
+type OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OIDCConfig_TokenExchange_BearerTokenCredentialsMultiError) AllErrors() []error { return m }
+
+// OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError is the
+// validation error returned by
+// OIDCConfig_TokenExchange_BearerTokenCredentials.Validate if the designated
+// constraints aren't met.
+type OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) Field() string {
+	return e.field
+}
+
+// Reason function returns reason value.
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) Reason() string {
+	return e.reason
+}
+
+// Cause function returns cause value.
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) ErrorName() string {
+	return "OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOIDCConfig_TokenExchange_BearerTokenCredentials.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{}

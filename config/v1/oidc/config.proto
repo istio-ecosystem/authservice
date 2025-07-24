@@ -310,4 +310,47 @@ message OIDCConfig {
   // Optional.
   // keep this field out from the trusted_ca_config one of for backward compatibility.
   google.protobuf.Value skip_verify_peer_cert = 18;
+
+  // Configuration for exchanging the access token obtained from the OIDC Provider for
+  // a service-specific token.
+  message TokenExchange {
+    // The Token Exchange endpoint to call to exchange the OIDC access token for a service-specific token.
+    string token_exchange_uri = 1 [(validate.rules).string.min_len = 1];
+
+    // Client Credentials designates that the OIDC clientID and clientSecret should be used to authenticate
+    // to the Token Exchange endpoint.
+    message ClientCredentials {}
+
+    // Configures a Bearer Token to be used as a bearer token to authenticate to the
+    // Token Exchange endpoint.
+    // If a token is not explicitly set and a path is not set either, then the Authservice will use the
+    // Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
+    message BearerTokenCredentials {
+      oneof bearer_token {
+        // The bearer token to use when exchanging the token.
+        // This is useful when the Token Exchange endpoint requires a specific bearer token
+        // to authenticate the request.
+        string token = 1;
+
+        // The path to the file containing the token to use when exchanging the token.
+        string token_path = 2;
+      }
+    }
+
+    oneof credentials {
+      option(validate.required) = true;
+
+      // The client credentials to use when exchanging the token.
+      ClientCredentials client_credentials = 2;
+
+      // The bearer token credentials to use when exchanging the token.
+      BearerTokenCredentials bearer_token_credentials = 3;
+    }
+  }
+
+  // When configured, the Authservice will exchange the OIDC access token for a service-specific token from the
+  // defined authorization server.
+  // This is useful to automatically exchange the access token obtained from the Identity Provider for a service-specific
+  // token issued by an internal authorization server.
+  TokenExchange token_exchange = 24;
 }
