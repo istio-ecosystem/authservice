@@ -29,7 +29,6 @@ import (
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	typev3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
-	"github.com/istio-ecosystem/authservice/internal/k8s"
 	"github.com/lestrrat-go/jwx/v2/jws"
 	"github.com/tetratelabs/telemetry"
 	"golang.org/x/oauth2"
@@ -39,6 +38,7 @@ import (
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
 	inthttp "github.com/istio-ecosystem/authservice/internal/http"
+	"github.com/istio-ecosystem/authservice/internal/k8s"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
