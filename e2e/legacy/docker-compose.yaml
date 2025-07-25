@@ -62,7 +62,7 @@ services:
 
   # Keycloak container to be used as the OIDC provider. The tests will use the `master` realm
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0.6
+    image: quay.io/keycloak/keycloak:26.3.1
     platform: linux/${ARCH:-amd64}
     environment:
       KEYCLOAK_ADMIN: admin
@@ -88,7 +88,7 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
-    image: quay.io/keycloak/keycloak:23.0.6
+    image: quay.io/keycloak/keycloak:26.3.1
     platform: linux/${ARCH:-amd64}
     environment:
       KEYCLOAK_ADMIN: admin

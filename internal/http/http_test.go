@@ -140,6 +140,10 @@ func TestBasicAuthHeader(t *testing.T) {
 	}
 }
 
+func TestBearerAuthHeader(t *testing.T) {
+	require.Equal(t, "Bearer token", BearerAuthHeader("token"))
+}
+
 func TestNewHTTPClient(t *testing.T) {
 	t.Run("proxy-skip-verify", func(t *testing.T) {
 		cfg := &oidcv1.OIDCConfig{

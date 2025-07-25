@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
@@ -50,7 +51,7 @@ var (
 type SecretController struct {
 	log       telemetry.Logger
 	config    *configv1.Config
-	secrets   map[string][]*oidcv1.OIDCConfig
+	secrets   map[string][]func(string, []byte)
 	restConf  *rest.Config
 	manager   manager.Manager
 	k8sClient client.Client
@@ -81,7 +82,8 @@ func (s *SecretController) PreRun() error {
 	for _, c := range s.config.Chains {
 		for _, f := range c.Filters {
 			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
-			if isOIDCConf && oidcCfg.Oidc.GetClientSecretRef() != nil {
+			if isOIDCConf &&
+				(oidcCfg.Oidc.GetClientSecretRef() != nil || oidcCfg.Oidc.GetTokenExchange().GetClientCredentials().GetClientSecretRef() != nil) {
 				needWatchSecrets = true
 				break
 			}
@@ -95,11 +97,10 @@ func (s *SecretController) PreRun() error {
 
 	// Load the current namespace from the service account directory
 	if s.namespace == "" {
-		const namespaceFile = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
 		var data []byte
-		data, err = os.ReadFile(namespaceFile)
+		data, err = os.ReadFile(NamespacePath)
 		if err != nil {
-			return fmt.Errorf("error reading namespace file %s: %w", namespaceFile, err)
+			return fmt.Errorf("error reading namespace file %s: %w", NamespacePath, err)
 		}
 		s.namespace = string(data)
 	}
@@ -119,12 +120,14 @@ func (s *SecretController) PreRun() error {
 
 	// The controller manager is encapsulated in the secret controller because we
 	// only need it to watch secrets and update the configuration.
-	//TODO: Add manager options, like metrics, healthz, leader election, etc.
 	s.manager, err = ctrl.NewManager(s.restConf, ctrl.Options{
+		Metrics: metricsserver.Options{BindAddress: "0"},
 		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				s.namespace: {},
+			// Only watch for Secret objects in the desired namespace and ignore the rest
+			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Secret{}: {Namespaces: map[string]cache.Config{s.namespace: {}}},
 			},
+			DefaultTransform: cache.TransformStripManagedFields(),
 		},
 	})
 	s.k8sClient = s.manager.GetClient()
@@ -159,26 +162,48 @@ func (s *SecretController) ServeContext(ctx context.Context) error {
 
 // loadSecrets loads the secrets from the configuration and stores them in the secrets map.
 func (s *SecretController) loadSecrets() error {
-	s.secrets = make(map[string][]*oidcv1.OIDCConfig)
+	s.secrets = make(map[string][]func(string, []byte))
 	for _, c := range s.config.Chains {
 		for _, f := range c.Filters {
 			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
-			if !isOIDCConf ||
-				oidcCfg.Oidc.GetClientSecretRef() == nil ||
-				oidcCfg.Oidc.GetClientSecretRef().GetName() == "" {
+			if !isOIDCConf {
 				continue
 			}
 
-			ref := oidcCfg.Oidc.GetClientSecretRef()
-			if ref.Namespace != "" && ref.Namespace != s.namespace {
-				return fmt.Errorf("%w: secret reference namespace %s does not match the current namespace %s",
-					ErrCrossNamespaceSecretRef, ref.Namespace, s.namespace)
+			if err := loadSecret(s.secrets, oidcCfg.Oidc.GetClientSecretRef(), s.namespace,
+				func(name string, v []byte) {
+					s.log.Info("updating client-secret data from secret", "secret", name, "client-id", oidcCfg.Oidc.GetClientId())
+					oidcCfg.Oidc.ClientSecretConfig = &oidcv1.OIDCConfig_ClientSecret{
+						ClientSecret: string(v),
+					}
+				}); err != nil {
+				return err
 			}
-
-			key := secretNamespacedName(ref, s.namespace).String()
-			s.secrets[key] = append(s.secrets[key], oidcCfg.Oidc)
+			if err := loadSecret(s.secrets, oidcCfg.Oidc.GetTokenExchange().GetClientCredentials().GetClientSecretRef(), s.namespace,
+				func(name string, v []byte) {
+					s.log.Info("updating token exchange client-secret data from secret",
+						"secret", name, "client-id", oidcCfg.Oidc.TokenExchange.GetClientCredentials().GetClientId())
+					oidcCfg.Oidc.TokenExchange.GetClientCredentials().ClientSecretConfig = &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_ClientSecret{
+						ClientSecret: string(v),
+					}
+				}); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
+}
+
+func loadSecret(secrets map[string][]func(string, []byte), ref *oidcv1.OIDCConfig_SecretReference, namespace string, updateFn func(string, []byte)) error {
+	if ref == nil || ref.GetName() == "" {
+		return nil // No secret reference to load
+	}
+	if ref.Namespace != "" && ref.Namespace != namespace {
+		return fmt.Errorf("%w: secret reference namespace %s does not match the current namespace %s",
+			ErrCrossNamespaceSecretRef, ref.Namespace, namespace)
+	}
+	key := secretNamespacedName(ref, namespace).String()
+	secrets[key] = append(secrets[key], updateFn)
 	return nil
 }
 
@@ -192,7 +217,7 @@ func secretNamespacedName(secretRef *oidcv1.OIDCConfig_SecretReference, currentN
 func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	changedSecret := req.NamespacedName.String()
 
-	oidcConfigs, exist := s.secrets[changedSecret]
+	oidcConfigsUpdateFuncs, exist := s.secrets[changedSecret]
 
 	// If the secret is not used in the configuration, we can ignore it
 	if !exist {
@@ -217,14 +242,8 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	for _, oidcConfig := range oidcConfigs {
-		s.log.Info("updating client-secret data from secret",
-			"secret", changedSecret, "client-id", oidcConfig.GetClientId())
-
-		// Update the configuration with the loaded client secret
-		oidcConfig.ClientSecretConfig = &oidcv1.OIDCConfig_ClientSecret{
-			ClientSecret: string(clientSecretBytes),
-		}
+	for _, oidcUpdateFunc := range oidcConfigsUpdateFuncs {
+		oidcUpdateFunc(secret.GetName(), clientSecretBytes)
 	}
 
 	return ctrl.Result{}, nil

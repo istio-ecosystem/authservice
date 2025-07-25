@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -206,7 +207,6 @@ var (
 )
 
 func TestOIDCProcess(t *testing.T) {
-
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
 	// We remove the optional "alg" field from this key to test that we can
@@ -236,6 +236,9 @@ func TestOIDCProcess(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
+
+	tokenExchangeBearerFile := t.TempDir() + "/token-exchange-bearer"
+	require.NoError(t, os.WriteFile(tokenExchangeBearerFile, []byte("token"), 0644))
 
 	// The following subset of tests is testing the requests to the app, not any callback or auth flow.
 	// So there's no expected communication with any external server.
@@ -312,6 +315,7 @@ func TestOIDCProcess(t *testing.T) {
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
 				// The sessionID should not have been changed
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredState(t, store, newSessionID, false)
 				requireStoredTokens(t, store, newSessionID, false)
 			},
@@ -362,27 +366,30 @@ func TestOIDCProcess(t *testing.T) {
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
 
 	callbackTests := []struct {
-		name               string
-		req                *envoy.CheckRequest
-		storedAuthState    *oidc.AuthorizationState
-		mockTokensResponse *idpTokensResponse
-		mockStatusCode     int
-		responseVerify     func(*testing.T, *envoy.CheckResponse)
+		name                       string
+		setup                      func(*oidcv1.OIDCConfig)
+		cleanup                    func(*oidcv1.OIDCConfig)
+		req                        *envoy.CheckRequest
+		storedAuthState            *oidc.AuthorizationState
+		mockTokensResponse         mockIdpResponse
+		mockTokensExchangeResponse mockIdpResponse
+		responseVerify             func(*testing.T, *envoy.CheckResponse)
 	}{
 		{
 			name:            "successfully retrieve new tokens",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -390,16 +397,17 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "successfully retrieve new tokens when 'alg' is not specified in JWK",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, noAlgJwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -465,21 +473,21 @@ func TestOIDCProcess(t *testing.T) {
 			},
 		},
 		{
-			name:            "idp server returns non-200 status code",
-			req:             callbackRequest,
-			storedAuthState: validAuthState,
-			mockStatusCode:  http.StatusInternalServerError,
+			name:               "idp server returns non-200 status code",
+			req:                callbackRequest,
+			storedAuthState:    validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusInternalServerError, nil),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unknown), response.GetStatus().GetCode())
+				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
 		},
 		{
-			name:            "idp server returns empty body",
-			req:             callbackRequest,
-			storedAuthState: validAuthState,
-			mockStatusCode:  http.StatusOK,
+			name:               "idp server returns empty body",
+			req:                callbackRequest,
+			storedAuthState:    validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, nil),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -490,10 +498,10 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp returned non-bearer token type",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:   newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", newNonce).Audience([]string{"test-client-id"})),
 				TokenType: "not-bearer",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -504,11 +512,11 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp returned invalid expires_in for access token",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:   newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", newNonce).Audience([]string{"test-client-id"})),
 				TokenType: "Bearer",
 				ExpiresIn: -1,
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -519,11 +527,11 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp didn't return access token",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:   newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", newNonce).Audience([]string{"test-client-id"})),
 				TokenType: "Bearer",
 				ExpiresIn: 3600,
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -534,13 +542,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp server returns invalid JWT id-token",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockStatusCode:  http.StatusOK,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     "not-a-jwt",
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -551,12 +558,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp server returns JWT signed with unknown key",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, unknownJWKPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -571,12 +578,12 @@ func TestOIDCProcess(t *testing.T) {
 				State:        newState,
 				RequestedURL: requestedAppURL,
 			},
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder()),
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -591,12 +598,12 @@ func TestOIDCProcess(t *testing.T) {
 				State:        newState,
 				RequestedURL: requestedAppURL,
 			},
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", "non-matching-nonce")),
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -607,12 +614,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp returned empty audience",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", newNonce)),
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
@@ -623,15 +630,261 @@ func TestOIDCProcess(t *testing.T) {
 			name:            "idp returned non-matching audience",
 			req:             callbackRequest,
 			storedAuthState: validAuthState,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Claim("nonce", newNonce).Audience([]string{"non-matching-audience"})),
 				TokenType:   "Bearer",
 				ExpiresIn:   3600,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, response)
+				requireStoredTokens(t, store, sessionID, false)
+			},
+		},
+		{
+			name: "token exchange client credentials defaults",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_{
+						ClientCredentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials{},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange client credentials custom",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_{
+						ClientCredentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials{
+							ClientId: "client-id-exchange",
+							ClientSecretConfig: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_ClientSecret{
+								ClientSecret: "client-secret-exchange",
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange bearer",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_Token{
+								Token: "token",
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange bearer file",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath{
+								TokenPath: tokenExchangeBearerFile,
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange bearer file invalid",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath{},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.InvalidArgument), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireStoredTokens(t, store, sessionID, false)
+			},
+		},
+		{
+			// This test will fail because the kubernetes service account token file located at
+			// /var/run/secrets/kubernetes.io/serviceaccount/token is not expected to be present
+			// in the test environment.
+			name: "token exchange kubernetes service account",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_KubernetesServiceAccountToken{
+								KubernetesServiceAccountToken: true,
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Internal), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireStoredTokens(t, store, sessionID, false)
+			},
+		},
+		{
+			name: "token exchange failure",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_Token{
+								Token: "token",
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusForbidden, nil),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.PermissionDenied), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
 				requireStoredTokens(t, store, sessionID, false)
 			},
 		},
@@ -639,17 +892,20 @@ func TestOIDCProcess(t *testing.T) {
 
 	for _, tt := range callbackTests {
 		t.Run("matches callback: "+tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(basicOIDCConfig)
+			}
 			idpServer.Start()
 			t.Cleanup(func() {
 				idpServer.Stop()
+				if tt.cleanup != nil {
+					tt.cleanup(basicOIDCConfig)
+				}
 				require.NoError(t, store.RemoveSession(ctx, sessionID))
 			})
 
 			idpServer.tokensResponse = tt.mockTokensResponse
-			idpServer.statusCode = tt.mockStatusCode
-			if tt.mockStatusCode <= 0 {
-				idpServer.statusCode = http.StatusOK
-			}
+			idpServer.tokenExchangeResponse = tt.mockTokensExchangeResponse
 
 			// Set the authorization state in the store, so it can be found by the handler
 			require.NoError(t, store.SetAuthorizationState(ctx, sessionID, tt.storedAuthState))
@@ -673,18 +929,21 @@ func TestOIDCProcess(t *testing.T) {
 	}
 
 	refreshTokensTests := []struct {
-		name                string
-		req                 *envoy.CheckRequest
-		storedAuthState     *oidc.AuthorizationState
-		storedTokenResponse *oidc.TokenResponse
-		mockTokensResponse  *idpTokensResponse
-		mockStatusCode      int
-		responseVerify      func(*testing.T, *envoy.CheckResponse)
+		name                       string
+		setup                      func(*oidcv1.OIDCConfig)
+		cleanup                    func(*oidcv1.OIDCConfig)
+		req                        *envoy.CheckRequest
+		storedAuthState            *oidc.AuthorizationState
+		storedTokenResponse        *oidc.TokenResponse
+		mockTokensResponse         mockIdpResponse
+		mockTokensExchangeResponse mockIdpResponse
+		responseVerify             func(*testing.T, *envoy.CheckResponse)
 	}{
 		{
 			name:                "IDP server returns empty body",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
+			mockTokensResponse:  mockTokenResponse(http.StatusOK, nil),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -698,7 +957,7 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an non-200 status",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockStatusCode:      http.StatusInternalServerError,
+			mockTokensResponse:  mockTokenResponse(http.StatusInternalServerError, nil),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -712,11 +971,11 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns response with an invalid token_type",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     validIDToken,
 				AccessToken: "access-token",
 				TokenType:   "invalid-token-type",
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -730,12 +989,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns a response with an invalid expires_at",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     validIDToken,
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   -1,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -749,16 +1008,17 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns a response with no access token - succeeds using the stored access token",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:   validIDToken,
 				TokenType: "Bearer",
 				ExpiresIn: 10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -766,16 +1026,17 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server doesn't return an id-token - succeeds using the stored id-token",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -783,17 +1044,18 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an invalid JWT as id-token - succeeds using the stored id-token",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     "not-a-jwt",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
 				AccessToken: "access-token",
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -801,12 +1063,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an id-token signed with unknown key",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, unknownJWKPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -820,12 +1082,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an id-token with non-matching nonce",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", "non-matching-nonce")),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -839,17 +1101,18 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an id-token with no nonce claim - succeeds as it is not required",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     validIDTokenWithoutNonce,
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDTokenWithoutNonce, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -857,12 +1120,12 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns an id-token with non-matching audience",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"non-matching-audience"}).Claim("nonce", newNonce)),
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
 				requireStandardResponseHeaders(t, resp)
@@ -876,17 +1139,18 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "IDP server returns lowercase 'bearer' token, succeeds",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     validIDToken,
 				AccessToken: "access-token",
 				TokenType:   "bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
 			},
 		},
@@ -894,36 +1158,118 @@ func TestOIDCProcess(t *testing.T) {
 			name:                "succeed",
 			req:                 withSessionHeader,
 			storedTokenResponse: expiredTokenResponse,
-			mockTokensResponse: &idpTokensResponse{
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
 				IDToken:     validIDToken,
 				AccessToken: "access-token",
 				TokenType:   "Bearer",
 				ExpiresIn:   10,
-			},
+			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "succeed with token exchange",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_Token{
+								Token: "token",
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:                 withSessionHeader,
+			storedTokenResponse: expiredTokenResponse,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     validIDToken,
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+				ExpiresIn:   10,
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				require.NotNil(t, resp.GetOkResponse())
+				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token-exchanged")
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange failed",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_Token{
+								Token: "token",
+							},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:                 withSessionHeader,
+			storedTokenResponse: expiredTokenResponse,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     validIDToken,
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+				ExpiresIn:   10,
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusUnauthorized, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
+				requireCookie(t, resp.GetDeniedResponse())
+				requireStoredState(t, store, newSessionID, true)
+				requireStoredState(t, store, sessionID, false)
 			},
 		},
 	}
 
 	for _, tt := range refreshTokensTests {
 		t.Run("refresh tokens: "+tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup(basicOIDCConfig)
+			}
 			idpServer.Start()
 			t.Cleanup(func() {
 				idpServer.Stop()
+				if tt.cleanup != nil {
+					tt.cleanup(basicOIDCConfig)
+				}
 				require.NoError(t, store.RemoveSession(ctx, sessionID))
 				require.NoError(t, store.RemoveSession(ctx, newSessionID))
 			})
 
 			idpServer.tokensResponse = tt.mockTokensResponse
-			idpServer.statusCode = tt.mockStatusCode
-			if tt.mockStatusCode <= 0 {
-				idpServer.statusCode = http.StatusOK
-			}
+			idpServer.tokenExchangeResponse = tt.mockTokensExchangeResponse
 
 			if tt.storedAuthState == nil {
 				tt.storedAuthState = validAuthState
@@ -998,12 +1344,11 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	}
 
 	idpServer := newServer(wellKnownURIs)
-	idpServer.statusCode = http.StatusOK
-	idpServer.tokensResponse = &idpTokensResponse{
+	idpServer.tokensResponse = mockTokenResponse(http.StatusOK, &idpTokensResponse{
 		IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 		AccessToken: "access-token",
 		TokenType:   "Bearer",
-	}
+	})
 	idpServer.Start()
 	t.Cleanup(idpServer.Stop)
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
@@ -1113,12 +1458,11 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 		require.NoError(t, store.RemoveSession(ctx, sessionID))
 	})
 
-	idpServer.tokensResponse = &idpTokensResponse{
+	idpServer.tokensResponse = mockTokenResponse(http.StatusOK, &idpTokensResponse{
 		IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
 		AccessToken: "access-token",
 		TokenType:   "Bearer",
-	}
-	idpServer.statusCode = http.StatusOK
+	})
 
 	expiredTokenResponse := &oidc.TokenResponse{
 		IDToken:              newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(yesterday).Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
@@ -1576,6 +1920,12 @@ func requireStoredTokens(t *testing.T, store oidc.SessionStore, sessionID string
 	}
 }
 
+func requireStoredAccessToken(t *testing.T, store oidc.SessionStore, sessionID string, token string) {
+	got, err := store.GetTokenResponse(context.Background(), sessionID)
+	require.NoError(t, err)
+	require.Equal(t, token, got.AccessToken)
+}
+
 func requireStoredState(t *testing.T, store oidc.SessionStore, sessionID string, wantExists bool) {
 	got, err := store.GetAuthorizationState(context.Background(), sessionID)
 	require.NoError(t, err)
@@ -1674,14 +2024,26 @@ func newConfigFor(oidc *oidcv1.OIDCConfig) *configv1.Config {
 	}
 }
 
+type mockIdpResponse struct {
+	resp       *idpTokensResponse
+	statusCode int
+}
+
+func mockTokenResponse(statusCode int, response *idpTokensResponse) mockIdpResponse {
+	return mockIdpResponse{
+		resp:       response,
+		statusCode: statusCode,
+	}
+}
+
 // idpServer is a mock IDP server that can be used to test the OIDC handler.
 // It listens on a bufconn.Listener and provides a http.Client that can be used to make requests to it.
 // It returns a predefined response when the /token endpoint is called, that can be set using the tokensResponse field.
 type idpServer struct {
-	server         *http.Server
-	listener       *bufconn.Listener
-	tokensResponse *idpTokensResponse
-	statusCode     int
+	server                *http.Server
+	listener              *bufconn.Listener
+	tokensResponse        mockIdpResponse
+	tokenExchangeResponse mockIdpResponse
 }
 
 func newServer(wellKnownPayload string) *idpServer {
@@ -1691,12 +2053,23 @@ func newServer(wellKnownPayload string) *idpServer {
 	handler := http.NewServeMux()
 	handler.HandleFunc("/token", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(idpServer.statusCode)
+		w.WriteHeader(idpServer.tokensResponse.statusCode)
 
-		if idpServer.statusCode == http.StatusOK && idpServer.tokensResponse != nil {
-			err := json.NewEncoder(w).Encode(idpServer.tokensResponse)
+		if idpServer.tokensResponse.statusCode == http.StatusOK && idpServer.tokensResponse.resp != nil {
+			err := json.NewEncoder(w).Encode(idpServer.tokensResponse.resp)
 			if err != nil {
-				http.Error(w, fmt.Errorf("cannot json encode id_token: %w", err).Error(), http.StatusInternalServerError)
+				http.Error(w, fmt.Errorf("cannot json encode token response: %w", err).Error(), http.StatusInternalServerError)
+			}
+		}
+	})
+	handler.HandleFunc("/token-exchange", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(idpServer.tokenExchangeResponse.statusCode)
+
+		if idpServer.tokenExchangeResponse.statusCode == http.StatusOK && idpServer.tokenExchangeResponse.resp != nil {
+			err := json.NewEncoder(w).Encode(idpServer.tokenExchangeResponse.resp)
+			if err != nil {
+				http.Error(w, fmt.Errorf("cannot json encode token response: %w", err).Error(), http.StatusInternalServerError)
 			}
 		}
 	})

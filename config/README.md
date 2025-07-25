@@ -9,6 +9,9 @@
     - [OIDCConfig.CookieAttributes](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes)
     - [OIDCConfig.JwksFetcherConfig](#authservice-config-v1-oidc-OIDCConfig-JwksFetcherConfig)
     - [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference)
+    - [OIDCConfig.TokenExchange](#authservice-config-v1-oidc-OIDCConfig-TokenExchange)
+    - [OIDCConfig.TokenExchange.BearerTokenCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-BearerTokenCredentials)
+    - [OIDCConfig.TokenExchange.ClientCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-ClientCredentials)
     - [RedisConfig](#authservice-config-v1-oidc-RedisConfig)
     - [TokenConfig](#authservice-config-v1-oidc-TokenConfig)
   
@@ -86,6 +89,7 @@ via the standard authorization code grant flow from an OIDC Provider.
 | proxy_uri | [string](#string) |  | The Authservice makes two kinds of direct network connections directly to the OIDC Provider. Both are POST requests to the configured `token_uri` of the OIDC Provider. The first is to exchange the authorization code for tokens, and the other is to use the refresh token to obtain new tokens. Configure the `proxy_uri` when both of these requests should be made through a web proxy. The format of `proxy_uri` is `http://proxyserver.example.com:8080`, where `:<port_number>` is optional. Userinfo (usernames and passwords) in the `proxy_uri` setting are not yet supported. The `proxy_uri` should always start with `http://`. The Authservice will upgrade the connection to the OIDC provider to HTTPS using an HTTP CONNECT request to the proxy server. The proxy server will see the hostname and port number of the OIDC provider in plain text in the CONNECT request, but all other communication will occur over an encrypted HTTPS connection negotiated directly between the Authservice and the OIDC provider. See also the related `trusted_certificate_authority` configuration option. Optional. |
 | redis_session_store_config | [RedisConfig](#authservice-config-v1-oidc-RedisConfig) |  | When specified, the Authservice will use the configured Redis server to store session data. Optional. |
 | skip_verify_peer_cert | [google.protobuf.Value](#google-protobuf-Value) |  | If set to true, the verification of the destination certificate will be skipped when making a request to the Token Endpoint. This option is useful when you want to use a self-signed certificate for testing purposes, but basically should not be set to true in any other cases. Optional. keep this field out from the trusted_ca_config one of for backward compatibility. |
+| token_exchange | [OIDCConfig.TokenExchange](#authservice-config-v1-oidc-OIDCConfig-TokenExchange) |  | When configured, the Authservice will exchange the OIDC access token for a service-specific token from the defined authorization server. This is useful to automatically exchange the access token obtained from the Identity Provider for a service-specific token issued by an internal authorization server. |
 
 
 
@@ -137,6 +141,60 @@ This message defines a reference to a Kubernetes Secret resource.
 | ----- | ---- | ----- | ----------- |
 | namespace | [string](#string) |  | The namespace of the referenced Secret, if not set, default to "default" namespace. |
 | name | [string](#string) |  | The name of the referenced Secret. |
+
+
+
+
+
+
+<a name="authservice-config-v1-oidc-OIDCConfig-TokenExchange"></a>
+
+### OIDCConfig.TokenExchange
+Configuration for exchanging the access token obtained from the OIDC Provider for
+a service-specific token.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token_exchange_uri | [string](#string) |  | The Token Exchange endpoint to call to exchange the OIDC access token for a service-specific token. |
+| client_credentials | [OIDCConfig.TokenExchange.ClientCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-ClientCredentials) |  | The client credentials to use when exchanging the token. |
+| bearer_token_credentials | [OIDCConfig.TokenExchange.BearerTokenCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-BearerTokenCredentials) |  | The bearer token credentials to use when exchanging the token. |
+
+
+
+
+
+
+<a name="authservice-config-v1-oidc-OIDCConfig-TokenExchange-BearerTokenCredentials"></a>
+
+### OIDCConfig.TokenExchange.BearerTokenCredentials
+Configures a Bearer Token to be used as a bearer token to authenticate to the
+Token Exchange endpoint.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| token | [string](#string) |  | The bearer token to use when exchanging the token. This is useful when the Token Exchange endpoint requires a specific bearer token to authenticate the request. |
+| token_path | [string](#string) |  | The path to the file containing the token to use when exchanging the token. |
+| kubernetes_service_account_token | [bool](#bool) |  | Use the Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token` |
+
+
+
+
+
+
+<a name="authservice-config-v1-oidc-OIDCConfig-TokenExchange-ClientCredentials"></a>
+
+### OIDCConfig.TokenExchange.ClientCredentials
+Client Credentials designates that the OIDC clientID and clientSecret should be used to authenticate
+to the Token Exchange endpoint.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| client_id | [string](#string) |  | The Client ID to use. If not set, the Client ID from the OIDC configuration will be used. |
+| client_secret | [string](#string) |  | The OIDC client secret to use. If not set, the Client Secret from the OIDC configuration will be used. |
+| client_secret_ref | [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference) |  | The Kubernetes secret that contains the OIDC client secret to be used. If not set, the Client Secret from the OIDC configuration will be used. |
 
 
 

@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
 	inthttp "github.com/istio-ecosystem/authservice/internal/http"
+	"github.com/istio-ecosystem/authservice/internal/k8s"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
@@ -359,9 +361,23 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	}
 
 	// validate ID token
-	if ok, errCode := o.isValidIDToken(ctx, log, bodyTokens.IDToken, stateFromStore.Nonce, true); !ok {
+	var ok bool
+	if ok, errCode = o.isValidIDToken(ctx, log, bodyTokens.IDToken, stateFromStore.Nonce, true); !ok {
 		setDenyResponse(resp, newDenyResponse(), errCode)
 		return
+	}
+
+	if o.config.GetTokenExchange() != nil {
+		var exchangedTokens *idpTokensResponse
+		exchangedTokens, errCode = o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		if errCode != codes.OK {
+			setDenyResponse(resp, newDenyResponse(), errCode)
+			return
+		}
+		// Only update the access token. When the token expires, the original refresh token will be used
+		// to trigger the entire flow again
+		bodyTokens.AccessToken = exchangedTokens.AccessToken
+		bodyTokens.ExpiresIn = exchangedTokens.ExpiresIn
 	}
 
 	if err := store.ClearAuthorizationState(ctx, sessionID); err != nil {
@@ -396,6 +412,59 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	setDenyResponse(resp, deny, codes.Unauthenticated)
 }
 
+// exchangeAccessToken exchanges the given access token for a new access token using the configured token exchange endpoint.
+func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken string) (*idpTokensResponse, codes.Code) {
+	cfg := o.config.GetTokenExchange()
+	headers := http.Header{inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded}}
+
+	if cfg.GetClientCredentials() != nil {
+		clientID := cfg.GetClientCredentials().GetClientId()
+		if clientID == "" {
+			clientID = o.config.GetClientId()
+		}
+		clientSecret := cfg.GetClientCredentials().GetClientSecret()
+		if clientSecret == "" {
+			clientSecret = o.config.GetClientSecret()
+		}
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(clientID, clientSecret)}
+	}
+
+	if bearerCfg := cfg.GetBearerTokenCredentials(); bearerCfg != nil {
+		bearer := bearerCfg.GetToken()
+		if bearer == "" {
+			bearerFile := bearerCfg.GetTokenPath()
+			if bearerFile == "" && bearerCfg.GetKubernetesServiceAccountToken() {
+				bearerFile = k8s.ServiceAccountTokenPath
+			}
+			if bearerFile == "" {
+				log.Error("config error", errors.New("no bearer token configuration provided"))
+				return nil, codes.InvalidArgument
+			}
+
+			log.Info("loading bearer token for token exchange", "file", bearerFile)
+			// Read the file at the exchange time. This shouldn't be frequent, and we always get the latest token.
+			b, err := os.ReadFile(bearerFile)
+			if err != nil {
+				log.Error("reading token file", err)
+				return nil, codes.Internal
+			}
+			bearer = string(b)
+		}
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BearerAuthHeader(bearer)}
+	}
+
+	form := url.Values{
+		"grant_type":           []string{"urn:ietf:params:oauth:grant-type:token-exchange"},
+		"requested_token_type": []string{"urn:ietf:params:oauth:token-type:access_token"},
+		"subject_token":        []string{accessToken},
+		"subject_token_type":   []string{"urn:ietf:params:oauth:token-type:access_token"},
+	}
+
+	log.Info("performing token exchange request")
+
+	return performIDPRequest(log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
+}
+
 // refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
 func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, expiredTokens *oidc.TokenResponse, token, sessionID string) *oidc.TokenResponse {
 	store := o.sessions.Get(o.config)
@@ -426,6 +495,15 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 	if !isValidIDPRefreshTokenResponse(log, bodyTokens) {
 		//setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return nil
+	}
+
+	if o.config.GetTokenExchange() != nil && bodyTokens.AccessToken != "" {
+		exchangedTokens, errCode := o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		if errCode != codes.OK {
+			return nil
+		}
+		bodyTokens.AccessToken = exchangedTokens.AccessToken
+		bodyTokens.ExpiresIn = exchangedTokens.ExpiresIn
 	}
 
 	// merge the new tokens with the stored ones
@@ -510,7 +588,7 @@ func performIDPRequest(log telemetry.Logger, client *http.Client, uri string, fo
 
 	if oidcResp.StatusCode != http.StatusOK {
 		log.Info("OIDC server returned non-200 status code", "status-code", oidcResp.StatusCode, "url", oidcReq.URL.String())
-		return nil, codes.Unknown
+		return nil, inthttp.StatusToGrpcCode(oidcResp.StatusCode)
 	}
 
 	respBody, err := io.ReadAll(oidcResp.Body)

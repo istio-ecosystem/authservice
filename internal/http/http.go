@@ -92,6 +92,11 @@ func BasicAuthHeader(id string, secret string) string {
 	return "Basic " + base64.StdEncoding.EncodeToString([]byte(id+":"+secret))
 }
 
+// BearerAuthHeader returns the value of the Authorization header for the given token.
+func BearerAuthHeader(token string) string {
+	return "Bearer " + token
+}
+
 // NewHTTPClient creates a new HTTP client with the given OIDC configuration and TLS pool.
 // If a logger is provided, it will log the requests and responses at debug level.
 func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, log telemetry.Logger) (*http.Client, error) {

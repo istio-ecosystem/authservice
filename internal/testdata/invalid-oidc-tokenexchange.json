@@ -8,10 +8,10 @@
       "filters": [
         {
           "oidc": {
-            "configuration_uri": "http://fake",
+            "authorization_uri": "http://fake",
+            "token_uri": "http://fake",
             "callback_uri": "http://fake/callback",
             "proxy_uri": "http://fake",
-            "jwks": "fake-jwks",
             "client_id": "fake-client-id",
             "client_secret": "fake-client-secret",
             "id_token": {
@@ -21,9 +21,17 @@
             "redis_session_store_config": {
               "server_uri": "redis://localhost:6379/0"
             },
+            "logout": {
+              "path": "/logout",
+              "redirect_uri": "http://fake"
+            },
             "skip_verify_peer_cert": true,
+            "jwks_fetcher": {
+              "jwks_uri": "http://fake/jwks",
+              "skip_verify_peer_cert": "true"
+            },
+            "trusted_certificate_authority": "fake-ca-pem",
             "token_exchange": {
-              "token_exchange_uri": "http://fake/token-exchange",
               "client_credentials": {}
             }
           }
