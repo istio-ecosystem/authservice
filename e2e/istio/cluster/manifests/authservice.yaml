@@ -127,6 +127,15 @@ type: Opaque
 stringData:
   client-secret: "authservice-secret"
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: client-secret-exchange
+  namespace: authservice
+type: Opaque
+stringData:
+  client-secret: "authservice-secret"
+---
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -166,7 +175,13 @@ data:
                 },
                 "token_exchange": {
                   "token_exchange_uri": "http://keycloak.keycloak:8080/realms/master/protocol/openid-connect/token",
-                  "client_credentials": {}
+                  "client_credentials": {
+                    "client_id": "authservice",
+                    "client_secret_ref": {
+                      "namespace": "authservice",
+                      "name": "client-secret-exchange"
+                    }
+                  }
                 }
               }
             }

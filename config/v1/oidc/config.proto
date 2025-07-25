@@ -319,30 +319,39 @@ message OIDCConfig {
 
     // Client Credentials designates that the OIDC clientID and clientSecret should be used to authenticate
     // to the Token Exchange endpoint.
-    message ClientCredentials {}
+    message ClientCredentials {
+      // The Client ID to use. If not set, the Client ID from the OIDC configuration will be used.
+      string client_id = 1;
+
+      oneof client_secret_config {
+        // The OIDC client secret to use. If not set, the Client Secret from the OIDC configuration will be used.
+        string client_secret = 2;
+        // The Kubernetes secret that contains the OIDC client secret to be used. If not set, the Client Secret
+        // from the OIDC configuration will be used.
+        SecretReference client_secret_ref = 3;
+      }
+    }
 
     // Configures a Bearer Token to be used as a bearer token to authenticate to the
     // Token Exchange endpoint.
-    // If a token is not explicitly set and a path is not set either, then the Authservice will use the
-    // Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
     message BearerTokenCredentials {
       oneof bearer_token {
+        option(validate.required) = true;
         // The bearer token to use when exchanging the token.
         // This is useful when the Token Exchange endpoint requires a specific bearer token
         // to authenticate the request.
         string token = 1;
-
         // The path to the file containing the token to use when exchanging the token.
         string token_path = 2;
+        // Use the Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`
+        bool kubernetes_service_account_token = 3;
       }
     }
 
     oneof credentials {
       option(validate.required) = true;
-
       // The client credentials to use when exchanging the token.
       ClientCredentials client_credentials = 2;
-
       // The bearer token credentials to use when exchanging the token.
       BearerTokenCredentials bearer_token_credentials = 3;
     }

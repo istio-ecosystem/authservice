@@ -48,6 +48,7 @@ func (e errCheck) Check(t *testing.T, err error) {
 }
 
 const (
+	msgValueRequired    = "%s: value is required"
 	msgLengthValidation = "value length must be at least 1 runes"
 	msgInvalidClientID  = `invalid OIDCConfig.ClientId: value contains substring ":"`
 )
@@ -77,6 +78,10 @@ func TestValidateConfig(t *testing.T) {
 		{"valid", "testdata/mock.json", errCheck{is: nil}},
 		{"invalid-oidc-client-secret", "testdata/invalid-oidc-client-secret.json", errCheck{msg: msgLengthValidation}},
 		{"invalid-oidc-client-secret-ref", "testdata/invalid-oidc-client-secret-ref.json", errCheck{msg: msgLengthValidation}},
+		{"invalid-oidc-tokenexchange", "testdata/invalid-oidc-tokenexchange.json", errCheck{msg: msgLengthValidation}},
+		{"invalid-oidc-tokenexchange-bearer", "testdata/invalid-oidc-tokenexchange-bearer.json", errCheck{msg: fmt.Sprintf(msgValueRequired, "BearerToken")}},
+		{"invalid-oidc-tokenexchange-credentials", "testdata/invalid-oidc-tokenexchange-credentials.json",
+			errCheck{msg: fmt.Sprintf(msgValueRequired, "Credentials")}},
 	}
 
 	for _, tt := range tests {

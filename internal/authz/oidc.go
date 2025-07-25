@@ -416,16 +416,31 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken string) (*idpTokensResponse, codes.Code) {
 	cfg := o.config.GetTokenExchange()
 	headers := http.Header{inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded}}
+
 	if cfg.GetClientCredentials() != nil {
-		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())}
+		clientID := cfg.GetClientCredentials().GetClientId()
+		if clientID == "" {
+			clientID = o.config.GetClientId()
+		}
+		clientSecret := cfg.GetClientCredentials().GetClientSecret()
+		if clientSecret == "" {
+			clientSecret = o.config.GetClientSecret()
+		}
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(clientID, clientSecret)}
 	}
+
 	if bearerCfg := cfg.GetBearerTokenCredentials(); bearerCfg != nil {
 		bearer := bearerCfg.GetToken()
 		if bearer == "" {
 			bearerFile := bearerCfg.GetTokenPath()
-			if bearerFile == "" {
+			if bearerFile == "" && bearerCfg.GetKubernetesServiceAccountToken() {
 				bearerFile = k8s.ServiceAccountTokenPath
 			}
+			if bearerFile == "" {
+				log.Error("config error", errors.New("no bearer token configuration provided"))
+				return nil, codes.InvalidArgument
+			}
+
 			log.Info("loading bearer token for token exchange", "file", bearerFile)
 			// Read the file at the exchange time. This shouldn't be frequent, and we always get the latest token.
 			b, err := os.ReadFile(bearerFile)

@@ -170,14 +170,13 @@ a service-specific token.
 ### OIDCConfig.TokenExchange.BearerTokenCredentials
 Configures a Bearer Token to be used as a bearer token to authenticate to the
 Token Exchange endpoint.
-If a token is not explicitly set and a path is not set either, then the Authservice will use the
-Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token`.
 
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | token | [string](#string) |  | The bearer token to use when exchanging the token. This is useful when the Token Exchange endpoint requires a specific bearer token to authenticate the request. |
 | token_path | [string](#string) |  | The path to the file containing the token to use when exchanging the token. |
+| kubernetes_service_account_token | [bool](#bool) |  | Use the Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serviceaccount/token` |
 
 
 
@@ -189,6 +188,13 @@ Kubernetes Service Account Token mounted at `/var/run/secrets/kubernetes.io/serv
 ### OIDCConfig.TokenExchange.ClientCredentials
 Client Credentials designates that the OIDC clientID and clientSecret should be used to authenticate
 to the Token Exchange endpoint.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| client_id | [string](#string) |  | The Client ID to use. If not set, the Client ID from the OIDC configuration will be used. |
+| client_secret | [string](#string) |  | The OIDC client secret to use. If not set, the Client Secret from the OIDC configuration will be used. |
+| client_secret_ref | [OIDCConfig.SecretReference](#authservice-config-v1-oidc-OIDCConfig-SecretReference) |  | The Kubernetes secret that contains the OIDC client secret to be used. If not set, the Client Secret from the OIDC configuration will be used. |
 
 
 

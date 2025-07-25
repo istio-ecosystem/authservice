@@ -1575,6 +1575,66 @@ func (m *OIDCConfig_TokenExchange_ClientCredentials) validate(all bool) error {
 
 	var errors []error
 
+	// no validation rules for ClientId
+
+	switch v := m.ClientSecretConfig.(type) {
+	case *OIDCConfig_TokenExchange_ClientCredentials_ClientSecret:
+		if v == nil {
+			err := OIDCConfig_TokenExchange_ClientCredentialsValidationError{
+				field:  "ClientSecretConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClientSecret
+	case *OIDCConfig_TokenExchange_ClientCredentials_ClientSecretRef:
+		if v == nil {
+			err := OIDCConfig_TokenExchange_ClientCredentialsValidationError{
+				field:  "ClientSecretConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetClientSecretRef()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchange_ClientCredentialsValidationError{
+						field:  "ClientSecretRef",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, OIDCConfig_TokenExchange_ClientCredentialsValidationError{
+						field:  "ClientSecretRef",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetClientSecretRef()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return OIDCConfig_TokenExchange_ClientCredentialsValidationError{
+					field:  "ClientSecretRef",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
 	if len(errors) > 0 {
 		return OIDCConfig_TokenExchange_ClientCredentialsMultiError(errors)
 	}
@@ -1681,6 +1741,7 @@ func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) validate(all bool) err
 
 	var errors []error
 
+	oneofBearerTokenPresent := false
 	switch v := m.BearerToken.(type) {
 	case *OIDCConfig_TokenExchange_BearerTokenCredentials_Token:
 		if v == nil {
@@ -1693,6 +1754,7 @@ func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) validate(all bool) err
 			}
 			errors = append(errors, err)
 		}
+		oneofBearerTokenPresent = true
 		// no validation rules for Token
 	case *OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath:
 		if v == nil {
@@ -1705,9 +1767,33 @@ func (m *OIDCConfig_TokenExchange_BearerTokenCredentials) validate(all bool) err
 			}
 			errors = append(errors, err)
 		}
+		oneofBearerTokenPresent = true
 		// no validation rules for TokenPath
+	case *OIDCConfig_TokenExchange_BearerTokenCredentials_KubernetesServiceAccountToken:
+		if v == nil {
+			err := OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{
+				field:  "BearerToken",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		oneofBearerTokenPresent = true
+		// no validation rules for KubernetesServiceAccountToken
 	default:
 		_ = v // ensures v is used
+	}
+	if !oneofBearerTokenPresent {
+		err := OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{
+			field:  "BearerToken",
+			reason: "value is required",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
 	}
 
 	if len(errors) > 0 {

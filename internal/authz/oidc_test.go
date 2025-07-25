@@ -643,12 +643,51 @@ func TestOIDCProcess(t *testing.T) {
 			},
 		},
 		{
-			name: "token exchange client credentials",
+			name: "token exchange client credentials defaults",
 			setup: func(cfg *oidcv1.OIDCConfig) {
 				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
 					TokenExchangeUri: "http://idp-test-server/token-exchange",
 					Credentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_{
 						ClientCredentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials{},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
+				requireStoredTokens(t, store, sessionID, true)
+				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
+				requireStoredTokens(t, store, newSessionID, false)
+			},
+		},
+		{
+			name: "token exchange client credentials custom",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_{
+						ClientCredentials: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials{
+							ClientId: "client-id-exchange",
+							ClientSecretConfig: &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_ClientSecret{
+								ClientSecret: "client-secret-exchange",
+							},
+						},
 					},
 				}
 			},
@@ -753,6 +792,39 @@ func TestOIDCProcess(t *testing.T) {
 			},
 		},
 		{
+			name: "token exchange bearer file invalid",
+			setup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = &oidcv1.OIDCConfig_TokenExchange{
+					TokenExchangeUri: "http://idp-test-server/token-exchange",
+					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
+						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath{},
+						},
+					},
+				}
+			},
+			cleanup: func(cfg *oidcv1.OIDCConfig) {
+				cfg.TokenExchange = nil
+			},
+			req:             callbackRequest,
+			storedAuthState: validAuthState,
+			mockTokensResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+				AccessToken: "access-token",
+				TokenType:   "Bearer",
+			}),
+			mockTokensExchangeResponse: mockTokenResponse(http.StatusOK, &idpTokensResponse{
+				AccessToken: "access-token-exchanged",
+				ExpiresIn:   3600,
+				TokenType:   "Bearer",
+			}),
+			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
+				require.Equal(t, int32(codes.InvalidArgument), resp.GetStatus().GetCode())
+				requireStandardResponseHeaders(t, resp)
+				requireStoredTokens(t, store, sessionID, false)
+			},
+		},
+		{
 			// This test will fail because the kubernetes service account token file located at
 			// /var/run/secrets/kubernetes.io/serviceaccount/token is not expected to be present
 			// in the test environment.
@@ -762,7 +834,9 @@ func TestOIDCProcess(t *testing.T) {
 					TokenExchangeUri: "http://idp-test-server/token-exchange",
 					Credentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_{
 						BearerTokenCredentials: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials{
-							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_TokenPath{},
+							BearerToken: &oidcv1.OIDCConfig_TokenExchange_BearerTokenCredentials_KubernetesServiceAccountToken{
+								KubernetesServiceAccountToken: true,
+							},
 						},
 					},
 				}
