@@ -185,6 +185,10 @@ func mergeAndValidateOIDCConfigs(cfg *configv1.Config) error {
 }
 
 func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
+	if config.GetClientAuthenticationMethod() == "" {
+		config.ClientAuthenticationMethod = ClientAuthenticationBasic
+	}
+
 	if config.GetScopes() == nil {
 		config.Scopes = []string{ScopeOIDC}
 	}
@@ -194,10 +198,6 @@ func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
 		}
 	}
 	config.Scopes = append(config.Scopes, ScopeOIDC)
-
-	if config.GetClientAuthenticationMethod() == "" {
-		config.ClientAuthenticationMethod = ClientAuthenticationPost
-	}
 }
 
 func ConfigToJSONString(c *configv1.Config) string {
