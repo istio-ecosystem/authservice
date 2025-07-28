@@ -408,7 +408,20 @@ func (m *OIDCConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	// no validation rules for ClientAuthenticationMethod
+	if m.GetClientAuthenticationMethod() != "" {
+
+		if _, ok := _OIDCConfig_ClientAuthenticationMethod_InLookup[m.GetClientAuthenticationMethod()]; !ok {
+			err := OIDCConfigValidationError{
+				field:  "ClientAuthenticationMethod",
+				reason: "value must be in list [client_secret_basic client_secret_post client_secret_jwt private_key_jwt none]",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+	}
 
 	if utf8.RuneCountInString(m.GetClientId()) < 1 {
 		err := OIDCConfigValidationError{
@@ -927,6 +940,14 @@ var _ interface {
 	ErrorName() string
 } = OIDCConfigValidationError{}
 
+var _OIDCConfig_ClientAuthenticationMethod_InLookup = map[string]struct{}{
+	"client_secret_basic": {},
+	"client_secret_post":  {},
+	"client_secret_jwt":   {},
+	"private_key_jwt":     {},
+	"none":                {},
+}
+
 // Validate checks the field values on OIDCConfig_JwksFetcherConfig with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -1177,10 +1198,6 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_SecretReferenceValidationError{}
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 82e02ea (fix merge)
 
 // Validate checks the field values on OIDCConfig_CookieAttributes with the
 // rules defined in the proto definition for this message. If any rules are
@@ -1343,7 +1360,6 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_CookieAttributesValidationError{}
-<<<<<<< HEAD
 
 // Validate checks the field values on OIDCConfig_TokenExchange with the rules
 // defined in the proto definition for this message. If any rules are
@@ -1889,7 +1905,3 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = OIDCConfig_TokenExchange_BearerTokenCredentialsValidationError{}
-=======
->>>>>>> 727d485 (missing generated files)
-=======
->>>>>>> 82e02ea (fix merge)

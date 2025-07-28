@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.9"
-
 services:
   # This is a proxy that intercepts requests to the target application and calls the authservice to
   # perform the OIDC authorization check.

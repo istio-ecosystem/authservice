@@ -340,7 +340,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	form, err := buildAuthParams(o.config, codeFromReq, stateFromReq)
+	form, err := buildAuthParams(o.config, codeFromReq, stateFromStore.CodeVerifier)
 	if err != nil {
 		log.Error("error building auth params", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
@@ -471,89 +471,38 @@ func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken stri
 // The function returns an error if the client authentication method is unspecified
 // or if the implementation for the specified method is not supported.
 func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
+	headers := http.Header{
+		inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+	}
 
-	var headers http.Header
 	switch config.GetClientAuthenticationMethod() {
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
-
-		// Build basic auth header
-		headers = http.Header{
-			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
-		}
-
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
-
-		// Build post auth header
-		headers = http.Header{
-			inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
-		}
-
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
-		// Build jwt auth header
-		// TODO: implement jwt auth header
-		return nil, errors.New("client authentication method client_secret_jwt is not implemented")
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
-		// Build private key jwt auth header
-		// TODO: implement private key jwt auth header
-		return nil, errors.New("client authentication method private_key_jwt is not implemented")
+	case internal.ClientAuthenticationBasic:
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())}
+	case internal.ClientAuthenticationPost:
+		// No extra headers to add for client_secret_post.
 	default:
-		// Builds basic auth header
-		headers = http.Header{
-			inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-			inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())},
-		}
+		return nil, fmt.Errorf("client authentication method %s is not implemented", config.GetClientAuthenticationMethod())
 	}
 
 	return headers, nil
 }
 
 func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifierFromReq string) (url.Values, error) {
-	var params url.Values
+	params := url.Values{
+		"grant_type":    []string{"authorization_code"},
+		"code":          []string{codeFromReq},
+		"redirect_uri":  []string{config.GetCallbackUri()},
+		"code_verifier": []string{codeVerifierFromReq},
+	}
+
 	switch config.GetClientAuthenticationMethod() {
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC:
-
-		params = url.Values{
-			"grant_type":    []string{"authorization_code"},
-			"code":          []string{codeFromReq},
-			"redirect_uri":  []string{config.GetCallbackUri()},
-			"code_verifier": []string{codeVerifierFromReq},
-		}
-
-		return params, nil
-
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST:
-		// Build post auth params
-		params = url.Values{
-			"grant_type":    []string{"authorization_code"},
-			"code":          []string{codeFromReq},
-			"redirect_uri":  []string{config.GetCallbackUri()},
-			"code_verifier": []string{codeVerifierFromReq},
-			"client_id":     []string{config.GetClientId()},
-			"client_secret": []string{config.GetClientSecret()},
-		}
-
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT:
-		// Build jwt auth params
-		// TODO: implement jwt auth params
-		return nil, errors.New("client authentication method client_secret_jwt is not implemented")
-
-	case oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT:
-		// Build private key jwt auth params
-		// TODO: implement private key jwt auth params
-		return nil, errors.New("client authentication method private_key_jwt is not implemented")
-
+	case internal.ClientAuthenticationBasic:
+		// No extra body params to add.
+	case internal.ClientAuthenticationPost:
+		params["client_id"] = []string{config.GetClientId()}
+		params["client_secret"] = []string{config.GetClientSecret()}
 	default:
-
-		// Build basic auth params
-		params = url.Values{
-			"grant_type":    []string{"authorization_code"},
-			"code":          []string{codeFromReq},
-			"redirect_uri":  []string{config.GetCallbackUri()},
-			"code_verifier": []string{codeVerifierFromReq},
-		}
-
-		return params, nil
+		return nil, fmt.Errorf("client authentication method %s is not implemented", config.GetClientAuthenticationMethod())
 	}
 	return params, nil
 }

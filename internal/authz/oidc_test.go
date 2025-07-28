@@ -149,31 +149,8 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_BASIC,
+		ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
 		Scopes:                     []string{"openid", "email"},
-		Logout: &oidcv1.LogoutConfig{
-			Path:        "/logout",
-			RedirectUri: "http://idp-test-server/logout?with-params",
-		},
-	}
-
-	emptyAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
-		IdToken: &oidcv1.TokenConfig{
-			Header:   "Authorization",
-			Preamble: "Bearer",
-		},
-		AccessToken: &oidcv1.TokenConfig{
-			Header:   "X-Access-Token",
-			Preamble: "Bearer",
-		},
-		TokenUri:         "http://idp-test-server/token",
-		AuthorizationUri: "http://idp-test-server/auth",
-		CallbackUri:      "https://localhost:443/callback",
-		ClientId:         "test-client-id",
-		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
-			ClientSecret: "test-client-secret",
-		},
-		Scopes: []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
 			RedirectUri: "http://idp-test-server/logout?with-params",
@@ -196,7 +173,7 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST,
+		ClientAuthenticationMethod: internal.ClientAuthenticationPost,
 		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
@@ -220,7 +197,7 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		ClientAuthenticationMethod: oidcv1.OIDCConfig_CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT,
+		ClientAuthenticationMethod: internal.ClientAuthenticationJWT,
 		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
@@ -279,15 +256,11 @@ var (
 )
 
 func TestBasicClientAuthenticationMethod(t *testing.T) {
-	testOIDCProcessReusable(t, basicOIDCConfig)
+	testOIDCProcess(t, basicOIDCConfig)
 }
 
 func TestPostClientAuthenticationMethod(t *testing.T) {
-	testOIDCProcessReusable(t, postOIDCConfig)
-}
-
-func TestEmptyClientAuthenticationMethod(t *testing.T) {
-	testOIDCProcessReusable(t, emptyAuthMethodOIDCConfig)
+	testOIDCProcess(t, postOIDCConfig)
 }
 
 func TestJWTClientAuthenticationMethodUnauthenticated(t *testing.T) {
@@ -330,7 +303,7 @@ func TestJWTClientAuthenticationMethodUnauthenticated(t *testing.T) {
 	})
 }
 
-func testOIDCProcessReusable(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
+func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
 	// We remove the optional "alg" field from this key to test that we can

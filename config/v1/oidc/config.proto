@@ -129,29 +129,23 @@ message OIDCConfig {
     JwksFetcherConfig jwks_fetcher = 17;
   }
 
-  enum ClientAuthenticationMethod {
-    CLIENT_AUTHENTICATION_METHOD_UNSPECIFIED = 0;
-
-    // Clients authenticate using the HTTP Basic authentication scheme
-    CLIENT_AUTHENTICATION_METHOD_BASIC = 1;
-
-    // Clients  authenticate by including the Client Credentials in the request body
-    CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_POST = 2;
-
-
-    // Clients create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256 (currently not implemented)
-    CLIENT_AUTHENTICATION_METHOD_CLIENT_SECRET_JWT = 3;
-
-
-    // Clients that have registered a public key sign a JWT using that key (currently not implemented)
-    CLIENT_AUTHENTICATION_METHOD_PRIVATE_KEY_JWT = 4;
-
-    
-  }
-
   // Available [Client Authentication](https://openid.net/specs/openid-connect-core-1_0.html#ClientAuthentication)
-  // methods
-  ClientAuthenticationMethod client_authentication_method = 24;
+  // methods.
+  // * `client_secret_basic` - Clients authenticate using the HTTP Basic authentication scheme.
+  // * `client_secret_post` - Clients authenticate by including the Client Credentials in the request body.
+  // * `client_secret_jwt` - Clients create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256 (not implemented).
+  // * `private_key_jwt` - Clients that have registered a public key sign a JWT using that key (not implemented).
+  // * `none` - The Client does not authenticate itself at the Token Endpoint, either because it uses only the
+  //   Implicit Flow (and so does not use the Token Endpoint) or because it is a Public Client with no
+  //   Client Secret or other authentication mechanism (not implemented).
+  // If not set, it defaults to `client_secret_basic`.
+  string client_authentication_method = 25 [(validate.rules).string = {ignore_empty: true, in: [
+    "client_secret_basic", // Clients authenticate using the HTTP Basic authentication scheme.
+    "client_secret_post", // Clients authenticate by including the Client Credentials in the request body.
+    "client_secret_jwt", // Clients create a JWT using an HMAC SHA algorithm, such as HMAC SHA-256.
+    "private_key_jwt", // Clients that have registered a public key sign a JWT using that key.
+    "none" // The Client does not authenticate itself at the Token Endpoint.
+  ]}];
 
   // The OIDC client ID assigned to the filter to be used in the
   // [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).

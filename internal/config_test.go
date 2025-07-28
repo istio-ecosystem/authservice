@@ -48,9 +48,10 @@ func (e errCheck) Check(t *testing.T, err error) {
 }
 
 const (
-	msgValueRequired    = "%s: value is required"
-	msgLengthValidation = "value length must be at least 1 runes"
-	msgInvalidClientID  = `invalid OIDCConfig.ClientId: value contains substring ":"`
+	msgValueRequired     = "%s: value is required"
+	msgLengthValidation  = "value length must be at least 1 runes"
+	msgInvalidClientID   = `invalid OIDCConfig.ClientId: value contains substring ":"`
+	msgInvalidClientAuth = "ClientAuthenticationMethod: value must be in list [client_secret_basic client_secret_post client_secret_jwt private_key_jwt none]"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -69,6 +70,7 @@ func TestValidateConfig(t *testing.T) {
 		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"invalid-oidc-uris", "testdata/invalid-oidc-uris.json", errCheck{is: ErrRequiredURL}},
 		{"invalid-oidc-client-id", "testdata/invalid-oidc-client-id.json", errCheck{msg: msgInvalidClientID}},
+		{"invalid-oidc-client-auth", "testdata/invalid-oidc-client-auth-method.json", errCheck{msg: msgInvalidClientAuth}},
 		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
 		{"invalid-callback-uri", "testdata/invalid-callback.json", errCheck{is: ErrMustNotBeRootPath}},
 		{"invalid-logout-path", "testdata/invalid-logout.json", errCheck{is: ErrMustNotBeRootPath}},

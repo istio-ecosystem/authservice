@@ -30,7 +30,15 @@ import (
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
-const ScopeOIDC = "openid"
+const (
+	ScopeOIDC = "openid"
+
+	ClientAuthenticationBasic      = "client_secret_basic"
+	ClientAuthenticationPost       = "client_secret_post"
+	ClientAuthenticationJWT        = "client_secret_jwt"
+	ClientAuthenticationPrivateKey = "private_key_jwt"
+	ClientAuthenticationNone       = "none"
+)
 
 var (
 	_ run.Config = (*LocalConfigFile)(nil)
@@ -186,6 +194,10 @@ func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
 		}
 	}
 	config.Scopes = append(config.Scopes, ScopeOIDC)
+
+	if config.GetClientAuthenticationMethod() == "" {
+		config.ClientAuthenticationMethod = ClientAuthenticationPost
+	}
 }
 
 func ConfigToJSONString(c *configv1.Config) string {
