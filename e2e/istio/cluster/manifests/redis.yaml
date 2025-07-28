@@ -61,6 +61,8 @@ spec:
       containers:
         - name: redis
           image: redis:7.2.4
+          args:
+            - /etc/redis/redis.conf
           imagePullPolicy: IfNotPresent
           ports:
             - name: redis
@@ -71,3 +73,37 @@ spec:
             periodSeconds: 5
             tcpSocket:
               port: 6379
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
+              readOnly: true
+            - name: certs
+              mountPath: /etc/redis/certs
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
+        - name: certs
+          secret:
+            secretName: redis-certs
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: redis-config
+  namespace: redis
+data:
+  redis.conf: |
+    # Only accept TLS connections
+    port 0
+    tls-port 6379
+    
+    # Configure user credentials
+    user default off
+    user authservice on +@all ~* >redis-pass
+    
+    # Configure server certificates and require mTLS from clients
+    tls-cert-file /etc/redis/certs/tls.crt
+    tls-key-file /etc/redis/certs/tls.key
+    tls-ca-cert-file /etc/redis/certs/ca.crt

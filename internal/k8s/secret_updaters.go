@@ -23,9 +23,7 @@ import (
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 )
 
-const (
-	keyClientSecret = "client-secret"
-)
+const keyClientSecret = "client-secret"
 
 // updateOIDCClientSecret is a function that updates the OIDC client secret in the provided OIDCConfig.
 func updateOIDCClientSecret(logger telemetry.Logger, namespace, name string, cfg *oidcv1.OIDCConfig) secretUpdateFunc {

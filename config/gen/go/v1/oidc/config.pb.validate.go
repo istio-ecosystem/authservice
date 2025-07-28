@@ -180,6 +180,66 @@ func (m *RedisConfig) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for Username
+
+	if all {
+		switch v := interface{}(m.GetTlsConfig()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RedisConfigValidationError{
+					field:  "TlsConfig",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RedisConfigValidationError{
+					field:  "TlsConfig",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTlsConfig()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RedisConfigValidationError{
+				field:  "TlsConfig",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	switch v := m.RedisPassword.(type) {
+	case *RedisConfig_Password:
+		if v == nil {
+			err := RedisConfigValidationError{
+				field:  "RedisPassword",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for Password
+	case *RedisConfig_PasswordFile:
+		if v == nil {
+			err := RedisConfigValidationError{
+				field:  "RedisPassword",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for PasswordFile
+	default:
+		_ = v // ensures v is used
+	}
+
 	if len(errors) > 0 {
 		return RedisConfigMultiError(errors)
 	}
@@ -947,6 +1007,195 @@ var _OIDCConfig_ClientAuthenticationMethod_InLookup = map[string]struct{}{
 	"private_key_jwt":     {},
 	"none":                {},
 }
+
+// Validate checks the field values on RedisConfig_TLSConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RedisConfig_TLSConfig) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RedisConfig_TLSConfig with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RedisConfig_TLSConfigMultiError, or nil if none found.
+func (m *RedisConfig_TLSConfig) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RedisConfig_TLSConfig) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SkipVerifyPeerCert
+
+	switch v := m.Ca.(type) {
+	case *RedisConfig_TLSConfig_TrustedCaPem:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "Ca",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for TrustedCaPem
+	case *RedisConfig_TLSConfig_TrustedCaFile:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "Ca",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for TrustedCaFile
+	default:
+		_ = v // ensures v is used
+	}
+	switch v := m.ClientCert.(type) {
+	case *RedisConfig_TLSConfig_ClientCertPem:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "ClientCert",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClientCertPem
+	case *RedisConfig_TLSConfig_ClientCertFile:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "ClientCert",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClientCertFile
+	default:
+		_ = v // ensures v is used
+	}
+	switch v := m.ClientKey.(type) {
+	case *RedisConfig_TLSConfig_ClientKeyPem:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "ClientKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClientKeyPem
+	case *RedisConfig_TLSConfig_ClientKeyFile:
+		if v == nil {
+			err := RedisConfig_TLSConfigValidationError{
+				field:  "ClientKey",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for ClientKeyFile
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return RedisConfig_TLSConfigMultiError(errors)
+	}
+
+	return nil
+}
+
+// RedisConfig_TLSConfigMultiError is an error wrapping multiple validation
+// errors returned by RedisConfig_TLSConfig.ValidateAll() if the designated
+// constraints aren't met.
+type RedisConfig_TLSConfigMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RedisConfig_TLSConfigMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RedisConfig_TLSConfigMultiError) AllErrors() []error { return m }
+
+// RedisConfig_TLSConfigValidationError is the validation error returned by
+// RedisConfig_TLSConfig.Validate if the designated constraints aren't met.
+type RedisConfig_TLSConfigValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RedisConfig_TLSConfigValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RedisConfig_TLSConfigValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RedisConfig_TLSConfigValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RedisConfig_TLSConfigValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RedisConfig_TLSConfigValidationError) ErrorName() string {
+	return "RedisConfig_TLSConfigValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RedisConfig_TLSConfigValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRedisConfig_TLSConfig.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RedisConfig_TLSConfigValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RedisConfig_TLSConfigValidationError{}
 
 // Validate checks the field values on OIDCConfig_JwksFetcherConfig with the
 // rules defined in the proto definition for this message. If any rules are

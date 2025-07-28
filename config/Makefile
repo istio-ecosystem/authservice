@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PROTO_SOURCES := $(shell find . -name '*.proto')
+.PHONY: all
+all: clean build lint
 
 .PHONY: build
-build: $(PROTO_SOURCES) ## Generate the Go code from the protobuf definitions
+build:  ## Generate the Go code from the protobuf definitions
 	@echo "Generating Go code from protobuf definitions"
 	@go tool buf build
 	@go tool buf generate

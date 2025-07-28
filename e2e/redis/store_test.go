@@ -16,23 +16,52 @@ package mock
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwt"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
-const redisURL = "redis://localhost:6379"
+const (
+	redisURL  = "redis://localhost:6379"
+	redisUser = "authservice"
+	redisPass = "redis-pass"
+)
+
+var redisConfig *oidcv1.RedisConfig
+
+func TestMain(m *testing.M) {
+	redisConfig = &oidcv1.RedisConfig{
+		ServerUri:     redisURL,
+		Username:      redisUser,
+		RedisPassword: &oidcv1.RedisConfig_Password{Password: redisPass},
+		TlsConfig: &oidcv1.RedisConfig_TLSConfig{
+			Ca:         &oidcv1.RedisConfig_TLSConfig_TrustedCaPem{TrustedCaPem: mustRead("certs/ca.crt")},
+			ClientCert: &oidcv1.RedisConfig_TLSConfig_ClientCertPem{ClientCertPem: mustRead("certs/client.crt")},
+			ClientKey:  &oidcv1.RedisConfig_TLSConfig_ClientKeyPem{ClientKeyPem: mustRead("certs/client.key")},
+		},
+	}
+
+	m.Run()
+}
+
+func mustRead(filename string) string {
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+	return string(content)
+}
 
 func TestRedisTokenResponse(t *testing.T) {
-	opts, err := redis.ParseURL(redisURL)
+	client, err := oidc.NewRedisClient(redisConfig)
 	require.NoError(t, err)
-	client := redis.NewClient(opts)
 
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 0, 1*time.Minute)
 	require.NoError(t, err)
@@ -67,9 +96,8 @@ func TestRedisTokenResponse(t *testing.T) {
 }
 
 func TestRedisAuthorizationState(t *testing.T) {
-	opts, err := redis.ParseURL(redisURL)
+	client, err := oidc.NewRedisClient(redisConfig)
 	require.NoError(t, err)
-	client := redis.NewClient(opts)
 
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 0, 1*time.Minute)
 	require.NoError(t, err)
@@ -100,9 +128,8 @@ func TestRedisAuthorizationState(t *testing.T) {
 }
 
 func TestSessionExpiration(t *testing.T) {
-	opts, err := redis.ParseURL(redisURL)
+	client, err := oidc.NewRedisClient(redisConfig)
 	require.NoError(t, err)
-	client := redis.NewClient(opts)
 
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 2*time.Second, 0)
 	require.NoError(t, err)

@@ -90,7 +90,7 @@ func TestManagerStarts(t *testing.T) {
 	}))
 	require.NoError(t, err)
 
-	// signale the prerun phase to complete
+	// signal the prerun phase to complete
 	close(manual.finishPreRun)
 
 	// at some point of serve phase, the manager should be started

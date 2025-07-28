@@ -38,6 +38,8 @@ const (
 	Server   = "server"
 	Session  = "session"
 	K8s      = "k8s"
+	Secrets  = "secrets"
+	Watch    = "watch"
 )
 
 // scopes contains the list of all logging scopes
@@ -52,6 +54,8 @@ var scopes = map[string]string{
 	Server:   "Server request handling messages",
 	Session:  "Session store messages",
 	K8s:      "Kubernetes controller messages",
+	Secrets:  "Kubernetes secrets controller messages",
+	Watch:    "Filie watcher messages",
 }
 
 // ErrInvalidLogLevel is returned when the configured log level is invalid.

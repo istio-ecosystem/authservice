@@ -19,7 +19,7 @@ include ../suite-k8s.mk
 E2E_ISTIO_VERSION ?=
 
 .PHONY: gen-certs
-gen-certs: clean-certs ca/ca.authservice.internal certificate/http-echo.authservice.internal
+gen-certs: clean-certs ca/ca.authservice.internal certificate/http-echo.authservice.internal certificate/redis.redis.svc.cluster.local certificate/redis-client
 	@chmod -R a+r $(CERTS_DIR)
 
 .PHONY: clean
@@ -28,6 +28,18 @@ clean:: clean-certs
 .PHONY: e2e-pre
 e2e-pre:: gen-certs
 	@kubectl --kubeconfig $(E2E_KUBECONFIG) create namespace istio-system
+	@kubectl --kubeconfig $(E2E_KUBECONFIG) create namespace authservice
+	@kubectl --kubeconfig $(E2E_KUBECONFIG) create namespace redis
 	@kubectl --kubeconfig $(E2E_KUBECONFIG) -n istio-system create secret tls http-echo-certs \
 		--cert=certs/http-echo.authservice.internal.crt \
 		--key=certs/http-echo.authservice.internal.key
+	@kubectl --kubeconfig $(E2E_KUBECONFIG) -n redis create secret generic redis-certs \
+		--from-file=ca.crt=certs/ca.crt \
+		--from-file=tls.crt=certs/redis.redis.svc.cluster.local.crt \
+		--from-file=tls.key=certs/redis.redis.svc.cluster.local.key
+	@kubectl --kubeconfig $(E2E_KUBECONFIG) -n authservice create secret generic redis-client-mtls \
+		--from-file=ca.crt=certs/ca.crt \
+		--from-file=tls.crt=certs/redis-client.crt \
+		--from-file=tls.key=certs/redis-client.key
+	@kubectl --kubeconfig $(E2E_KUBECONFIG) -n authservice create secret generic redis-password \
+		--from-literal=password=redis-pass
