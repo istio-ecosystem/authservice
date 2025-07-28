@@ -15,7 +15,6 @@
 package oidc
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -24,7 +23,7 @@ import (
 
 func TestMemoryTokenResponse(t *testing.T) {
 	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tr, err := m.GetTokenResponse(ctx, "s1")
 	require.NoError(t, err)
@@ -50,7 +49,7 @@ func TestMemoryTokenResponse(t *testing.T) {
 
 func TestMemoryAuthorizationState(t *testing.T) {
 	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	as, err := m.GetAuthorizationState(ctx, "s1")
 	require.NoError(t, err)
@@ -83,7 +82,7 @@ func TestMemoryAuthorizationState(t *testing.T) {
 
 func TestMemoryRemoveResponse(t *testing.T) {
 	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
 	require.NotNil(t, m.sessions["s1"])
@@ -94,7 +93,7 @@ func TestMemoryRemoveResponse(t *testing.T) {
 
 func TestMemoryRemoveAllExpired(t *testing.T) {
 	m := NewMemoryStore(&Clock{}, 0, 0).(*memoryStore)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	require.NoError(t, m.SetTokenResponse(ctx, "s1", &TokenResponse{}))
 	require.NoError(t, m.SetTokenResponse(ctx, "s2", &TokenResponse{}))

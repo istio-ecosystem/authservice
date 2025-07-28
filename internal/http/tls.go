@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package http
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
@@ -24,11 +23,15 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"sync"
 
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	"github.com/istio-ecosystem/authservice/internal"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 type (
@@ -56,18 +59,18 @@ type (
 	tlsConfigPool struct {
 		log telemetry.Logger
 
-		mu        sync.RWMutex
-		configs   map[string]*tls.Config
-		caWatcher *FileWatcher
+		mu          sync.RWMutex
+		configs     map[string]*tls.Config
+		fileWatcher watch.Callbacker
 	}
 )
 
 // NewTLSConfigPool creates a new TLSConfigPool.
-func NewTLSConfigPool(ctx context.Context) TLSConfigPool {
+func NewTLSConfigPool(fileWatcher watch.Callbacker) TLSConfigPool {
 	return &tlsConfigPool{
-		log:       Logger(Config),
-		configs:   make(map[string]*tls.Config),
-		caWatcher: NewFileWatcher(ctx),
+		log:         internal.Logger(internal.Config),
+		configs:     make(map[string]*tls.Config),
+		fileWatcher: fileWatcher,
 	}
 }
 
@@ -85,8 +88,10 @@ func (p *tlsConfigPool) LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
 
 	p.mu.Lock()
 	if tlsConfig, ok := p.configs[id]; ok {
+		// Return a clone of the config for sare read access during concurrent updates
+		clone := tlsConfig.Clone()
 		p.mu.Unlock()
-		return tlsConfig, nil
+		return clone, nil
 	}
 	p.mu.Unlock()
 
@@ -101,23 +106,30 @@ func (p *tlsConfigPool) LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
 		ca = []byte(config.GetTrustedCertificateAuthority())
 
 	case config.GetTrustedCertificateAuthorityFile() != "":
-		var err error
-		ca, err = p.caWatcher.WatchFile(
-			NewFileReader(config.GetTrustedCertificateAuthorityFile()),
-			config.GetTrustedCertificateAuthorityRefreshInterval().AsDuration(),
-			func(data []byte) { p.updateCA(id, data) },
+		var (
+			err    error
+			caFile = config.GetTrustedCertificateAuthorityFile()
 		)
-		if err != nil {
+		if ca, err = os.ReadFile(caFile); err != nil {
+			return nil, fmt.Errorf("error reading trusted CA file: %w", err)
+		}
+		if err = p.fileWatcher.Watch(caFile, func(data watch.Data) {
+			if data.Err != nil {
+				log.Error("updating trusted CA file", data.Err)
+				return
+			}
+			p.updateCA(id, data.Value.(watch.FileValue).Data)
+		}); err != nil {
 			return nil, fmt.Errorf("error watching trusted CA file: %w", err)
 		}
 
 	case config.GetSkipVerifyPeerCert() != nil:
-		tlsConfig.InsecureSkipVerify = BoolStrValue(config.GetSkipVerifyPeerCert())
+		tlsConfig.InsecureSkipVerify = internal.BoolStrValue(config.GetSkipVerifyPeerCert())
 	}
 
 	// Add the loaded CA to the TLS config
 	if len(ca) != 0 {
-		if BoolStrValue(config.GetSkipVerifyPeerCert()) {
+		if internal.BoolStrValue(config.GetSkipVerifyPeerCert()) {
 			log.Info("`skip_verify_peer_cert` is set to true but there's also a trusted certificate authority, ignoring `skip_verify_peer_cert`")
 		}
 
@@ -189,7 +201,7 @@ func encodeConfig(config TLSConfig) tlsConfigEncoder {
 		TrustedCA:                config.GetTrustedCertificateAuthority(),
 		TrustedCAFile:            config.GetTrustedCertificateAuthorityFile(),
 		TrustedCARefreshInterval: config.GetTrustedCertificateAuthorityRefreshInterval().AsDuration().String(),
-		SkipVerifyPeerCert:       BoolStrValue(config.GetSkipVerifyPeerCert()),
+		SkipVerifyPeerCert:       internal.BoolStrValue(config.GetSkipVerifyPeerCert()),
 	}
 }
 

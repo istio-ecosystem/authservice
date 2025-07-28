@@ -31,6 +31,7 @@ import (
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 func TestSessionStoreFactoryInit(t *testing.T) {
@@ -89,7 +90,7 @@ func TestSessionStoreFactoryInit(t *testing.T) {
 		},
 	}
 
-	store := NewSessionStoreFactory(config).(*sessionStoreFactory)
+	store := NewSessionStoreFactory(config, noopWatcher{}).(*sessionStoreFactory)
 	require.NoError(t, store.PreRun())
 
 	require.NotNil(t, store.fallbackStore)
@@ -133,7 +134,7 @@ func TestSessionStoreFactoryRedisInitFailure(t *testing.T) {
 	}
 
 	g := run.Group{}
-	g.Register(NewSessionStoreFactory(config))
+	g.Register(NewSessionStoreFactory(config, noopWatcher{}))
 
 	require.ErrorContains(t, g.Run(), "server error")
 }
@@ -170,6 +171,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 		},
 	}
 
+	fileWatcher := watch.NewFileWatcher(watch.NewOpts())
 	factory := NewSessionStoreFactory(&configv1.Config{
 		Chains: []*configv1.FilterChain{
 			{
@@ -182,7 +184,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 				},
 			},
 		},
-	}).(*sessionStoreFactory)
+	}, fileWatcher).(*sessionStoreFactory)
 
 	// Verify that the files have been initialized
 	require.Empty(t, redisConfig.GetPassword())
@@ -199,7 +201,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	go func() {
-		_ = factory.ServeContext(ctx)
+		_ = fileWatcher.Start(ctx.Done())
 	}()
 
 	// Set new values. This will cause a redis connect failure, but we don't care about that here.
@@ -240,3 +242,9 @@ func TestSessionGenerator(t *testing.T) {
 		require.Equal(t, "codeverifier", sg.GenerateCodeVerifier())
 	})
 }
+
+var _ watch.Callbacker = (*noopWatcher)(nil)
+
+type noopWatcher struct{}
+
+func (noopWatcher) Watch(string, ...watch.Callback) error { return nil }

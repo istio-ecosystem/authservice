@@ -338,6 +338,7 @@ message OIDCConfig {
   // Unset or 0 (the default) disables the refresh, useful is no rotation is expected.
   // Is a String that ends in `s` to indicate seconds and is preceded by the number of seconds, e.g. `120s` (represents 2 minutes).
   // Optional.
+  // Deprecated. The file will be automatically reloaded when it changes.
   google.protobuf.Duration trusted_certificate_authority_refresh_interval = 22;
 
   // The Authservice makes two kinds of direct network connections directly to the OIDC Provider.

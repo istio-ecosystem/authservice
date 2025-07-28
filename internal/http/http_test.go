@@ -15,7 +15,6 @@
 package http
 
 import (
-	"context"
 	"encoding/base64"
 	"net/http"
 	"testing"
@@ -25,7 +24,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
-	"github.com/istio-ecosystem/authservice/internal"
 )
 
 func TestGetPathQueryFragment(t *testing.T) {
@@ -150,7 +148,7 @@ func TestNewHTTPClient(t *testing.T) {
 			ProxyUri:           "http://localhost:8080",
 			SkipVerifyPeerCert: &structpb.Value{Kind: &structpb.Value_BoolValue{BoolValue: true}},
 		}
-		pool := internal.NewTLSConfigPool(context.Background())
+		pool := NewTLSConfigPool(noopWatcher{})
 
 		client, err := NewHTTPClient(cfg, pool, nil)
 		require.NoError(t, err)
@@ -165,7 +163,7 @@ func TestNewHTTPClient(t *testing.T) {
 				TrustedCertificateAuthorityFile: "unexisting",
 			},
 		}
-		pool := internal.NewTLSConfigPool(context.Background())
+		pool := NewTLSConfigPool(noopWatcher{})
 
 		_, err := NewHTTPClient(cfg, pool, nil)
 		require.Error(t, err)
@@ -173,7 +171,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 	t.Run("disabled-logger", func(t *testing.T) {
 		cfg := &oidcv1.OIDCConfig{}
-		pool := internal.NewTLSConfigPool(context.Background())
+		pool := NewTLSConfigPool(noopWatcher{})
 		log := telemetry.NoopLogger()
 		log.SetLevel(telemetry.LevelInfo)
 
@@ -184,7 +182,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 	t.Run("enabled-logger", func(t *testing.T) {
 		cfg := &oidcv1.OIDCConfig{}
-		pool := internal.NewTLSConfigPool(context.Background())
+		pool := NewTLSConfigPool(noopWatcher{})
 		log := telemetry.NoopLogger()
 		log.SetLevel(telemetry.LevelDebug)
 

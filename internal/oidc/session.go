@@ -33,7 +33,7 @@ import (
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
-	watcher "github.com/istio-ecosystem/authservice/internal/watch"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 type (
@@ -56,9 +56,7 @@ type (
 
 	// SessionStoreFactoryUnit is a combination of a run.PreRunner and a SessionStoreFactory.
 	SessionStoreFactoryUnit interface {
-		run.Config
 		run.PreRunner
-		run.ServiceContext
 		SessionStoreFactory
 	}
 )
@@ -73,8 +71,7 @@ type sessionStoreFactory struct {
 	clock         *Clock
 	fallbackStore SessionStore
 
-	fileWatcher            watcher.Watcher
-	periodicReloadInterval time.Duration
+	fileWatcher watch.Callbacker
 
 	mu     sync.RWMutex
 	stores map[string]SessionStore
@@ -84,41 +81,23 @@ type sessionStoreFactory struct {
 
 // NewSessionStoreFactory creates a factory for managing session stores.
 // It uses the OIDC configuration to determine which store to use.
-func NewSessionStoreFactory(cfg *configv1.Config) SessionStoreFactoryUnit {
+func NewSessionStoreFactory(cfg *configv1.Config, fileWatcher watch.Callbacker) SessionStoreFactoryUnit {
 	clock := &Clock{}
 	return &sessionStoreFactory{
 		config:        cfg,
 		clock:         clock,
 		fallbackStore: NewMemoryStore(clock, 0, 0),
 		stores:        make(map[string]SessionStore),
+		fileWatcher:   fileWatcher,
 	}
 }
 
 // Name implements run.Unit.
 func (s *sessionStoreFactory) Name() string { return "OIDC session store factory" }
 
-// FlagSet returns the flags used to customize the config file location.
-func (s *sessionStoreFactory) FlagSet() *run.FlagSet {
-	flags := run.NewFlagSet("Session Store flags")
-	flags.DurationVar(&s.periodicReloadInterval, "periodic-reload-interval", 0,
-		"Interval for periodic reload of watched files. A value of 0 disables periodic reload.")
-	return flags
-}
-
-// Validate and load the configuration file.
-func (s *sessionStoreFactory) Validate() error { return nil }
-
 // PreRun initializes the stores that are defined in the configuration
 func (s *sessionStoreFactory) PreRun() error {
 	s.log = internal.Logger(internal.Session)
-
-	var opts []watcher.OptionFunc
-	if s.periodicReloadInterval > 0 {
-		opts = append(opts, watcher.WithFallbackInterval(s.periodicReloadInterval))
-	} else {
-		opts = append(opts, watcher.WithSkipFallback())
-	}
-	s.fileWatcher = watcher.NewFileWatcher(watcher.NewOpts(opts...))
 
 	for _, fc := range s.config.Chains {
 		for _, f := range fc.Filters {
@@ -144,15 +123,6 @@ func (s *sessionStoreFactory) PreRun() error {
 		}
 	}
 
-	return nil
-}
-
-// ServeContext watches for configuration changes and updates the session stores accordingly.
-func (s *sessionStoreFactory) ServeContext(ctx context.Context) error {
-	if err := s.fileWatcher.Start(ctx.Done()); err != nil {
-		return err
-	}
-	<-ctx.Done()
 	return nil
 }
 
@@ -251,8 +221,8 @@ func (s *sessionStoreFactory) initializeRedisFileWatchers(cfg *oidcv1.OIDCConfig
 }
 
 // redisCallBack returns a callback function that updates the Redis configuration
-func (s *sessionStoreFactory) redisCallBack(log telemetry.Logger, cfg *oidcv1.OIDCConfig, update func(value []byte)) watcher.Callback {
-	return func(data watcher.Data) {
+func (s *sessionStoreFactory) redisCallBack(log telemetry.Logger, cfg *oidcv1.OIDCConfig, update func(value []byte)) watch.Callback {
+	return func(data watch.Data) {
 		if data.Err != nil {
 			log.Error("updating redis config", data.Err)
 			return
@@ -262,7 +232,7 @@ func (s *sessionStoreFactory) redisCallBack(log telemetry.Logger, cfg *oidcv1.OI
 		s.redisCallbackLock.Lock()
 		defer s.redisCallbackLock.Unlock()
 
-		update(data.Value.(watcher.FileValue).Data)
+		update(data.Value.(watch.FileValue).Data)
 		if err := s.loadRedisConfig(cfg); err != nil {
 			log.Error("reloading redis config", err)
 		}

@@ -36,7 +36,7 @@ import (
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
-	"github.com/istio-ecosystem/authservice/internal"
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 )
 
 // nolint: lll
@@ -80,16 +80,16 @@ var (
 )
 
 func TestStaticJWKSProvider(t *testing.T) {
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	cfg := &configv1.Config{}
 
 	t.Run("invalid", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
-		_, err := cache.Get(context.Background(), &oidcv1.OIDCConfig{
+		_, err := cache.Get(t.Context(), &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_Jwks{
 				Jwks: "{aaa}",
 			},
@@ -99,12 +99,12 @@ func TestStaticJWKSProvider(t *testing.T) {
 	})
 
 	t.Run("single-key", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
-		jwks, err := cache.Get(context.Background(), &oidcv1.OIDCConfig{
+		jwks, err := cache.Get(t.Context(), &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_Jwks{
 				Jwks: singleKey,
 			},
@@ -121,12 +121,12 @@ func TestStaticJWKSProvider(t *testing.T) {
 	})
 
 	t.Run("multiple-keys", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cache := NewJWKSProvider(cfg, tlsPool)
 		go func() { require.NoError(t, cache.ServeContext(ctx)) }()
 		t.Cleanup(cancel)
 
-		jwks, err := cache.Get(context.Background(), &oidcv1.OIDCConfig{
+		jwks, err := cache.Get(t.Context(), &oidcv1.OIDCConfig{
 			JwksConfig: &oidcv1.OIDCConfig_Jwks{
 				Jwks: keys,
 			},
@@ -154,7 +154,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		pub  = newKey(t)
 		jwks = newKeySet(t, pub)
 
-		tlsPool  = internal.NewTLSConfigPool(context.Background())
+		tlsPool  = inthttp.NewTLSConfigPool(noopWatcher{})
 		newCache = func(_ *testing.T, oidc *oidcv1.OIDCConfig) JWKSProvider {
 			cfg := &configv1.Config{
 				Chains: []*configv1.FilterChain{
@@ -189,7 +189,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		}
 		cache := newCache(t, config)
 
-		_, err := cache.Get(context.Background(), config)
+		_, err := cache.Get(t.Context(), config)
 
 		require.ErrorIs(t, err, ErrJWKSFetch)
 		require.Equal(t, int32(1), atomic.LoadInt32(server.requestCount)) // The attempt to load the JWKS is made, but fails
@@ -208,7 +208,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		}
 		cache := newCache(t, config)
 
-		keys, err := cache.Get(context.Background(), config)
+		keys, err := cache.Get(t.Context(), config)
 		require.NoError(t, err)
 		require.Equal(t, jwks, keys)
 		require.Equal(t, int32(1), atomic.LoadInt32(server.requestCount))
@@ -227,7 +227,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		cache := newCache(t, config)
 
 		for i := 0; i < 5; i++ {
-			keys, err := cache.Get(context.Background(), config)
+			keys, err := cache.Get(t.Context(), config)
 			require.NoError(t, err)
 			require.Equal(t, jwks, keys)
 			require.Equal(t, int32(1), atomic.LoadInt32(server.requestCount)) // Cached results after the first request
@@ -247,7 +247,7 @@ func TestDynamicJWKSProvider(t *testing.T) {
 		cache := newCache(t, config)
 
 		// Load the entry in the cache and remove it to let the background refresher refresh it
-		_, err := cache.Get(context.Background(), config)
+		_, err := cache.Get(t.Context(), config)
 		require.NoError(t, err)
 		require.NoError(t, jwks.RemoveKey(pub))
 

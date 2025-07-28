@@ -15,7 +15,6 @@
 package k8s
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -62,7 +61,7 @@ func TestOIDCProcessWithKubernetesSecret(t *testing.T) {
 
 			// reconcile the secrets
 			for _, secret := range secrets.Items {
-				_, err := controller.Reconcile(context.Background(), ctrl.Request{
+				_, err := controller.Reconcile(t.Context(), ctrl.Request{
 					NamespacedName: types.NamespacedName{
 						Namespace: secret.Namespace,
 						Name:      secret.Name,
@@ -70,7 +69,7 @@ func TestOIDCProcessWithKubernetesSecret(t *testing.T) {
 				})
 				require.NoError(t, err)
 			}
-			_, err := controller.Reconcile(context.Background(), ctrl.Request{
+			_, err := controller.Reconcile(t.Context(), ctrl.Request{
 				NamespacedName: types.NamespacedName{
 					Namespace: "default",
 					Name:      "non-existing-secret",

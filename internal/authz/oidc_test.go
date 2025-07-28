@@ -45,6 +45,7 @@ import (
 	"github.com/istio-ecosystem/authservice/internal"
 	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 var (
@@ -269,7 +270,7 @@ func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(noneAuthMethodOIDCConfig)
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	h, err := NewOIDCHandler(noneAuthMethodOIDCConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
@@ -326,13 +327,13 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(oidcConfig)
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	h, err := NewOIDCHandler(oidcConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(oidcConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tokenExchangeBearerFile := t.TempDir() + "/token-exchange-bearer"
 	require.NoError(t, os.WriteFile(tokenExchangeBearerFile, []byte("token"), 0644))
@@ -1386,7 +1387,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 	store := &storeMock{delegate: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
 	sessions := &mockSessionStoreFactory{store: store}
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 
 	jwkPriv, jwkPub := newKeyPair(t)
 	bytes, err := json.Marshal(newKeySet(t, jwkPub))
@@ -1399,7 +1400,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// The following subset of tests is testing the requests to the app, not any callback or auth flow.
 	// So there's no expected communication with any external server.
@@ -1539,7 +1540,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
@@ -1547,7 +1548,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	idpServer := newServer(wellKnownURIs)
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	idpServer.Start()
 	t.Cleanup(func() {
@@ -1746,7 +1747,7 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 	}
 
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1819,7 +1820,7 @@ func TestAreTokensExpired(t *testing.T) {
 	}
 
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&oidc.Clock{}, time.Hour, time.Hour)}
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1866,7 +1867,7 @@ func TestLoadWellKnownConfigMissingLogoutRedirectURI(t *testing.T) {
 
 func TestLoadWellKnownConfigError(t *testing.T) {
 	clock := oidc.Clock{}
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
 	cfg.ConfigurationUri = "http://stopped-server/.well-known/openid-configuration"
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
@@ -1877,7 +1878,7 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 
 func TestNewOIDCHandler(t *testing.T) {
 	clock := oidc.Clock{}
-	tlsPool := internal.NewTLSConfigPool(context.Background())
+	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 
 	tests := []struct {
@@ -2129,7 +2130,7 @@ func requireSessionErrorResponse(t *testing.T, resp *envoy.CheckResponse) {
 }
 
 func requireStoredTokens(t *testing.T, store oidc.SessionStore, sessionID string, wantExists bool) {
-	got, err := store.GetTokenResponse(context.Background(), sessionID)
+	got, err := store.GetTokenResponse(t.Context(), sessionID)
 	require.NoError(t, err)
 	if wantExists {
 		require.NotNil(t, got)
@@ -2139,13 +2140,13 @@ func requireStoredTokens(t *testing.T, store oidc.SessionStore, sessionID string
 }
 
 func requireStoredAccessToken(t *testing.T, store oidc.SessionStore, sessionID string, token string) {
-	got, err := store.GetTokenResponse(context.Background(), sessionID)
+	got, err := store.GetTokenResponse(t.Context(), sessionID)
 	require.NoError(t, err)
 	require.Equal(t, token, got.AccessToken)
 }
 
 func requireStoredState(t *testing.T, store oidc.SessionStore, sessionID string, wantExists bool) {
-	got, err := store.GetAuthorizationState(context.Background(), sessionID)
+	got, err := store.GetAuthorizationState(t.Context(), sessionID)
 	require.NoError(t, err)
 	if wantExists {
 		require.NotNil(t, got)
@@ -2417,3 +2418,9 @@ type jwksProviderFunc func() (jwk.Set, error)
 func (j jwksProviderFunc) Get(context.Context, *oidcv1.OIDCConfig) (jwk.Set, error) {
 	return j()
 }
+
+var _ watch.Callbacker = (*noopWatcher)(nil)
+
+type noopWatcher struct{}
+
+func (n noopWatcher) Watch(string, ...watch.Callback) error { return nil }

@@ -23,7 +23,6 @@ import (
 	"github.com/tetratelabs/telemetry"
 
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
-	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // GetPathQueryFragment splits the given path into path, query, and fragment.
@@ -99,7 +98,7 @@ func BearerAuthHeader(token string) string {
 
 // NewHTTPClient creates a new HTTP client with the given OIDC configuration and TLS pool.
 // If a logger is provided, it will log the requests and responses at debug level.
-func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool internal.TLSConfigPool, log telemetry.Logger) (*http.Client, error) {
+func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool TLSConfigPool, log telemetry.Logger) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 
 	var err error
