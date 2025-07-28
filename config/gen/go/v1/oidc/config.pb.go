@@ -801,7 +801,7 @@ type OIDCConfig_SecretReference struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The namespace of the referenced Secret, if not set, default to "default" namespace.
+	// The namespace of the referenced Secret, if not set, defaults to the namespace where the Authservice is running.
 	Namespace string `protobuf:"bytes,1,opt,name=namespace,proto3" json:"namespace,omitempty"`
 	// The name of the referenced Secret.
 	Name string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`

@@ -23,7 +23,6 @@ import (
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -37,33 +36,34 @@ import (
 	"github.com/istio-ecosystem/authservice/internal"
 )
 
-const clientSecretKey = "client-secret"
-
 var (
 	_ run.PreRunner      = (*SecretController)(nil)
 	_ run.ServiceContext = (*SecretController)(nil)
 
-	ErrLoadingConfig           = errors.New("error loading kube config")
-	ErrCrossNamespaceSecretRef = errors.New("cross-namespace secret reference is not allowed")
+	ErrLoadingConfig = errors.New("error loading kube config")
 )
+
+// secretUpdateFunc is a function that updates the configuration with the loaded secret data.
+type secretUpdateFunc func(ctx context.Context, secretData map[string][]byte) error
 
 // SecretController watches secrets for updates and updates the configuration with the loaded data.
 type SecretController struct {
-	log       telemetry.Logger
-	config    *configv1.Config
-	secrets   map[string][]func(string, []byte)
-	restConf  *rest.Config
-	manager   manager.Manager
-	k8sClient client.Client
-	namespace string
+	log              telemetry.Logger
+	config           *configv1.Config
+	secrets          map[string][]secretUpdateFunc
+	restConf         *rest.Config
+	manager          manager.Manager
+	k8sClient        client.Client
+	defaultNamespace string
 }
 
 // NewSecretController creates a new k8s Controller that loads secrets from
 // Kubernetes and updates the configuration with the loaded data.
 func NewSecretController(cfg *configv1.Config) *SecretController {
 	return &SecretController{
-		log:    internal.Logger(internal.Config),
-		config: cfg,
+		log:     internal.Logger(internal.Config),
+		config:  cfg,
+		secrets: make(map[string][]secretUpdateFunc),
 	}
 }
 
@@ -73,42 +73,27 @@ func (s *SecretController) Name() string { return "Secret controller" }
 // PreRun saves the original configuration in PreRun phase because the
 // configuration is loaded from the file in the Config Validate phase.
 func (s *SecretController) PreRun() error {
-	var (
-		needWatchSecrets = false
-		err              error
-	)
-
-	// Check if there are any k8s secrets to watch
-	for _, c := range s.config.Chains {
-		for _, f := range c.Filters {
-			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
-			if isOIDCConf &&
-				(oidcCfg.Oidc.GetClientSecretRef() != nil || oidcCfg.Oidc.GetTokenExchange().GetClientCredentials().GetClientSecretRef() != nil) {
-				needWatchSecrets = true
-				break
-			}
+	if s.defaultNamespace == "" {
+		var data []byte
+		data, err := os.ReadFile(NamespacePath)
+		if err != nil {
+			s.log.Error("error reading namespace file", err, "file", NamespacePath)
+			s.defaultNamespace = "default"
+		} else {
+			s.defaultNamespace = string(data)
 		}
 	}
 
+	// Check if there are any k8s secrets to watch. By only caching the configured namespaces we don't require
+	// wide permissions for the controller to watch secrets in all the namespaces.
+	cachedNamespaces := s.processSecretsConfig()
+
 	// If there are no secrets to watch, we can skip starting the controller manager
-	if !needWatchSecrets {
+	if len(cachedNamespaces) == 0 {
 		return nil
 	}
 
-	// Load the current namespace from the service account directory
-	if s.namespace == "" {
-		var data []byte
-		data, err = os.ReadFile(NamespacePath)
-		if err != nil {
-			return fmt.Errorf("error reading namespace file %s: %w", NamespacePath, err)
-		}
-		s.namespace = string(data)
-	}
-
-	// Collect the k8s secrets that are used in the configuration
-	if err = s.loadSecrets(); err != nil {
-		return err
-	}
+	var err error
 
 	// Load the k8s configuration from in-cluster environment
 	if s.restConf == nil {
@@ -123,9 +108,9 @@ func (s *SecretController) PreRun() error {
 	s.manager, err = ctrl.NewManager(s.restConf, ctrl.Options{
 		Metrics: metricsserver.Options{BindAddress: "0"},
 		Cache: cache.Options{
-			// Only watch for Secret objects in the desired namespace and ignore the rest
+			// Only watch for Secret objects in the desired namespaces
 			ByObject: map[client.Object]cache.ByObject{
-				&corev1.Secret{}: {Namespaces: map[string]cache.Config{s.namespace: {}}},
+				&corev1.Secret{}: {Namespaces: cachedNamespaces},
 			},
 			DefaultTransform: cache.TransformStripManagedFields(),
 		},
@@ -144,6 +129,31 @@ func (s *SecretController) PreRun() error {
 	return nil
 }
 
+// processSecretsConfig reads the secrets from the configuration and registers them for updates.
+func (s *SecretController) processSecretsConfig() map[string]cache.Config {
+	cachedNamespaces := make(map[string]cache.Config)
+
+	for _, c := range s.config.Chains {
+		for _, f := range c.Filters {
+			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
+			if !isOIDCConf {
+				continue
+			}
+
+			if ns, name := secretToWatch(oidcCfg.Oidc.GetClientSecretRef(), s.defaultNamespace); ns != "" {
+				cachedNamespaces[ns] = cache.Config{}
+				registerSecret(s.secrets, ns, name, updateOIDCClientSecret(s.log, ns, name, oidcCfg.Oidc))
+			}
+			if ns, name := secretToWatch(oidcCfg.Oidc.GetTokenExchange().GetClientCredentials().GetClientSecretRef(), s.defaultNamespace); ns != "" {
+				cachedNamespaces[ns] = cache.Config{}
+				registerSecret(s.secrets, ns, name, updateTokenExchangeClientSecret(s.log, ns, name, oidcCfg.Oidc.GetTokenExchange().GetClientCredentials()))
+			}
+		}
+	}
+
+	return cachedNamespaces
+}
+
 // ServeContext starts the controller manager and watches secrets for updates.
 func (s *SecretController) ServeContext(ctx context.Context) error {
 	// If there are no secrets to watch, we can skip starting the controller manager
@@ -160,63 +170,8 @@ func (s *SecretController) ServeContext(ctx context.Context) error {
 	return nil
 }
 
-// loadSecrets loads the secrets from the configuration and stores them in the secrets map.
-func (s *SecretController) loadSecrets() error {
-	s.secrets = make(map[string][]func(string, []byte))
-	for _, c := range s.config.Chains {
-		for _, f := range c.Filters {
-			oidcCfg, isOIDCConf := f.Type.(*configv1.Filter_Oidc)
-			if !isOIDCConf {
-				continue
-			}
-
-			if err := loadSecret(s.secrets, oidcCfg.Oidc.GetClientSecretRef(), s.namespace,
-				func(name string, v []byte) {
-					s.log.Info("updating client-secret data from secret", "secret", name, "client-id", oidcCfg.Oidc.GetClientId())
-					oidcCfg.Oidc.ClientSecretConfig = &oidcv1.OIDCConfig_ClientSecret{
-						ClientSecret: string(v),
-					}
-				}); err != nil {
-				return err
-			}
-			if err := loadSecret(s.secrets, oidcCfg.Oidc.GetTokenExchange().GetClientCredentials().GetClientSecretRef(), s.namespace,
-				func(name string, v []byte) {
-					s.log.Info("updating token exchange client-secret data from secret",
-						"secret", name, "client-id", oidcCfg.Oidc.TokenExchange.GetClientCredentials().GetClientId())
-					oidcCfg.Oidc.TokenExchange.GetClientCredentials().ClientSecretConfig = &oidcv1.OIDCConfig_TokenExchange_ClientCredentials_ClientSecret{
-						ClientSecret: string(v),
-					}
-				}); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func loadSecret(secrets map[string][]func(string, []byte), ref *oidcv1.OIDCConfig_SecretReference, namespace string, updateFn func(string, []byte)) error {
-	if ref == nil || ref.GetName() == "" {
-		return nil // No secret reference to load
-	}
-	if ref.Namespace != "" && ref.Namespace != namespace {
-		return fmt.Errorf("%w: secret reference namespace %s does not match the current namespace %s",
-			ErrCrossNamespaceSecretRef, ref.Namespace, namespace)
-	}
-	key := secretNamespacedName(ref, namespace).String()
-	secrets[key] = append(secrets[key], updateFn)
-	return nil
-}
-
-func secretNamespacedName(secretRef *oidcv1.OIDCConfig_SecretReference, currentNamespace string) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: currentNamespace,
-		Name:      secretRef.GetName(),
-	}
-}
-
 func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	changedSecret := req.NamespacedName.String()
-
 	oidcConfigsUpdateFuncs, exist := s.secrets[changedSecret]
 
 	// If the secret is not used in the configuration, we can ignore it
@@ -234,17 +189,30 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	clientSecretBytes, ok := secret.Data[clientSecretKey]
-	if !ok || len(clientSecretBytes) == 0 {
-		s.log.Error("", errors.New("client-secret not found in secret"), "secret", changedSecret)
-		// Do not return an error here, as trying to process the secret again
-		// will not help when the data is not present.
-		return ctrl.Result{}, nil
-	}
-
 	for _, oidcUpdateFunc := range oidcConfigsUpdateFuncs {
-		oidcUpdateFunc(secret.GetName(), clientSecretBytes)
+		if err := oidcUpdateFunc(ctx, secret.Data); err != nil {
+			// Do not return an error here, as trying to process the secret again
+			// will not help when the data is not present. Just log the error
+			s.log.Error("error updating secret", err)
+		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// secretToWatch returns the namespace to watch for the given secret reference.
+func secretToWatch(ref *oidcv1.OIDCConfig_SecretReference, defaultNamespace string) (string, string) {
+	if ref == nil {
+		return "", ""
+	}
+	if ref.GetNamespace() == "" {
+		return defaultNamespace, ref.GetName()
+	}
+	return ref.GetNamespace(), ref.GetName()
+}
+
+// registerSecret registers a secret update function for the given namespace and name.
+func registerSecret(secrets map[string][]secretUpdateFunc, namespace, name string, updateFn secretUpdateFunc) {
+	key := namespace + "/" + name
+	secrets[key] = append(secrets[key], updateFn)
 }

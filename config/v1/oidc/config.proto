@@ -138,9 +138,8 @@ message OIDCConfig {
 
   // This message defines a reference to a Kubernetes Secret resource.
   message SecretReference {
-    // The namespace of the referenced Secret, if not set, default to "default" namespace.
+    // The namespace of the referenced Secret, if not set, defaults to the namespace where the Authservice is running.
     string namespace = 1;
-
     // The name of the referenced Secret.
     string name = 2 [(validate.rules).string.min_len = 1];
   }

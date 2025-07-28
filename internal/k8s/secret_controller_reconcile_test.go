@@ -44,7 +44,6 @@ func TestOIDCProcessWithKubernetesSecret(t *testing.T) {
 		{"secret ref without data", "oidc-with-secret-ref-without-data", nil},
 		{"secret ref deleting", "oidc-with-secret-ref-deleting", nil},
 		{"secret ref not found", "oidc-with-secret-ref-not-found", nil},
-		{"cross namespace secret ref", "oidc-with-cross-ns-secret-ref", ErrCrossNamespaceSecretRef},
 	}
 
 	for _, tt := range tests {
@@ -57,9 +56,9 @@ func TestOIDCProcessWithKubernetesSecret(t *testing.T) {
 			secrets := secretsForTest()
 			kubeClient := fake.NewClientBuilder().WithLists(secrets).Build()
 			controller := NewSecretController(originalConf)
-			controller.namespace = "default"
+			controller.defaultNamespace = "default"
 			controller.k8sClient = kubeClient // set the k8s client with the fake client for testing
-			require.ErrorIs(t, controller.loadSecrets(), tt.err)
+			_ = controller.processSecretsConfig()
 
 			// reconcile the secrets
 			for _, secret := range secrets.Items {
@@ -80,7 +79,11 @@ func TestOIDCProcessWithKubernetesSecret(t *testing.T) {
 			require.NoError(t, err)
 
 			// check if the configuration is updated
-			require.True(t, proto.Equal(originalConf, expectedConf))
+			if !proto.Equal(originalConf, expectedConf) {
+				want, _ := protojson.Marshal(expectedConf)
+				got, _ := protojson.Marshal(originalConf)
+				require.JSONEq(t, string(want), string(got))
+			}
 		})
 	}
 }
@@ -94,7 +97,7 @@ func secretsForTest() *corev1.SecretList {
 					Name:      "test-secret-1",
 				},
 				Data: map[string][]byte{
-					clientSecretKey: []byte("fake-client-secret-1"),
+					keyClientSecret: []byte("fake-client-secret-1"),
 				},
 			},
 			{
@@ -103,7 +106,7 @@ func secretsForTest() *corev1.SecretList {
 					Name:      "test-secret-2",
 				},
 				Data: map[string][]byte{
-					clientSecretKey: []byte("fake-client-secret-2"),
+					keyClientSecret: []byte("fake-client-secret-2"),
 				},
 			},
 			{
