@@ -77,7 +77,8 @@ func (s *SecretController) PreRun() error {
 		var data []byte
 		data, err := os.ReadFile(NamespacePath)
 		if err != nil {
-			s.log.Error("error reading namespace file", err, "file", NamespacePath)
+			s.log.Error("error reading namespace file. Defaulting to 'default' namespace",
+				err, "file", NamespacePath)
 			s.defaultNamespace = "default"
 		} else {
 			s.defaultNamespace = string(data)
