@@ -202,7 +202,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 		_ = factory.ServeContext(ctx)
 	}()
 
-	// Set new values. This will cause a redis connect failure,but we don't care about that here.
+	// Set new values. This will cause a redis connect failure, but we don't care about that here.
 	// We just want to verify that the values are updated
 	require.NoError(t, os.WriteFile(tmp+"/redis-password", []byte("new-redis-pass"), 0600))
 	require.NoError(t, os.WriteFile(tmp+"/client.crt", []byte("updated-client-cert"), 0600))
