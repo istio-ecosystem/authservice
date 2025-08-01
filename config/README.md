@@ -139,7 +139,7 @@ This message defines a reference to a Kubernetes Secret resource.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| namespace | [string](#string) |  | The namespace of the referenced Secret, if not set, default to "default" namespace. |
+| namespace | [string](#string) |  | The namespace of the referenced Secret, if not set, defaults to the namespace where the Authservice is running. |
 | name | [string](#string) |  | The name of the referenced Secret. |
 
 

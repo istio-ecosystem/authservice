@@ -43,7 +43,7 @@ const (
 func TestErrorLoadingConfig(t *testing.T) {
 	t.Setenv("KUBECONFIG", "non-existent-file")
 	sc := NewSecretController(loadTestConf(t, "testdata/oidc-with-secret-ref.json"))
-	sc.namespace = defaultNamespace
+	sc.defaultNamespace = defaultNamespace
 
 	require.ErrorIs(t, sc.PreRun(), ErrLoadingConfig)
 }
@@ -66,7 +66,7 @@ func TestManagerStarts(t *testing.T) {
 	}
 
 	controller.restConf = startEnv(t)
-	controller.namespace = defaultNamespace
+	controller.defaultNamespace = defaultNamespace
 	g.Register(irq, &cfg, controller, manual)
 
 	wg := sync.WaitGroup{}
@@ -121,7 +121,7 @@ func TestManagerNotInitializedIfNothingToWatch(t *testing.T) {
 	}
 
 	controller.restConf = startEnv(t)
-	controller.namespace = defaultNamespace
+	controller.defaultNamespace = defaultNamespace
 	g.Register(irq, &cfg, controller, manual)
 
 	wg := sync.WaitGroup{}
