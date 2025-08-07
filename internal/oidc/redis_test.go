@@ -101,7 +101,7 @@ func TestRedisTLS(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
-		require.ErrorContains(t, err, "certificate is not trusted")
+		require.IsType(t, &tls.CertificateVerificationError{}, err)
 	})
 
 	t.Run("skip-verify", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestRedisMTLS(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
-		require.ErrorContains(t, err, "certificate signed by unknown authority")
+		require.IsType(t, &tls.CertificateVerificationError{}, err)
 	})
 
 	t.Run("ok", func(t *testing.T) {
