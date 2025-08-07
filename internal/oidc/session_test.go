@@ -182,7 +182,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 				},
 			},
 		},
-	})
+	}).(*sessionStoreFactory)
 
 	// Verify that the files have been initialized
 	require.Empty(t, redisConfig.GetPassword())
@@ -210,6 +210,9 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmp+"/ca.crt", []byte("updated-ca"), 0600))
 
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		factory.redisCallbackLock.Lock()
+		defer factory.redisCallbackLock.Unlock()
+
 		assert.Equal(t, "new-redis-pass", redisConfig.GetPassword())
 		assert.Equal(t, "updated-client-cert", redisConfig.GetTlsConfig().GetClientCertPem())
 		assert.Equal(t, "updated-client-key", redisConfig.GetTlsConfig().GetClientKeyPem())

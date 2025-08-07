@@ -78,6 +78,8 @@ type sessionStoreFactory struct {
 
 	mu     sync.RWMutex
 	stores map[string]SessionStore
+
+	redisCallbackLock sync.Mutex // protects the redis configuration from concurrent updates
 }
 
 // NewSessionStoreFactory creates a factory for managing session stores.
@@ -255,6 +257,11 @@ func (s *sessionStoreFactory) redisCallBack(log telemetry.Logger, cfg *oidcv1.OI
 			log.Error("updating redis config", data.Err)
 			return
 		}
+
+		// Make sure no other config callbacks are updating the config concurrently
+		s.redisCallbackLock.Lock()
+		defer s.redisCallbackLock.Unlock()
+
 		update(data.Value.(watcher.FileValue).Data)
 		if err := s.loadRedisConfig(cfg); err != nil {
 			log.Error("reloading redis config", err)
