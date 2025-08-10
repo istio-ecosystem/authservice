@@ -54,6 +54,10 @@ var (
 	// ErrMissingLogoutRedirectURI is returned when the logout redirect uri is missing because it was not explicitly
 	// configured or the OIDC Discovery did not return it.
 	ErrMissingLogoutRedirectURI = errors.New("missing logout redirect uri")
+
+	// ErrClientAuthenticationNotImplemented is returned when the configured client authentication method is
+	// not implemeted.
+	ErrClientAuthenticationNotImplemented = errors.New("client authentication method not implemented")
 )
 
 // oidc handler is an implementation of the Handler interface that implements
@@ -481,7 +485,7 @@ func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
 	case internal.ClientAuthenticationPost:
 		// No extra headers to add for client_secret_post.
 	default:
-		return nil, fmt.Errorf("client authentication method %s is not implemented", config.GetClientAuthenticationMethod())
+		return nil, fmt.Errorf("%w: %s", ErrClientAuthenticationNotImplemented, config.GetClientAuthenticationMethod())
 	}
 
 	return headers, nil
@@ -502,7 +506,7 @@ func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifier
 		params["client_id"] = []string{config.GetClientId()}
 		params["client_secret"] = []string{config.GetClientSecret()}
 	default:
-		return nil, fmt.Errorf("client authentication method %s is not implemented", config.GetClientAuthenticationMethod())
+		return nil, fmt.Errorf("%w: %s", ErrClientAuthenticationNotImplemented, config.GetClientAuthenticationMethod())
 	}
 	return params, nil
 }

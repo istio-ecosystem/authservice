@@ -181,7 +181,7 @@ var (
 		},
 	}
 
-	jwtAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
+	noneAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
 		IdToken: &oidcv1.TokenConfig{
 			Header:   "Authorization",
 			Preamble: "Bearer",
@@ -197,7 +197,7 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		ClientAuthenticationMethod: internal.ClientAuthenticationJWT,
+		ClientAuthenticationMethod: internal.ClientAuthenticationNone,
 		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
@@ -263,14 +263,14 @@ func TestPostClientAuthenticationMethod(t *testing.T) {
 	testOIDCProcess(t, postOIDCConfig)
 }
 
-func TestJWTClientAuthenticationMethodUnauthenticated(t *testing.T) {
+func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
 	jwkPriv, _ := newKeyPair(t)
 
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	store := sessions.Get(jwtAuthMethodOIDCConfig)
+	store := sessions.Get(noneAuthMethodOIDCConfig)
 	tlsPool := internal.NewTLSConfigPool(context.Background())
-	h, err := NewOIDCHandler(jwtAuthMethodOIDCConfig, tlsPool,
+	h, err := NewOIDCHandler(noneAuthMethodOIDCConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
@@ -1940,6 +1940,127 @@ func TestCookieAttributesConfig(t *testing.T) {
 	} {
 		haveAttributes := getCookieDirectives(tt.config, -1)
 		require.Equal(t, tt.wantAttributes, haveAttributes)
+	}
+}
+
+func TestBuildAuthHeaders(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *oidcv1.OIDCConfig
+		want   http.Header
+		err    error
+	}{
+		{
+			name: internal.ClientAuthenticationBasic,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+			},
+			want: http.Header{
+				inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+				inthttp.HeaderAuthorization: []string{"Basic Y2xpZW50LWlkOmNsaWVudC1zZWNyZXQ="},
+			},
+		},
+		{
+			name: internal.ClientAuthenticationPost,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationPost,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+			},
+			want: http.Header{
+				inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+			},
+		},
+		{
+			name:   internal.ClientAuthenticationJWT,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationPrivateKey,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationNone,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers, err := buildAuthHeader(tt.config)
+			require.ErrorIs(t, err, tt.err)
+			require.Equal(t, tt.want, headers)
+		})
+	}
+}
+
+func TestBuildAuthParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *oidcv1.OIDCConfig
+		want   url.Values
+		err    error
+	}{
+		{
+			name: internal.ClientAuthenticationBasic,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+				CallbackUri:                "https://example.com/callback",
+			},
+			want: url.Values{
+				"grant_type":    []string{"authorization_code"},
+				"code":          []string{"test"},
+				"redirect_uri":  []string{"https://example.com/callback"},
+				"code_verifier": []string{"test-verifier"},
+			},
+		},
+		{
+			name: internal.ClientAuthenticationPost,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationPost,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+				CallbackUri:                "https://example.com/callback",
+			},
+			want: url.Values{
+				"grant_type":    []string{"authorization_code"},
+				"code":          []string{"test"},
+				"redirect_uri":  []string{"https://example.com/callback"},
+				"code_verifier": []string{"test-verifier"},
+				"client_id":     []string{"client-id"},
+				"client_secret": []string{"client-secret"},
+			},
+		},
+		{
+			name:   internal.ClientAuthenticationJWT,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationPrivateKey,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationNone,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers, err := buildAuthParams(tt.config, "test", "test-verifier")
+			require.ErrorIs(t, err, tt.err)
+			require.Equal(t, tt.want, headers)
+		})
 	}
 }
 
