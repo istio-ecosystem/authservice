@@ -54,6 +54,10 @@ var (
 	// ErrMissingLogoutRedirectURI is returned when the logout redirect uri is missing because it was not explicitly
 	// configured or the OIDC Discovery did not return it.
 	ErrMissingLogoutRedirectURI = errors.New("missing logout redirect uri")
+
+	// ErrClientAuthenticationNotImplemented is returned when the configured client authentication method is
+	// not implemeted.
+	ErrClientAuthenticationNotImplemented = errors.New("client authentication method not implemented")
 )
 
 // oidc handler is an implementation of the Handler interface that implements
@@ -333,18 +337,18 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		return
 	}
 
-	// build body
-	form := url.Values{
-		"grant_type":    []string{"authorization_code"},
-		"code":          []string{codeFromReq},
-		"redirect_uri":  []string{o.config.GetCallbackUri()},
-		"code_verifier": []string{stateFromStore.CodeVerifier},
+	headers, err := buildAuthHeader(o.config)
+	if err != nil {
+		log.Error("error building auth header", err)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
-	// build headers
-	headers := http.Header{
-		inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
-		inthttp.HeaderAuthorization: []string{inthttp.BasicAuthHeader(o.config.GetClientId(), o.config.GetClientSecret())},
+	form, err := buildAuthParams(o.config, codeFromReq, stateFromStore.CodeVerifier)
+	if err != nil {
+		log.Error("error building auth params", err)
+		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
+		return
 	}
 
 	log.Info("performing request to retrieve new tokens")
@@ -463,6 +467,48 @@ func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken stri
 	log.Info("performing token exchange request")
 
 	return performIDPRequest(log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
+}
+
+// buildAuthHeader builds the authorization header for the client according to the
+// client authentication method specified in the OIDCConfig.
+//
+// The function returns an error if the client authentication method is unspecified
+// or if the implementation for the specified method is not supported.
+func buildAuthHeader(config *oidcv1.OIDCConfig) (http.Header, error) {
+	headers := http.Header{
+		inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+	}
+
+	switch config.GetClientAuthenticationMethod() {
+	case internal.ClientAuthenticationBasic:
+		headers[inthttp.HeaderAuthorization] = []string{inthttp.BasicAuthHeader(config.GetClientId(), config.GetClientSecret())}
+	case internal.ClientAuthenticationPost:
+		// No extra headers to add for client_secret_post.
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrClientAuthenticationNotImplemented, config.GetClientAuthenticationMethod())
+	}
+
+	return headers, nil
+}
+
+func buildAuthParams(config *oidcv1.OIDCConfig, codeFromReq string, codeVerifierFromReq string) (url.Values, error) {
+	params := url.Values{
+		"grant_type":    []string{"authorization_code"},
+		"code":          []string{codeFromReq},
+		"redirect_uri":  []string{config.GetCallbackUri()},
+		"code_verifier": []string{codeVerifierFromReq},
+	}
+
+	switch config.GetClientAuthenticationMethod() {
+	case internal.ClientAuthenticationBasic:
+		// No extra body params to add.
+	case internal.ClientAuthenticationPost:
+		params["client_id"] = []string{config.GetClientId()}
+		params["client_secret"] = []string{config.GetClientSecret()}
+	default:
+		return nil, fmt.Errorf("%w: %s", ErrClientAuthenticationNotImplemented, config.GetClientAuthenticationMethod())
+	}
+	return params, nil
 }
 
 // refreshToken retrieves new tokens from the Identity Provider using the given refresh token.
@@ -880,7 +926,6 @@ func getCookieDirectives(config *oidcv1.OIDCConfig, timeout time.Duration) []str
 	} else {
 		directives = append(directives, inthttp.HeaderSetCookieSameSiteLax)
 	}
-
 	if timeout >= 0 {
 		directives = append(directives, fmt.Sprintf("%s=%d", inthttp.HeaderSetCookieMaxAge, int(timeout.Seconds())))
 	}

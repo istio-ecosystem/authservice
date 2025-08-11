@@ -48,9 +48,10 @@ func (e errCheck) Check(t *testing.T, err error) {
 }
 
 const (
-	msgValueRequired    = "%s: value is required"
-	msgLengthValidation = "value length must be at least 1 runes"
-	msgInvalidClientID  = `invalid OIDCConfig.ClientId: value contains substring ":"`
+	msgValueRequired     = "%s: value is required"
+	msgLengthValidation  = "value length must be at least 1 runes"
+	msgInvalidClientID   = `invalid OIDCConfig.ClientId: value contains substring ":"`
+	msgInvalidClientAuth = "ClientAuthenticationMethod: value must be in list [client_secret_basic client_secret_post client_secret_jwt private_key_jwt none]"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -69,6 +70,7 @@ func TestValidateConfig(t *testing.T) {
 		{"invalid-redis", "testdata/invalid-redis.json", errCheck{is: ErrInvalidURL}},
 		{"invalid-oidc-uris", "testdata/invalid-oidc-uris.json", errCheck{is: ErrRequiredURL}},
 		{"invalid-oidc-client-id", "testdata/invalid-oidc-client-id.json", errCheck{msg: msgInvalidClientID}},
+		{"invalid-oidc-client-auth", "testdata/invalid-oidc-client-auth-method.json", errCheck{msg: msgInvalidClientAuth}},
 		{"invalid-health-port", "testdata/invalid-health-port.json", errCheck{is: ErrHealthPortInUse}},
 		{"invalid-callback-uri", "testdata/invalid-callback.json", errCheck{is: ErrMustNotBeRootPath}},
 		{"invalid-logout-path", "testdata/invalid-logout.json", errCheck{is: ErrMustNotBeRootPath}},
@@ -227,16 +229,17 @@ func TestLoadOIDC(t *testing.T) {
 										SkipVerifyPeerCert: structpb.NewStringValue("true"),
 									},
 								},
-								ClientId:                "fake-client-id",
-								ClientSecretConfig:      &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "fake-client-secret"},
-								CookieNamePrefix:        "",
-								IdToken:                 &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
-								ProxyUri:                "http://fake",
-								RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
-								Scopes:                  []string{ScopeOIDC},
-								Logout:                  &oidcv1.LogoutConfig{Path: "/logout", RedirectUri: "http://fake"},
-								TrustedCaConfig:         &oidcv1.OIDCConfig_TrustedCertificateAuthority{TrustedCertificateAuthority: "fake-ca-pem"},
-								SkipVerifyPeerCert:      structpb.NewBoolValue(true),
+								ClientId:                   "fake-client-id",
+								ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "fake-client-secret"},
+								ClientAuthenticationMethod: ClientAuthenticationBasic,
+								CookieNamePrefix:           "",
+								IdToken:                    &oidcv1.TokenConfig{Preamble: "Bearer", Header: "authorization"},
+								ProxyUri:                   "http://fake",
+								RedisSessionStoreConfig:    &oidcv1.RedisConfig{ServerUri: "redis://localhost:6379/0"},
+								Scopes:                     []string{ScopeOIDC},
+								Logout:                     &oidcv1.LogoutConfig{Path: "/logout", RedirectUri: "http://fake"},
+								TrustedCaConfig:            &oidcv1.OIDCConfig_TrustedCertificateAuthority{TrustedCertificateAuthority: "fake-ca-pem"},
+								SkipVerifyPeerCert:         structpb.NewBoolValue(true),
 							},
 						},
 					},

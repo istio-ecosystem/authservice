@@ -149,7 +149,56 @@ var (
 		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
 			ClientSecret: "test-client-secret",
 		},
-		Scopes: []string{"openid", "email"},
+		ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
+		Scopes:                     []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
+	}
+
+	postOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		ClientAuthenticationMethod: internal.ClientAuthenticationPost,
+		Scopes:                     []string{"openid", "email"},
+		Logout: &oidcv1.LogoutConfig{
+			Path:        "/logout",
+			RedirectUri: "http://idp-test-server/logout?with-params",
+		},
+	}
+
+	noneAuthMethodOIDCConfig = &oidcv1.OIDCConfig{
+		IdToken: &oidcv1.TokenConfig{
+			Header:   "Authorization",
+			Preamble: "Bearer",
+		},
+		AccessToken: &oidcv1.TokenConfig{
+			Header:   "X-Access-Token",
+			Preamble: "Bearer",
+		},
+		TokenUri:         "http://idp-test-server/token",
+		AuthorizationUri: "http://idp-test-server/auth",
+		CallbackUri:      "https://localhost:443/callback",
+		ClientId:         "test-client-id",
+		ClientSecretConfig: &oidcv1.OIDCConfig_ClientSecret{
+			ClientSecret: "test-client-secret",
+		},
+		ClientAuthenticationMethod: internal.ClientAuthenticationNone,
+		Scopes:                     []string{"openid", "email"},
 		Logout: &oidcv1.LogoutConfig{
 			Path:        "/logout",
 			RedirectUri: "http://idp-test-server/logout?with-params",
@@ -206,7 +255,55 @@ var (
 	wantRedirectBaseURI = "http://idp-test-server/auth"
 )
 
-func TestOIDCProcess(t *testing.T) {
+func TestBasicClientAuthenticationMethod(t *testing.T) {
+	testOIDCProcess(t, basicOIDCConfig)
+}
+
+func TestPostClientAuthenticationMethod(t *testing.T) {
+	testOIDCProcess(t, postOIDCConfig)
+}
+
+func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
+	jwkPriv, _ := newKeyPair(t)
+
+	clock := oidc.Clock{}
+	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
+	store := sessions.Get(noneAuthMethodOIDCConfig)
+	tlsPool := internal.NewTLSConfigPool(context.Background())
+	h, err := NewOIDCHandler(noneAuthMethodOIDCConfig, tlsPool,
+		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
+		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
+	require.NoError(t, err)
+
+	idpServer := newServer(wellKnownURIs)
+	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
+
+	ctx := context.Background()
+
+	idpServer.Start()
+	t.Cleanup(func() {
+		idpServer.Stop()
+		require.NoError(t, store.RemoveSession(ctx, sessionID))
+	})
+
+	idpServer.tokensResponse = mockTokenResponse(http.StatusOK, &idpTokensResponse{
+		IDToken:     newJWT(t, jwkPriv, jwt.NewBuilder().Audience([]string{"test-client-id"}).Claim("nonce", newNonce)),
+		AccessToken: "access-token",
+		TokenType:   "Bearer",
+	})
+
+	require.NoError(t, store.SetAuthorizationState(ctx, sessionID, validAuthState))
+
+	t.Run("callback request ", func(t *testing.T) {
+		resp := &envoy.CheckResponse{}
+		require.NoError(t, h.Process(ctx, callbackRequest, resp))
+		require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+		requireStandardResponseHeaders(t, resp)
+		requireStoredTokens(t, store, sessionID, false)
+	})
+}
+
+func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 	unknownJWKPriv, _ := newKeyPair(t)
 	jwkPriv, jwkPub := newKeyPair(t)
 	// We remove the optional "alg" field from this key to test that we can
@@ -222,16 +319,16 @@ func TestOIDCProcess(t *testing.T) {
 
 	bytes, err := json.Marshal(newKeySet(t, jwkPub, noAlgJwkPub))
 	require.NoError(t, err)
-	basicOIDCConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
+	oidcConfig.JwksConfig = &oidcv1.OIDCConfig_Jwks{
 		Jwks: string(bytes),
 	}
 
 	clock := oidc.Clock{}
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	store := sessions.Get(basicOIDCConfig)
+	store := sessions.Get(oidcConfig)
 	tlsPool := internal.NewTLSConfigPool(context.Background())
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool,
-		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
+	h, err := NewOIDCHandler(oidcConfig, tlsPool,
+		oidc.NewJWKSProvider(newConfigFor(oidcConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
@@ -312,7 +409,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
 				// The sessionID should not have been changed
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
@@ -893,13 +990,13 @@ func TestOIDCProcess(t *testing.T) {
 	for _, tt := range callbackTests {
 		t.Run("matches callback: "+tt.name, func(t *testing.T) {
 			if tt.setup != nil {
-				tt.setup(basicOIDCConfig)
+				tt.setup(oidcConfig)
 			}
 			idpServer.Start()
 			t.Cleanup(func() {
 				idpServer.Stop()
 				if tt.cleanup != nil {
-					tt.cleanup(basicOIDCConfig)
+					tt.cleanup(oidcConfig)
 				}
 				require.NoError(t, store.RemoveSession(ctx, sessionID))
 			})
@@ -1016,7 +1113,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1034,7 +1131,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1053,7 +1150,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, expiredTokenResponse.IDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1110,7 +1207,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDTokenWithoutNonce, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDTokenWithoutNonce, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1148,7 +1245,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1167,7 +1264,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1206,7 +1303,7 @@ func TestOIDCProcess(t *testing.T) {
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
 				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
 				require.NotNil(t, resp.GetOkResponse())
-				requireTokensInResponse(t, resp.GetOkResponse(), basicOIDCConfig, validIDToken, "access-token-exchanged")
+				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token-exchanged")
 				requireStoredTokens(t, store, sessionID, true)
 				requireStoredAccessToken(t, store, sessionID, "access-token-exchanged")
 				requireStoredTokens(t, store, newSessionID, false)
@@ -1256,13 +1353,13 @@ func TestOIDCProcess(t *testing.T) {
 	for _, tt := range refreshTokensTests {
 		t.Run("refresh tokens: "+tt.name, func(t *testing.T) {
 			if tt.setup != nil {
-				tt.setup(basicOIDCConfig)
+				tt.setup(oidcConfig)
 			}
 			idpServer.Start()
 			t.Cleanup(func() {
 				idpServer.Stop()
 				if tt.cleanup != nil {
-					tt.cleanup(basicOIDCConfig)
+					tt.cleanup(oidcConfig)
 				}
 				require.NoError(t, store.RemoveSession(ctx, sessionID))
 				require.NoError(t, store.RemoveSession(ctx, newSessionID))
@@ -1843,6 +1940,127 @@ func TestCookieAttributesConfig(t *testing.T) {
 	} {
 		haveAttributes := getCookieDirectives(tt.config, -1)
 		require.Equal(t, tt.wantAttributes, haveAttributes)
+	}
+}
+
+func TestBuildAuthHeaders(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *oidcv1.OIDCConfig
+		want   http.Header
+		err    error
+	}{
+		{
+			name: internal.ClientAuthenticationBasic,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+			},
+			want: http.Header{
+				inthttp.HeaderContentType:   []string{inthttp.HeaderContentTypeFormURLEncoded},
+				inthttp.HeaderAuthorization: []string{"Basic Y2xpZW50LWlkOmNsaWVudC1zZWNyZXQ="},
+			},
+		},
+		{
+			name: internal.ClientAuthenticationPost,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationPost,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+			},
+			want: http.Header{
+				inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded},
+			},
+		},
+		{
+			name:   internal.ClientAuthenticationJWT,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationPrivateKey,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationNone,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers, err := buildAuthHeader(tt.config)
+			require.ErrorIs(t, err, tt.err)
+			require.Equal(t, tt.want, headers)
+		})
+	}
+}
+
+func TestBuildAuthParams(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *oidcv1.OIDCConfig
+		want   url.Values
+		err    error
+	}{
+		{
+			name: internal.ClientAuthenticationBasic,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationBasic,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+				CallbackUri:                "https://example.com/callback",
+			},
+			want: url.Values{
+				"grant_type":    []string{"authorization_code"},
+				"code":          []string{"test"},
+				"redirect_uri":  []string{"https://example.com/callback"},
+				"code_verifier": []string{"test-verifier"},
+			},
+		},
+		{
+			name: internal.ClientAuthenticationPost,
+			config: &oidcv1.OIDCConfig{
+				ClientAuthenticationMethod: internal.ClientAuthenticationPost,
+				ClientId:                   "client-id",
+				ClientSecretConfig:         &oidcv1.OIDCConfig_ClientSecret{ClientSecret: "client-secret"},
+				CallbackUri:                "https://example.com/callback",
+			},
+			want: url.Values{
+				"grant_type":    []string{"authorization_code"},
+				"code":          []string{"test"},
+				"redirect_uri":  []string{"https://example.com/callback"},
+				"code_verifier": []string{"test-verifier"},
+				"client_id":     []string{"client-id"},
+				"client_secret": []string{"client-secret"},
+			},
+		},
+		{
+			name:   internal.ClientAuthenticationJWT,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationPrivateKey,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+		{
+			name:   internal.ClientAuthenticationNone,
+			config: &oidcv1.OIDCConfig{ClientAuthenticationMethod: internal.ClientAuthenticationNone},
+			err:    ErrClientAuthenticationNotImplemented,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			headers, err := buildAuthParams(tt.config, "test", "test-verifier")
+			require.ErrorIs(t, err, tt.err)
+			require.Equal(t, tt.want, headers)
+		})
 	}
 }
 
