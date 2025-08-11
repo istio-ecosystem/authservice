@@ -88,7 +88,7 @@ func (p *tlsConfigPool) LoadTLSConfig(config TLSConfig) (*tls.Config, error) {
 
 	p.mu.Lock()
 	if tlsConfig, ok := p.configs[id]; ok {
-		// Return a clone of the config for sare read access during concurrent updates
+		// Return a clone of the config for safe read access during concurrent updates
 		clone := tlsConfig.Clone()
 		p.mu.Unlock()
 		return clone, nil

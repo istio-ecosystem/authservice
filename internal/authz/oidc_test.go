@@ -279,7 +279,7 @@ func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
 	idpServer := newServer(wellKnownURIs)
 	h.(*oidcHandler).httpClient = idpServer.newHTTPClient()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	idpServer.Start()
 	t.Cleanup(func() {
@@ -298,7 +298,7 @@ func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
 	t.Run("callback request ", func(t *testing.T) {
 		resp := &envoy.CheckResponse{}
 		require.NoError(t, h.Process(ctx, callbackRequest, resp))
-		require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+		requireStatus(t, codes.Unauthenticated, resp)
 		requireStandardResponseHeaders(t, resp)
 		requireStoredTokens(t, store, sessionID, false)
 	})
@@ -350,7 +350,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 		{
 			name: "invalid request with missing http",
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), resp.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, resp)
 				requireStandardResponseHeaders(t, resp)
 			},
 		},
@@ -358,7 +358,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request with no sessionID",
 			req:  noSessionRequest,
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -370,7 +370,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request with no existing sessionID",
 			req:  withSessionHeader,
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -389,7 +389,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessTokenExpiresAt: yesterday,
 			},
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -408,7 +408,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessTokenExpiresAt: tomorrow,
 			},
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, newJWT(t, jwkPriv, jwt.NewBuilder().Expiration(tomorrow)), "access-token")
 				// The sessionID should not have been changed
@@ -422,7 +422,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "matches logout: request with no sessionId",
 			req:  logoutWithNoSession,
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), "http://idp-test-server/logout", url.Values{"with-params": {""}})
 				requireDeleteCookie(t, resp.GetDeniedResponse())
@@ -432,7 +432,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "matches logout: request with sessionId",
 			req:  logoutWithSession,
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), "http://idp-test-server/logout", url.Values{"with-params": {""}})
 				requireDeleteCookie(t, resp.GetDeniedResponse())
@@ -483,7 +483,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -501,7 +501,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -513,7 +513,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request is invalid, query parameters are missing",
 			req:  modifyCallbackRequestPath("/callback?"),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -522,7 +522,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request is invalid, query has invalid format",
 			req:  modifyCallbackRequestPath("/callback?invalid;format"),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -531,7 +531,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request is invalid, state is missing",
 			req:  modifyCallbackRequestPath("/callback?code=auth-code"),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -540,7 +540,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "request is invalid, code is missing",
 			req:  modifyCallbackRequestPath("/callback?state=new-state"),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -549,7 +549,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			name: "session state not found in the store",
 			req:  callbackRequest,
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), response.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, response)
 				requireStandardResponseHeaders(t, response)
 				require.Equal(t, typev3.StatusCode_BadRequest, response.GetDeniedResponse().GetStatus().GetCode())
 				require.Equal(t, "Oops, your session has expired. Please try again.", response.GetDeniedResponse().GetBody())
@@ -565,7 +565,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				RequestedURL: requestedAppURL,
 			},
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -576,7 +576,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			storedAuthState:    validAuthState,
 			mockTokensResponse: mockTokenResponse(http.StatusInternalServerError, nil),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
+				requireStatus(t, codes.Internal, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -587,7 +587,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			storedAuthState:    validAuthState,
 			mockTokensResponse: mockTokenResponse(http.StatusOK, nil),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
+				requireStatus(t, codes.Internal, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -601,7 +601,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType: "not-bearer",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -616,7 +616,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn: -1,
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -631,7 +631,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn: 3600,
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -647,7 +647,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
+				requireStatus(t, codes.Internal, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -663,7 +663,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Internal), response.GetStatus().GetCode())
+				requireStatus(t, codes.Internal, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -683,7 +683,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -703,7 +703,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -719,7 +719,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -735,7 +735,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, response *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), response.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, response)
 				requireStandardResponseHeaders(t, response)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -766,7 +766,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -805,7 +805,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -843,7 +843,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -881,7 +881,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), requestedAppURL, nil)
 				requireStoredTokens(t, store, sessionID, true)
@@ -917,7 +917,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.InvalidArgument), resp.GetStatus().GetCode())
+				requireStatus(t, codes.InvalidArgument, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -950,7 +950,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Internal), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Internal, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -981,7 +981,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			}),
 			mockTokensExchangeResponse: mockTokenResponse(http.StatusForbidden, nil),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.PermissionDenied), resp.GetStatus().GetCode())
+				requireStatus(t, codes.PermissionDenied, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireStoredTokens(t, store, sessionID, false)
 			},
@@ -1043,7 +1043,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			storedTokenResponse: expiredTokenResponse,
 			mockTokensResponse:  mockTokenResponse(http.StatusOK, nil),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1057,7 +1057,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 			storedTokenResponse: expiredTokenResponse,
 			mockTokensResponse:  mockTokenResponse(http.StatusInternalServerError, nil),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1075,7 +1075,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "invalid-token-type",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1094,7 +1094,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   -1,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1112,7 +1112,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn: 10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1130,7 +1130,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1149,7 +1149,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				AccessToken: "access-token",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, expiredTokenResponse.IDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1168,7 +1168,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1187,7 +1187,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1206,7 +1206,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDTokenWithoutNonce, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1225,7 +1225,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1244,7 +1244,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1263,7 +1263,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				ExpiresIn:   10,
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1302,7 +1302,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.OK), resp.GetStatus().GetCode())
+				requireStatus(t, codes.OK, resp)
 				require.NotNil(t, resp.GetOkResponse())
 				requireTokensInResponse(t, resp.GetOkResponse(), oidcConfig, validIDToken, "access-token-exchanged")
 				requireStoredTokens(t, store, sessionID, true)
@@ -1341,7 +1341,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 				TokenType:   "Bearer",
 			}),
 			responseVerify: func(t *testing.T, resp *envoy.CheckResponse) {
-				require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+				requireStatus(t, codes.Unauthenticated, resp)
 				requireStandardResponseHeaders(t, resp)
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 				requireCookie(t, resp.GetDeniedResponse())
@@ -1518,7 +1518,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 
 			resp := &envoy.CheckResponse{}
 			require.NoError(t, h.Process(ctx, withSessionHeader, resp))
-			require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+			requireStatus(t, codes.Unauthenticated, resp)
 			requireStandardResponseHeaders(t, resp)
 			if tt.wantRedirect {
 				requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
@@ -1574,7 +1574,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	t.Run("callback request ", func(t *testing.T) {
 		resp := &envoy.CheckResponse{}
 		require.NoError(t, h.Process(ctx, callbackRequest, resp))
-		require.Equal(t, int32(codes.Internal), resp.GetStatus().GetCode())
+		requireStatus(t, codes.Internal, resp)
 		requireStandardResponseHeaders(t, resp)
 		requireStoredTokens(t, store, sessionID, false)
 	})
@@ -1585,7 +1585,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 		resp := &envoy.CheckResponse{}
 		require.NoError(t, h.Process(ctx, withSessionHeader, resp))
 
-		require.Equal(t, int32(codes.Unauthenticated), resp.GetStatus().GetCode())
+		requireStatus(t, codes.Unauthenticated, resp)
 		requireStandardResponseHeaders(t, resp)
 		requireRedirectResponse(t, resp.GetDeniedResponse(), wantRedirectBaseURI, wantRedirectParams)
 		requireCookie(t, resp.GetDeniedResponse())
@@ -2122,6 +2122,10 @@ func newJWT(t *testing.T, key jwk.Key, builder *jwt.Builder) string {
 	signed, err := jwt.Sign(token, jwt.WithKey(keyAlg, key))
 	require.NoError(t, err)
 	return string(signed)
+}
+
+func requireStatus(t *testing.T, want codes.Code, resp *envoy.CheckResponse) {
+	require.Equalf(t, int32(want), resp.GetStatus().GetCode(), "response: %+v", resp)
 }
 
 func requireSessionErrorResponse(t *testing.T, resp *envoy.CheckResponse) {
