@@ -42,7 +42,7 @@ func TestGrpcServer(t *testing.T) {
 	require.NoError(t, err)
 
 	client := testgrpc.NewTestServiceClient(conn)
-	interop.DoEmptyUnaryCall(context.Background(), client) // this method will panic if fails
+	interop.DoEmptyUnaryCall(t.Context(), client) // this method will panic if fails
 }
 
 func TestListenFails(t *testing.T) {

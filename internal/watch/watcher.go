@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package watcher
+package watch
 
 import "sync"
 
@@ -25,10 +25,15 @@ type Data struct {
 	Err   error
 }
 
-// Watcher defines the interface that a watcher must implement.
-type Watcher interface {
+// Callbacker defines the interface that a watcher must implement to register callbacks.
+type Callbacker interface {
 	// Watch is called to register callbacks to be notified when a watched named changes.
 	Watch(string, ...Callback) error
+}
+
+// Watcher defines the interface that a watcher must implement.
+type Watcher interface {
+	Callbacker
 	// Start is called to initiate the watches and provide a channel to signal when to stop watching.
 	Start(<-chan struct{}) error
 	// OnError is called when an error occurs.

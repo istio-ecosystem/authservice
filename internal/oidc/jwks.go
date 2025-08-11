@@ -54,12 +54,12 @@ type DefaultJWKSProvider struct {
 	log     telemetry.Logger
 	cache   *jwk.Cache
 	config  *configv1.Config
-	tlsPool internal.TLSConfigPool
+	tlsPool inthttp.TLSConfigPool
 	started chan struct{}
 }
 
 // NewJWKSProvider returns a new JWKSProvider.
-func NewJWKSProvider(cfg *configv1.Config, tlsPool internal.TLSConfigPool) *DefaultJWKSProvider {
+func NewJWKSProvider(cfg *configv1.Config, tlsPool inthttp.TLSConfigPool) *DefaultJWKSProvider {
 	return &DefaultJWKSProvider{
 		log:     internal.Logger(internal.JWKS),
 		config:  cfg,

@@ -15,7 +15,6 @@
 package authz
 
 import (
-	"context"
 	"testing"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -42,7 +41,7 @@ func TestProcessMock(t *testing.T) {
 				req  = &envoy.CheckRequest{}
 				resp = &envoy.CheckResponse{}
 			)
-			err := m.Process(context.Background(), req, resp)
+			err := m.Process(t.Context(), req, resp)
 			require.NoError(t, err)
 			require.Equal(t, int32(tt.want), resp.Status.Code)
 		})

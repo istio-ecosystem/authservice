@@ -470,6 +470,7 @@ type OIDCConfig struct {
 	// Unset or 0 (the default) disables the refresh, useful is no rotation is expected.
 	// Is a String that ends in `s` to indicate seconds and is preceded by the number of seconds, e.g. `120s` (represents 2 minutes).
 	// Optional.
+	// Deprecated. The file will be automatically reloaded when it changes.
 	TrustedCertificateAuthorityRefreshInterval *durationpb.Duration `protobuf:"bytes,22,opt,name=trusted_certificate_authority_refresh_interval,json=trustedCertificateAuthorityRefreshInterval,proto3" json:"trusted_certificate_authority_refresh_interval,omitempty"`
 	// The Authservice makes two kinds of direct network connections directly to the OIDC Provider.
 	// Both are POST requests to the configured `token_uri` of the OIDC Provider.

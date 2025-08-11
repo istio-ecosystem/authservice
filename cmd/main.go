@@ -24,19 +24,21 @@ import (
 	"github.com/tetratelabs/telemetry"
 
 	"github.com/istio-ecosystem/authservice/internal"
+	"github.com/istio-ecosystem/authservice/internal/http"
 	"github.com/istio-ecosystem/authservice/internal/k8s"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
 	"github.com/istio-ecosystem/authservice/internal/server"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 func main() {
 	var (
-		lifecycle   = run.NewLifecycle()
 		configFile  = &internal.LocalConfigFile{}
 		logging     = internal.NewLogSystem(log.New(), &configFile.Config)
-		tlsPool     = internal.NewTLSConfigPool(lifecycle.Context())
+		fileWatcher = &watch.FileWatcherService{}
+		tlsPool     = http.NewTLSConfigPool(fileWatcher)
 		jwks        = oidc.NewJWKSProvider(&configFile.Config, tlsPool)
-		sessions    = oidc.NewSessionStoreFactory(&configFile.Config)
+		sessions    = oidc.NewSessionStoreFactory(&configFile.Config, fileWatcher)
 		envoyAuthz  = server.NewExtAuthZFilter(&configFile.Config, tlsPool, jwks, sessions)
 		authzServer = server.New(&configFile.Config, envoyAuthz.Register)
 		healthz     = server.NewHealthServer(&configFile.Config)
@@ -58,9 +60,9 @@ func main() {
 	g := run.Group{Logger: internal.Logger(internal.Default)}
 
 	g.Register(
-		lifecycle,         // manage the lifecycle of the run.Services
 		configFile,        // load the configuration
 		logging,           // Set up the logging system
+		fileWatcher,       // watch for file changes
 		secretCtrl,        // watch for secret updates and update the configuration
 		configLog,         // log the configuration
 		fipsLog,           // log whether FIPS is enabled

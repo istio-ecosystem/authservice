@@ -15,7 +15,6 @@
 package istio
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -82,7 +81,7 @@ func (i *IstioSuite) SetupSuite() {
 
 	i.T().Log("deploying the test services...")
 	for _, f := range testManifests {
-		i.MustApply(context.Background(), manifestsDir+"/"+f)
+		i.MustApply(i.T().Context(), manifestsDir+"/"+f)
 	}
 	i.WaitForPods(client, "keycloak", "job-name=setup-keycloak", corev1.PodSucceeded, e2e.PodInitialized)
 	i.WaitForPods(client, "redis", "", corev1.PodRunning, e2e.PodReady)
@@ -113,7 +112,7 @@ func (i *IstioSuite) installIstio() {
 }
 
 func (i *IstioSuite) istioInstalled(client kubernetes.Interface) bool {
-	_, err := client.CoreV1().Services("istio-system").Get(context.Background(), "istiod", metav1.GetOptions{})
+	_, err := client.CoreV1().Services("istio-system").Get(i.T().Context(), "istiod", metav1.GetOptions{})
 	return err == nil
 }
 

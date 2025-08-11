@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package http
 
 import (
 	"context"
@@ -26,11 +26,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	"github.com/istio-ecosystem/authservice/internal/watch"
 )
 
 const (
@@ -109,10 +110,7 @@ func TestLoadTLSConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			pool := NewTLSConfigPool(ctx)
-			t.Cleanup(cancel)
-
+			pool := NewTLSConfigPool(noopWatcher{})
 			got, err := pool.LoadTLSConfig(tc.config)
 
 			// Check for errors
@@ -151,18 +149,21 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 	cert2, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	pool := NewTLSConfigPool(ctx)
-	t.Cleanup(cancel)
-
 	const (
 		interval        = 100 * time.Millisecond
 		intervalAndHalf = interval + interval/2
 	)
+	ctx, cancel := context.WithCancel(t.Context())
+	fileWatcher := watch.NewFileWatcher(watch.NewOpts(watch.WithFallbackInterval(interval)))
+	go func() {
+		require.NoError(t, fileWatcher.Start(ctx.Done()))
+	}()
+	t.Cleanup(cancel)
+
+	pool := NewTLSConfigPool(fileWatcher)
 
 	config := &oidc.OIDCConfig{
 		TrustedCaConfig: &oidc.OIDCConfig_TrustedCertificateAuthorityFile{TrustedCertificateAuthorityFile: caFile1},
-		TrustedCertificateAuthorityRefreshInterval: durationpb.New(interval),
 	}
 
 	// load the TLS config
@@ -176,20 +177,18 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 
 	// update the CA file content
 	require.NoError(t, os.WriteFile(caFile1, secondCAPem, 0644))
-	time.Sleep(intervalAndHalf)
-
-	// load the TLS config again
-	gotTLS, err = pool.LoadTLSConfig(config)
-	require.NoError(t, err)
-
-	// verify the got TLS config is not valid anymore for the old CA,
-	// as we updated it with CA only valid for cert2.
-	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: firstCertDNSName})
-	require.Error(t, err)
-
-	// verify the got TLS config is valid for the new CA
-	_, err = cert2.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: secondCertDNSName})
-	require.NoError(t, err)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		// load the TLS config again
+		gotTLS, err = pool.LoadTLSConfig(config)
+		require.NoError(t, err)
+		// verify the got TLS config is valid for the new CA
+		_, err = cert2.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: secondCertDNSName})
+		assert.NoError(t, err)
+		// verify the got TLS config is not valid anymore for the old CA,
+		// as we updated it with CA only valid for cert2.
+		_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: firstCertDNSName})
+		assert.Error(t, err)
+	}, 10*time.Second, 20*time.Millisecond)
 
 	// update the CA file content to be invalid
 	require.NoError(t, os.WriteFile(caFile1, []byte(invalidCAPem), 0644))
@@ -217,14 +216,12 @@ func TestTLSConfigPoolUpdates(t *testing.T) {
 
 	// update the CA file content to be valid again and verify the new CA is loaded
 	require.NoError(t, os.WriteFile(caFile1, firstCAPem, 0644))
-	time.Sleep(intervalAndHalf)
-
-	// load the TLS config again
-	gotTLS, err = pool.LoadTLSConfig(config)
-	require.NoError(t, err)
-
-	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: firstCertDNSName})
-	require.NoError(t, err)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		gotTLS, err = pool.LoadTLSConfig(config)
+		require.NoError(t, err)
+		_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS.RootCAs, DNSName: firstCertDNSName})
+		require.NoError(t, err)
+	}, 10*time.Second, 20*time.Millisecond)
 }
 
 func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
@@ -248,23 +245,20 @@ func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
 	cert2, err := x509.ParseCertificate(block.Bytes)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	pool := NewTLSConfigPool(ctx)
+	ctx, cancel := context.WithCancel(t.Context())
+	fileWatcher := watch.NewFileWatcher(watch.NewOpts())
+	go func() {
+		require.NoError(t, fileWatcher.Start(ctx.Done()))
+	}()
 	t.Cleanup(cancel)
 
-	const (
-		config1Interval = 100 * time.Millisecond
-		config2Interval = 200 * time.Millisecond
-	)
-	var intervalAndHalf = func(interval time.Duration) time.Duration { return interval + interval/2 }
+	pool := NewTLSConfigPool(fileWatcher)
 
 	config1 := &oidc.OIDCConfig{
 		TrustedCaConfig: &oidc.OIDCConfig_TrustedCertificateAuthorityFile{TrustedCertificateAuthorityFile: caFile1},
-		TrustedCertificateAuthorityRefreshInterval: durationpb.New(config1Interval),
 	}
 	config2 := &oidc.OIDCConfig{
 		TrustedCaConfig: &oidc.OIDCConfig_TrustedCertificateAuthorityFile{TrustedCertificateAuthorityFile: caFile2},
-		TrustedCertificateAuthorityRefreshInterval: durationpb.New(config2Interval),
 	}
 
 	// load the TLS config for config1
@@ -274,6 +268,8 @@ func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
 	// load the TLS config for config2
 	gotTLS2, err := pool.LoadTLSConfig(config2)
 	require.NoError(t, err)
+
+	require.NotEqual(t, gotTLS1, gotTLS2)
 
 	// verify the got TLS config for config1 is valid
 	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS1.RootCAs, DNSName: firstCertDNSName})
@@ -285,26 +281,26 @@ func TestTLSConfigPoolWithMultipleConfigs(t *testing.T) {
 
 	// update the second file to contain the first CA
 	require.NoError(t, os.WriteFile(caFile2, firstCAPem, 0644))
-	time.Sleep(intervalAndHalf(config2Interval))
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		// load the TLS config for config2 again
+		gotTLS2, err = pool.LoadTLSConfig(config2)
+		require.NoError(t, err)
 
-	// load the TLS config for config2 again
-	gotTLS2, err = pool.LoadTLSConfig(config2)
-	require.NoError(t, err)
+		// verify the got TLS config for config2 is valid for the first CA and not for the second
+		_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS2.RootCAs, DNSName: firstCertDNSName})
+		require.NoError(t, err)
+		_, err = cert2.Verify(x509.VerifyOptions{Roots: gotTLS2.RootCAs, DNSName: secondCertDNSName})
+		require.Error(t, err)
 
-	// verify the got TLS config for config2 is valid for the first CA and not for the second
-	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS2.RootCAs, DNSName: firstCertDNSName})
-	require.NoError(t, err)
-	_, err = cert2.Verify(x509.VerifyOptions{Roots: gotTLS2.RootCAs, DNSName: secondCertDNSName})
-	require.Error(t, err)
-
-	// verify the got TLS config for config1 is still valid
-	gotTLS1, err = pool.LoadTLSConfig(config1)
-	require.NoError(t, err)
-	_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS1.RootCAs, DNSName: firstCertDNSName})
-	require.NoError(t, err)
+		// verify the got TLS config for config1 is still valid
+		gotTLS1, err = pool.LoadTLSConfig(config1)
+		require.NoError(t, err)
+		_, err = cert1.Verify(x509.VerifyOptions{Roots: gotTLS1.RootCAs, DNSName: firstCertDNSName})
+		require.NoError(t, err)
+	}, 10*time.Second, 20*time.Millisecond)
 }
 
-func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
+func genCA(t *testing.T) (*x509.Certificate, *rsa.PrivateKey, []byte) {
 	defaultSubject := pkix.Name{
 		Organization: []string{"Tetrate"},
 		Country:      []string{"US"},
@@ -314,7 +310,7 @@ func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
 	caKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 
-	ca := x509.Certificate{
+	ca := &x509.Certificate{
 		SerialNumber:          big.NewInt(2025),
 		Subject:               defaultSubject,
 		NotBefore:             time.Now(),
@@ -325,8 +321,18 @@ func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
 		BasicConstraintsValid: true,
 	}
 
-	caDER, err := x509.CreateCertificate(rand.Reader, &ca, &ca, &caKey.PublicKey, caKey)
+	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	require.NoError(t, err)
+
+	return ca, caKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER})
+}
+
+func genCertificate(t *testing.T, dnsName string, ca *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, []byte) {
+	defaultSubject := pkix.Name{
+		Organization: []string{"Tetrate"},
+		Country:      []string{"US"},
+		Locality:     []string{"San Francisco"},
+	}
 
 	template := x509.Certificate{
 		SerialNumber:          big.NewInt(2025),
@@ -342,9 +348,23 @@ func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
 	certKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	require.NoError(t, err)
 
-	der, err := x509.CreateCertificate(rand.Reader, &template, &ca, &certKey.PublicKey, caKey)
+	der, err := x509.CreateCertificate(rand.Reader, &template, ca, &certKey.PublicKey, caKey)
 	require.NoError(t, err)
 
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}),
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+
+	return cert, certKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
+
+func genCAAndCert(t *testing.T, dnsName string) ([]byte, []byte) {
+	ca, key, caPEM := genCA(t)
+	_, _, cert := genCertificate(t, dnsName, ca, key)
+	return caPEM, cert
+}
+
+var _ watch.Callbacker = (*noopWatcher)(nil)
+
+type noopWatcher struct{}
+
+func (n noopWatcher) Watch(string, ...watch.Callback) error { return nil }

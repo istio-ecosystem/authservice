@@ -15,7 +15,6 @@
 package server
 
 import (
-	"context"
 	"testing"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
@@ -40,7 +39,7 @@ func TestUnmatchedRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := NewExtAuthZFilter(&configv1.Config{AllowUnmatchedRequests: tt.allow}, nil, nil, nil)
-			got, err := e.Check(context.Background(), &envoy.CheckRequest{})
+			got, err := e.Check(t.Context(), &envoy.CheckRequest{})
 			require.NoError(t, err)
 			require.Equal(t, int32(tt.want), got.Status.Code)
 		})
@@ -63,7 +62,7 @@ func TestFiltersMatch(t *testing.T) {
 			cfg := &configv1.Config{Chains: []*configv1.FilterChain{{Filters: tt.filters}}}
 			e := NewExtAuthZFilter(cfg, nil, nil, nil)
 
-			got, err := e.Check(context.Background(), &envoy.CheckRequest{})
+			got, err := e.Check(t.Context(), &envoy.CheckRequest{})
 			require.NoError(t, err)
 			require.Equal(t, int32(tt.want), got.Status.Code)
 		})
@@ -93,7 +92,7 @@ func TestUseFirstMatchingChain(t *testing.T) {
 
 	e := NewExtAuthZFilter(cfg, nil, nil, nil)
 
-	got, err := e.Check(context.Background(), header("match"))
+	got, err := e.Check(t.Context(), header("match"))
 	require.NoError(t, err)
 	require.Equal(t, int32(codes.OK), got.Status.Code)
 }
@@ -130,7 +129,7 @@ func TestGrpcNoChainsMatched(t *testing.T) {
 	require.NoError(t, err)
 	client := envoy.NewAuthorizationClient(conn)
 
-	ok, err := client.Check(context.Background(), header("test"))
+	ok, err := client.Check(t.Context(), header("test"))
 	require.NoError(t, err)
 	require.Equal(t, int32(codes.PermissionDenied), ok.Status.Code)
 }
@@ -284,7 +283,7 @@ func TestCheckTriggerRules(t *testing.T) {
 					},
 				},
 			}
-			got, err := e.Check(context.Background(), req)
+			got, err := e.Check(t.Context(), req)
 			require.NoError(t, err)
 			require.Equal(t, int32(tt.want), got.Status.Code)
 		})

@@ -177,7 +177,7 @@ func (k *K8sSuite) WaitForPods(client kubernetes.Interface, namespace, selector 
 		opts := metav1.ListOptions{
 			LabelSelector: selector,
 		}
-		pods, err := client.CoreV1().Pods(namespace).List(context.Background(), opts)
+		pods, err := client.CoreV1().Pods(namespace).List(k.T().Context(), opts)
 		if err != nil || len(pods.Items) == 0 {
 			return false
 		}

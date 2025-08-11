@@ -15,7 +15,6 @@
 package mock
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -66,7 +65,7 @@ func TestRedisTokenResponse(t *testing.T) {
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 0, 1*time.Minute)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	tr, err := store.GetTokenResponse(ctx, "s1")
 	require.NoError(t, err)
@@ -102,7 +101,7 @@ func TestRedisAuthorizationState(t *testing.T) {
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 0, 1*time.Minute)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	as, err := store.GetAuthorizationState(ctx, "s1")
 	require.NoError(t, err)
@@ -134,7 +133,7 @@ func TestSessionExpiration(t *testing.T) {
 	store, err := oidc.NewRedisStore(&oidc.Clock{}, client, 2*time.Second, 0)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("expire-token", func(t *testing.T) {
 		tr := &oidc.TokenResponse{

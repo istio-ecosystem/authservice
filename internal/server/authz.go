@@ -29,6 +29,7 @@ import (
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	"github.com/istio-ecosystem/authservice/internal"
 	"github.com/istio-ecosystem/authservice/internal/authz"
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 	"github.com/istio-ecosystem/authservice/internal/oidc"
 )
 
@@ -59,13 +60,13 @@ var (
 type ExtAuthZFilter struct {
 	log      telemetry.Logger
 	cfg      *configv1.Config
-	tlsPool  internal.TLSConfigPool
+	tlsPool  inthttp.TLSConfigPool
 	jwks     oidc.JWKSProvider
 	sessions oidc.SessionStoreFactory
 }
 
 // NewExtAuthZFilter creates a new ExtAuthZFilter.
-func NewExtAuthZFilter(cfg *configv1.Config, tlsPool internal.TLSConfigPool, jwks oidc.JWKSProvider, sessions oidc.SessionStoreFactory) *ExtAuthZFilter {
+func NewExtAuthZFilter(cfg *configv1.Config, tlsPool inthttp.TLSConfigPool, jwks oidc.JWKSProvider, sessions oidc.SessionStoreFactory) *ExtAuthZFilter {
 	return &ExtAuthZFilter{
 		log:      internal.Logger(internal.Authz),
 		cfg:      cfg,
