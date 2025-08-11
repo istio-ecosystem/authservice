@@ -114,7 +114,7 @@ func (s *sessionStoreFactory) PreRun() error {
 
 	var opts []watcher.OptionFunc
 	if s.periodicReloadInterval > 0 {
-		opts = append(opts, watcher.WithFallbackTimeout(s.periodicReloadInterval))
+		opts = append(opts, watcher.WithFallbackInterval(s.periodicReloadInterval))
 	} else {
 		opts = append(opts, watcher.WithSkipFallback())
 	}

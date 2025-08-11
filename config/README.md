@@ -233,11 +233,11 @@ and the Redis server.
 | ----- | ---- | ----- | ----------- |
 | skip_verify_peer_cert | [bool](#bool) |  | Set to true to skip the verification of the peer TLS certificate. |
 | trusted_ca_pem | [string](#string) |  | The PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate. |
-| trusted_ca_file | [string](#string) |  | The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate. |
+| trusted_ca_file | [string](#string) |  | The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate. This is typically mounted from a Kubernetes Secret. |
 | client_cert_pem | [string](#string) |  | The PEM-encoded client certificate to use for mutual TLS authentication. |
-| client_cert_file | [string](#string) |  | The file containing the PEM-encoded client certificate to use for mutual TLS authentication. |
+| client_cert_file | [string](#string) |  | The file containing the PEM-encoded client certificate to use for mutual TLS authentication. This is typically mounted from a Kubernetes Secret. |
 | client_key_pem | [string](#string) |  | The PEM-encoded client private key to use for mutual TLS authentication. |
-| client_key_file | [string](#string) |  | The file containing the PEM-encoded client private key to use for mutual TLS authentication. |
+| client_key_file | [string](#string) |  | The file containing the PEM-encoded client private key to use for mutual TLS authentication. This is typically mounted from a Kubernetes Secret. |
 
 
 

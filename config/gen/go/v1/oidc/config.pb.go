@@ -937,6 +937,7 @@ type RedisConfig_TLSConfig_TrustedCaPem struct {
 
 type RedisConfig_TLSConfig_TrustedCaFile struct {
 	// The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate.
+	// This is typically mounted from a Kubernetes Secret.
 	TrustedCaFile string `protobuf:"bytes,3,opt,name=trusted_ca_file,json=trustedCaFile,proto3,oneof"`
 }
 
@@ -955,6 +956,7 @@ type RedisConfig_TLSConfig_ClientCertPem struct {
 
 type RedisConfig_TLSConfig_ClientCertFile struct {
 	// The file containing the PEM-encoded client certificate to use for mutual TLS authentication.
+	// This is typically mounted from a Kubernetes Secret.
 	ClientCertFile string `protobuf:"bytes,5,opt,name=client_cert_file,json=clientCertFile,proto3,oneof"`
 }
 
@@ -973,6 +975,7 @@ type RedisConfig_TLSConfig_ClientKeyPem struct {
 
 type RedisConfig_TLSConfig_ClientKeyFile struct {
 	// The file containing the PEM-encoded client private key to use for mutual TLS authentication.
+	// This is typically mounted from a Kubernetes Secret.
 	ClientKeyFile string `protobuf:"bytes,7,opt,name=client_key_file,json=clientKeyFile,proto3,oneof"`
 }
 

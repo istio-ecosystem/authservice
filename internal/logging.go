@@ -55,7 +55,7 @@ var scopes = map[string]string{
 	Session:  "Session store messages",
 	K8s:      "Kubernetes controller messages",
 	Secrets:  "Kubernetes secrets controller messages",
-	Watch:    "Filie watcher messages",
+	Watch:    "File watcher messages",
 }
 
 // ErrInvalidLogLevel is returned when the configured log level is invalid.

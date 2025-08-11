@@ -64,18 +64,21 @@ message RedisConfig {
       // The PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate.
       string trusted_ca_pem = 2;
       // The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate.
+      // This is typically mounted from a Kubernetes Secret.
       string trusted_ca_file = 3;
     }
     oneof client_cert {
       // The PEM-encoded client certificate to use for mutual TLS authentication.
       string client_cert_pem = 4;
       // The file containing the PEM-encoded client certificate to use for mutual TLS authentication.
+      // This is typically mounted from a Kubernetes Secret.
       string client_cert_file = 5;
     }
     oneof client_key {
       // The PEM-encoded client private key to use for mutual TLS authentication.
       string client_key_pem = 6;
       // The file containing the PEM-encoded client private key to use for mutual TLS authentication.
+      // This is typically mounted from a Kubernetes Secret.
       string client_key_file = 7;
     }
   }

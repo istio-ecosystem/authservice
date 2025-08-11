@@ -304,15 +304,17 @@ func (o FileWatcherOptions) With(options ...OptionFunc) FileWatcherOptions {
 	return o
 }
 
-// WithFallbackTimeout sets the time the watcher will notify for changes even if no change event is received. Default is 1 minute.
-func WithFallbackTimeout(timeout time.Duration) OptionFunc {
+// WithFallbackInterval sets the time the watcher will notify for changes even if no change event is received.
+// Default is 1 minute.
+func WithFallbackInterval(timeout time.Duration) OptionFunc {
 	return func(m FileWatcherOptions) FileWatcherOptions {
 		m.fallbackTimeout = timeout
 		return m
 	}
 }
 
-// WithCheckInterval sets the interval between two checks for changes. Default is 1 second.
+// WithCheckInterval sets the interval between two checks for changes.
+// Default is 1 second.
 func WithCheckInterval(interval time.Duration) OptionFunc {
 	return func(m FileWatcherOptions) FileWatcherOptions {
 		m.checkInterval = interval
@@ -320,7 +322,9 @@ func WithCheckInterval(interval time.Duration) OptionFunc {
 	}
 }
 
-// WithFirstTimeRead sets the watcher to notify the changes on the first time it is started, without waiting for a change event. Default is disabled.
+// WithFirstTimeRead sets the watcher to notify the changes on the first time it is started,
+// without waiting for a change event.
+// Default is disabled.
 func WithFirstTimeRead() OptionFunc {
 	return func(m FileWatcherOptions) FileWatcherOptions {
 		m.firstTimeRead = true
@@ -328,7 +332,8 @@ func WithFirstTimeRead() OptionFunc {
 	}
 }
 
-// WithSkipFallback sets the watcher to not notify the changes after the fallback timeout, meaning it will only notify when a change event is received.
+// WithSkipFallback sets the watcher to not notify the changes after the fallback timeout,
+// meaning it will only notify when a change event is received.
 // Default is disabled.
 func WithSkipFallback() OptionFunc {
 	return func(m FileWatcherOptions) FileWatcherOptions {
@@ -337,7 +342,8 @@ func WithSkipFallback() OptionFunc {
 	}
 }
 
-// WithForceWatchDir sets the watcher to watch a directory and even create it if it does not exist. Default is disabled.
+// WithForceWatchDir sets the watcher to watch a directory and even create it if it does not exist.
+// Default is disabled.
 func WithForceWatchDir() OptionFunc {
 	return func(m FileWatcherOptions) FileWatcherOptions {
 		m.forceWatchDir = true

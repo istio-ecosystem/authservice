@@ -165,7 +165,7 @@ func (p *tlsConfigPool) updateCA(id string, caPem []byte) {
 		return
 	}
 
-	// UpdateConfig the TLS config
+	// Update the TLS config
 	tlsConfig.RootCAs = certPool
 	log.Info("updated TLS config with new trusted certificate authority")
 
