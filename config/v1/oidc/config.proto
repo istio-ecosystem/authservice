@@ -42,9 +42,49 @@ message TokenConfig {
 
 // When specified, the Authservice will use the configured Redis server to store session data
 message RedisConfig {
-
   // The Redis server uri, e.g. "tcp://127.0.0.1:6379"
   string server_uri = 1 [(validate.rules).string.min_len = 1];
+  // The username to use when connecting to the Redis server. It can also be configured in the `server_uri`.
+  string username = 2;
+
+  oneof redis_password {
+    // The password to use when connecting to the Redis server. It can also be configured in the `server_uri`.
+    string password = 3;
+    // The file containing the password to use when connecting to the Redis server.
+    // This is useful when the password is stored in a Kubernetes Secret.
+    string password_file = 4;
+  }
+
+  // Contains settings to configure the TLS connections. Typical uses are connections to the OIDC Provider
+  // and the Redis server.
+  message TLSConfig {
+    // Set to true to skip the verification of the peer TLS certificate.
+    bool skip_verify_peer_cert = 1;
+    oneof ca {
+      // The PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate.
+      string trusted_ca_pem = 2;
+      // The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate.
+      // This is typically mounted from a Kubernetes Secret.
+      string trusted_ca_file = 3;
+    }
+    oneof client_cert {
+      // The PEM-encoded client certificate to use for mutual TLS authentication.
+      string client_cert_pem = 4;
+      // The file containing the PEM-encoded client certificate to use for mutual TLS authentication.
+      // This is typically mounted from a Kubernetes Secret.
+      string client_cert_file = 5;
+    }
+    oneof client_key {
+      // The PEM-encoded client private key to use for mutual TLS authentication.
+      string client_key_pem = 6;
+      // The file containing the PEM-encoded client private key to use for mutual TLS authentication.
+      // This is typically mounted from a Kubernetes Secret.
+      string client_key_file = 7;
+    }
+  }
+
+  // The TLS configuration to use when connecting to the Redis server.
+  TLSConfig tls_config = 5;
 }
 
 // When specified, the Authservice will destroy the Authservice session when a request is
@@ -156,7 +196,7 @@ message OIDCConfig {
 
   // This message defines a reference to a Kubernetes Secret resource.
   message SecretReference {
-    // The namespace of the referenced Secret, if not set, defaults to the namespace where the Authservice is running.
+    // The namespace of the referenced Secret, if not set, defaults to the namespace where the authservice is running.
     string namespace = 1;
     // The name of the referenced Secret.
     string name = 2 [(validate.rules).string.min_len = 1];

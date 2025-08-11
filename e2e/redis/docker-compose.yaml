@@ -16,5 +16,13 @@ services:
   redis:
     image: redis:7.2.4
     platform: linux/${ARCH:-amd64}
+    command: /etc/redis/redis.conf
     ports:
       - "6379:6379"
+    volumes:
+      - type: bind
+        source: redis.conf
+        target: /etc/redis/redis.conf
+      - type: bind
+        source: certs
+        target: /etc/redis/certs

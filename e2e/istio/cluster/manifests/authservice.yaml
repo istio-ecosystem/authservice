@@ -78,6 +78,12 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/authservice
+            - name: redis-password
+              mountPath: /etc/authservice/redis
+              readOnly: true
+            - name: redis-client-mtls
+              mountPath: /etc/authservice/certs
+              readOnly: true
           livenessProbe:
             initialDelaySeconds: 1
             periodSeconds: 5
@@ -93,6 +99,12 @@ spec:
         - name: config
           configMap:
             name: authservice-config
+        - name: redis-password
+          secret:
+            secretName: redis-password
+        - name: redis-client-mtls
+          secret:
+            secretName: redis-client-mtls
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -171,7 +183,14 @@ data:
                   "header": "x-access-token"
                 },
                 "redis_session_store_config": {
-                  "server_uri": "redis://redis.redis.svc.cluster.local:6379"
+                  "server_uri": "redis://redis.redis.svc.cluster.local:6379",
+                  "username": "authservice",
+                  "password_file": "/etc/authservice/redis/password",
+                  "tls_config": {
+                    "trusted_ca_file": "/etc/authservice/certs/ca.crt",
+                    "client_cert_file": "/etc/authservice/certs/tls.crt",
+                    "client_key_file": "/etc/authservice/certs/tls.key"
+                  }
                 },
                 "token_exchange": {
                   "token_exchange_uri": "http://keycloak.keycloak:8080/realms/master/protocol/openid-connect/token",

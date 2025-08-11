@@ -13,6 +13,7 @@
     - [OIDCConfig.TokenExchange.BearerTokenCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-BearerTokenCredentials)
     - [OIDCConfig.TokenExchange.ClientCredentials](#authservice-config-v1-oidc-OIDCConfig-TokenExchange-ClientCredentials)
     - [RedisConfig](#authservice-config-v1-oidc-RedisConfig)
+    - [RedisConfig.TLSConfig](#authservice-config-v1-oidc-RedisConfig-TLSConfig)
     - [TokenConfig](#authservice-config-v1-oidc-TokenConfig)
   
     - [OIDCConfig.CookieAttributes.SameSite](#authservice-config-v1-oidc-OIDCConfig-CookieAttributes-SameSite)
@@ -140,7 +141,7 @@ This message defines a reference to a Kubernetes Secret resource.
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| namespace | [string](#string) |  | The namespace of the referenced Secret, if not set, defaults to the namespace where the Authservice is running. |
+| namespace | [string](#string) |  | The namespace of the referenced Secret, if not set, defaults to the namespace where the authservice is running. |
 | name | [string](#string) |  | The name of the referenced Secret. |
 
 
@@ -211,6 +212,32 @@ When specified, the Authservice will use the configured Redis server to store se
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | server_uri | [string](#string) |  | The Redis server uri, e.g. "tcp://127.0.0.1:6379" |
+| username | [string](#string) |  | The username to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
+| password | [string](#string) |  | The password to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
+| password_file | [string](#string) |  | The file containing the password to use when connecting to the Redis server. This is useful when the password is stored in a Kubernetes Secret. |
+| tls_config | [RedisConfig.TLSConfig](#authservice-config-v1-oidc-RedisConfig-TLSConfig) |  | The TLS configuration to use when connecting to the Redis server. |
+
+
+
+
+
+
+<a name="authservice-config-v1-oidc-RedisConfig-TLSConfig"></a>
+
+### RedisConfig.TLSConfig
+Contains settings to configure the TLS connections. Typical uses are connections to the OIDC Provider
+and the Redis server.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| skip_verify_peer_cert | [bool](#bool) |  | Set to true to skip the verification of the peer TLS certificate. |
+| trusted_ca_pem | [string](#string) |  | The PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate. |
+| trusted_ca_file | [string](#string) |  | The file containing the PEM-encoded trusted CA certificate to use for verifying the peer TLS certificate. This is typically mounted from a Kubernetes Secret. |
+| client_cert_pem | [string](#string) |  | The PEM-encoded client certificate to use for mutual TLS authentication. |
+| client_cert_file | [string](#string) |  | The file containing the PEM-encoded client certificate to use for mutual TLS authentication. This is typically mounted from a Kubernetes Secret. |
+| client_key_pem | [string](#string) |  | The PEM-encoded client private key to use for mutual TLS authentication. |
+| client_key_file | [string](#string) |  | The file containing the PEM-encoded client private key to use for mutual TLS authentication. This is typically mounted from a Kubernetes Secret. |
 
 
 

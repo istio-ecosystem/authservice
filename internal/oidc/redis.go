@@ -16,20 +16,25 @@ package oidc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/telemetry"
 
+	"github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
 )
 
 var (
 	_ SessionStore = (*redisStore)(nil)
 
-	ErrRedis = errors.New("redis error")
+	ErrRedis            = errors.New("redis error")
+	ErrRedisConfigureCA = errors.New("error configuring custom CA certificates for the redis client")
 )
 
 const (
@@ -57,6 +62,54 @@ type redisStore struct {
 	client                 redis.Cmdable
 	absoluteSessionTimeout time.Duration
 	idleSessionTimeout     time.Duration
+}
+
+// NewRedisClient creates a new Redis client based on the provided OIDC Redis configuration.
+func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
+	log := internal.Logger(internal.Session).With("type", "redis")
+
+	opts, err := redis.ParseURL(config.GetServerUri())
+	if err != nil {
+		return nil, fmt.Errorf("parsing redis URL: %w", err)
+	}
+	opts.Username = config.GetUsername()
+	opts.Password = config.GetPassword()
+
+	log.Info("connecting to redis",
+		"addr", opts.Addr,
+		"user", opts.Username,
+		"tls", config.GetTlsConfig() != nil,
+		"mtls", config.GetTlsConfig().GetClientCertPem() != "",
+	)
+
+	if tlscfg := config.GetTlsConfig(); tlscfg != nil {
+		// No need to check the error as it has been already validated when generating the options from the URL.
+		u, _ := url.Parse(config.GetServerUri())
+		opts.TLSConfig = &tls.Config{
+			ServerName:         u.Hostname(),
+			InsecureSkipVerify: config.GetTlsConfig().GetSkipVerifyPeerCert(),
+		}
+
+		if ca := tlscfg.GetTrustedCaPem(); ca != "" {
+			caCertPool := x509.NewCertPool()
+			if !caCertPool.AppendCertsFromPEM([]byte(ca)) {
+				return nil, ErrRedisConfigureCA
+			}
+			opts.TLSConfig.RootCAs = caCertPool
+		}
+
+		if certPEM := tlscfg.GetClientCertPem(); certPEM != "" {
+			cert, err := tls.X509KeyPair([]byte(certPEM), []byte(tlscfg.GetClientKeyPem()))
+			if err != nil {
+				return nil, fmt.Errorf("loading client certificate: %w", err)
+			}
+			opts.TLSConfig.Certificates = []tls.Certificate{cert}
+		}
+	}
+
+	log.Debug("connection options", "options", fmt.Sprintf("%+v", opts))
+
+	return redis.NewClient(opts), nil
 }
 
 // NewRedisStore creates a new SessionStore that stores the session data in a given Redis server.

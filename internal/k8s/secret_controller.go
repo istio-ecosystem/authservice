@@ -18,7 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
@@ -61,7 +63,7 @@ type SecretController struct {
 // Kubernetes and updates the configuration with the loaded data.
 func NewSecretController(cfg *configv1.Config) *SecretController {
 	return &SecretController{
-		log:     internal.Logger(internal.Config),
+		log:     internal.Logger(internal.Secrets),
 		config:  cfg,
 		secrets: make(map[string][]secretUpdateFunc),
 	}
@@ -71,7 +73,7 @@ func NewSecretController(cfg *configv1.Config) *SecretController {
 func (s *SecretController) Name() string { return "Secret controller" }
 
 // PreRun saves the original configuration in PreRun phase because the
-// configuration is loaded from the file in the Config Validate phase.
+// configuration is loaded from the file in the config Validate phase.
 func (s *SecretController) PreRun() error {
 	if s.defaultNamespace == "" {
 		var data []byte
@@ -84,6 +86,7 @@ func (s *SecretController) PreRun() error {
 			s.defaultNamespace = string(data)
 		}
 	}
+	s.log.Info("setting default namespace for secret references", "default-namespace", s.defaultNamespace)
 
 	// Check if there are any k8s secrets to watch. By only caching the configured namespaces we don't require
 	// wide permissions for the controller to watch secrets in all the namespaces.
@@ -93,6 +96,8 @@ func (s *SecretController) PreRun() error {
 	if len(cachedNamespaces) == 0 {
 		return nil
 	}
+
+	s.log.Info("watch secrets", "namespaces", slices.Collect(maps.Keys(cachedNamespaces)))
 
 	var err error
 
@@ -107,6 +112,7 @@ func (s *SecretController) PreRun() error {
 	// The controller manager is encapsulated in the secret controller because we
 	// only need it to watch secrets and update the configuration.
 	s.manager, err = ctrl.NewManager(s.restConf, ctrl.Options{
+		Logger:  internal.NewLogrAdapter(internal.Logger(internal.K8s)),
 		Metrics: metricsserver.Options{BindAddress: "0"},
 		Cache: cache.Options{
 			// Only watch for Secret objects in the desired namespaces
@@ -172,6 +178,9 @@ func (s *SecretController) ServeContext(ctx context.Context) error {
 }
 
 func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := s.log.Context(ctx).With("secret", req.String())
+	log.Debug("reconciling secret")
+
 	changedSecret := req.NamespacedName.String()
 	oidcConfigsUpdateFuncs, exist := s.secrets[changedSecret]
 
@@ -190,11 +199,17 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
+	if len(secret.Data) == 0 {
+		// Secret is empty, we cannot update the configuration
+		log.Info("secret is empty")
+		return ctrl.Result{}, nil
+	}
+
 	for _, oidcUpdateFunc := range oidcConfigsUpdateFuncs {
 		if err := oidcUpdateFunc(ctx, secret.Data); err != nil {
 			// Do not return an error here, as trying to process the secret again
 			// will not help when the data is not present. Just log the error
-			s.log.Error("error updating secret", err)
+			log.Error("error updating secret", err)
 		}
 	}
 

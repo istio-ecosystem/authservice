@@ -20,7 +20,15 @@
               "header": "authorization"
             },
             "redis_session_store_config": {
-              "server_uri": "redis://localhost:6379/0"
+              "server_uri": "redis://localhost:6379/0",
+              "username": "authservice",
+              "password_file": "/etc/authservice/redis/password",
+              "tls_config": {
+                "skip_verify_peer_cert": true,
+                "trusted_ca_file": "/etc/authservice/certs/ca.crt",
+                "client_cert_file": "/etc/authservice/certs/tls.crt",
+                "client_key_file": "/etc/authservice/certs/tls.key"
+              }
             },
             "skip_verify_peer_cert": true,
             "token_exchange": {
