@@ -34,6 +34,8 @@ const (
 	istiodConfig  = "cluster/istiod-config.yaml"
 	istioGwConfig = "cluster/istiogw-config.yaml"
 	manifestsDir  = "cluster/manifests"
+
+	helmCmd = "go tool helm" // Use Helm as a go tool for easier install and better version pinning
 )
 
 // testManifests contains the list of manifests that will be deployed in the cluster before running the e2e tests
@@ -97,8 +99,8 @@ func (i *IstioSuite) installIstio() {
 	}
 
 	var istioInstall = []string{
-		fmt.Sprintf("helm repo add istio %s --force-update", istioHelmRepo),
-		"helm repo update istio",
+		fmt.Sprintf("%s repo add istio %s --force-update", helmCmd, istioHelmRepo),
+		fmt.Sprintf("%s repo update istio", helmCmd),
 		i.helmInstall("istio-base", "istio/base", ""),
 		i.helmInstall("istiod", "istio/istiod", istiodConfig),
 		i.helmInstall("istio-ingress", "istio/gateway", istioGwConfig),
@@ -117,8 +119,8 @@ func (i *IstioSuite) istioInstalled(client kubernetes.Interface) bool {
 }
 
 func (i *IstioSuite) helmInstall(name, chart, values string) string {
-	cmd := fmt.Sprintf("helm --kubeconfig %s install %s %s --version %s -n istio-system --create-namespace --wait",
-		e2e.KubeConfig, name, chart, i.IstioVersion)
+	cmd := fmt.Sprintf("%s --kubeconfig %s install %s %s --version %s -n istio-system --create-namespace --wait",
+		helmCmd, e2e.KubeConfig, name, chart, i.IstioVersion)
 	if values != "" {
 		cmd += fmt.Sprintf(" -f %s", values)
 	}
