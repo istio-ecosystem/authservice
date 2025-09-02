@@ -12,7 +12,6 @@ The following software and tools are needed to build the project and run the tes
 * [GNU make](https://www.gnu.org/software/make/)
 * [Docker](https://docs.docker.com/get-docker/)
 * [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) (needed to run the Istio e2e test suite)
-* [Helm](https://helm.sh/docs/intro/install/) (needed to run the Istio e2e test suite)
 
 
 ## Building the binary
