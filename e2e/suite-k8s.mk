@@ -47,7 +47,7 @@ e2e-post::  ## Destroy the kind cluster and the generated kubeconfig file
 ifeq ($(E2E_PRESERVE_LOGS),true)
 	@$(MAKE) capture-logs
 endif
-	@go tool kind delete cluster -n $(E2E_CLUSTER_NAME)
+	@$(GO_TOOL) kind delete cluster -n $(E2E_CLUSTER_NAME)
 	@rm -f $(E2E_KUBECONFIG)
 
 .PHONY: e2e-post-error
@@ -60,7 +60,7 @@ capture-logs:
 # If the kubeconfig file does not exist, create a new cluster and export the kubeconfig file to the
 # configured file
 $(E2E_KUBECONFIG): $(E2E_KIND_CONFIG)
-	@go tool kind create cluster -n $(E2E_CLUSTER_NAME) --kubeconfig $(@) --config $(E2E_KIND_CONFIG)
+	@$(GO_TOOL) kind create cluster -n $(E2E_CLUSTER_NAME) --kubeconfig $(@) --config $(E2E_KIND_CONFIG)
 
 # Load the e2e images in the kind cluster. Note images are tagged in the `kind-local` registry
 # to use it as a placeholder in e2e kubernetes manifests regardless of the configured $(DOCKER_HUB). This
@@ -68,7 +68,7 @@ $(E2E_KUBECONFIG): $(E2E_KIND_CONFIG)
 .PHONY: kind-load
 kind-load:  ## Load the end-to-end test images in the local Kind cluster
 	@docker tag $(E2E_IMAGE) kind-local/$(NAME):e2e
-	@go tool kind load docker-image kind-local/$(NAME):e2e -n $(E2E_CLUSTER_NAME)
+	@$(GO_TOOL) kind load docker-image kind-local/$(NAME):e2e -n $(E2E_CLUSTER_NAME)
 
 .PHONY: kind-create
 kind-create: e2e-pre

@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+GO_TOOL := go tool -modfile=../tools/go.mod
+
 .PHONY: all
 all: clean build lint
 
 .PHONY: build
 build:  ## Generate the Go code from the protobuf definitions
 	@echo "Generating Go code from protobuf definitions"
-	@go tool buf build
-	@go tool buf generate
+	@$(GO_TOOL) buf build
+	@$(GO_TOOL) buf generate
 	@go mod tidy
 
 .PHONY: lint
 lint:  ## Lint the protobuf definitions
 	@echo "Linting protobuf definitions"
-	@go tool buf lint
+	@$(GO_TOOL) buf lint
 
 .PHONY: clean
 clean:  ## Clean all generated code

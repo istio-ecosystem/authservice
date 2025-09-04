@@ -35,7 +35,7 @@ const (
 	istioGwConfig = "cluster/istiogw-config.yaml"
 	manifestsDir  = "cluster/manifests"
 
-	helmCmd = "go tool helm" // Use Helm as a go tool for easier install and better version pinning
+	helmCmd = "go tool -modfile=../../tools/go.mod helm" // Use Helm as a go tool for easier install and better version pinning
 )
 
 // testManifests contains the list of manifests that will be deployed in the cluster before running the e2e tests

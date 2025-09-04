@@ -18,6 +18,8 @@ NAME      ?= authservice
 
 -include $(ROOT)/.makerc  # Pick up any local overrides.
 
+GO_TOOL := go tool -modfile=$(ROOT)/tools/go.mod
+
 TARGETS      ?= linux-amd64 linux-arm64 #darwin-amd64 darwin-arm64
 FIPS_TARGETS := $(filter linux-%,$(TARGETS))
 
