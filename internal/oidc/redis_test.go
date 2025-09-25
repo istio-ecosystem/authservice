@@ -69,6 +69,17 @@ func TestRedisAuth(t *testing.T) {
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
 		require.NoError(t, err)
 	})
+
+	t.Run("credentials-in-url", func(t *testing.T) {
+		// Test credentials in URL (the fix for issue #304)
+		client, err := NewRedisClient(&oidc.RedisConfig{
+			ServerUri: "redis://redis-user:redis-pass@" + mr.Addr(),
+		})
+		require.NoError(t, err)
+
+		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
+		require.NoError(t, err)
+	})
 }
 
 func TestRedisTLS(t *testing.T) {
