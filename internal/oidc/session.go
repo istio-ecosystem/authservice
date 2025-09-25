@@ -26,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
 	"golang.org/x/oauth2"
@@ -129,10 +130,19 @@ func (s *sessionStoreFactory) PreRun() error {
 // loadRedisConfig loads the Redis configuration from the OIDCConfig and initializes or updates
 // the Redis session store.
 func (s *sessionStoreFactory) loadRedisConfig(cfg *oidcv1.OIDCConfig) error {
-	s.log.Info("configuring redis session store",
-		"redis-url", cfg.GetRedisSessionStoreConfig().GetServerUri(),
-		"client-id", cfg.GetClientId(),
-	)
+	// Parse the Redis URL to extract host and port for logging (without credentials)
+	parseOpts, parseErr := redis.ParseURL(cfg.GetRedisSessionStoreConfig().GetServerUri())
+	if parseErr == nil {
+		s.log.Info("configuring redis session store",
+			"redis-url", parseOpts.Addr,
+			"client-id", cfg.GetClientId(),
+		)
+	} else {
+		// If URL parsing fails, log without the URL
+		s.log.Info("configuring redis session store",
+			"client-id", cfg.GetClientId(),
+		)
+	}
 	client, err := NewRedisClient(cfg.GetRedisSessionStoreConfig())
 	if err != nil {
 		return err

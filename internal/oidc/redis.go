@@ -72,8 +72,12 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parsing redis URL: %w", err)
 	}
-	opts.Username = config.GetUsername()
-	opts.Password = config.GetPassword()
+	if username := config.GetUsername(); username != "" {
+		opts.Username = username
+	}
+	if password := config.GetPassword(); password != "" {
+		opts.Password = password
+	}
 
 	log.Info("connecting to redis",
 		"addr", opts.Addr,
