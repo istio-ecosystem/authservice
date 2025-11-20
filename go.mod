@@ -15,7 +15,7 @@ require (
 	github.com/tetratelabs/log v0.2.3
 	github.com/tetratelabs/run v0.3.0
 	github.com/tetratelabs/telemetry v0.8.2
-	golang.org/x/net v0.41.0
+	golang.org/x/net v0.47.0
 	golang.org/x/oauth2 v0.28.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e
 	google.golang.org/grpc v1.71.0
@@ -77,11 +77,11 @@ require (
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.35.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/sync v0.16.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/term v0.33.0 // indirect
-	golang.org/x/text v0.27.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/term v0.37.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
