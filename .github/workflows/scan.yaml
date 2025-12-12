@@ -47,7 +47,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: actions/checkout@v4
       - run: make docker
-      - uses: anchore/scan-action@v3
+      - uses: anchore/scan-action@v7
         id: scan
         with:
           image: local/authservice:scan-amd64
