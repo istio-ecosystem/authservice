@@ -16,6 +16,10 @@ header:
   license:
     spdx-id: Apache-2.0
     copyright-owner: Tetrate
+    pattern: |
+      Copyright \d{4} Tetrate
+
+      Licensed under the Apache License, Version 2.0
   paths-ignore:
     - '**/go.mod'
     - '**/go.sum'
