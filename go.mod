@@ -1,6 +1,6 @@
 module github.com/istio-ecosystem/authservice
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/alicebob/miniredis/v2 v2.31.1
@@ -15,7 +15,7 @@ require (
 	github.com/tetratelabs/log v0.2.3
 	github.com/tetratelabs/run v0.3.0
 	github.com/tetratelabs/telemetry v0.8.2
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.55.0
 	golang.org/x/oauth2 v0.34.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217
 	google.golang.org/grpc v1.79.3
@@ -75,11 +75,11 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/term v0.38.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/term v0.43.0 // indirect
+	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
