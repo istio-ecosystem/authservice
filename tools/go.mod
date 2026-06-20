@@ -119,7 +119,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/fzipp/gocyclo v0.6.0 // indirect
 	github.com/ghostiam/protogetter v0.3.9 // indirect
-	github.com/go-chi/chi/v5 v5.2.3 // indirect
+	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/go-critic/go-critic v0.12.0 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
