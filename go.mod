@@ -1,6 +1,6 @@
 module github.com/istio-ecosystem/authservice
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/alicebob/miniredis/v2 v2.31.1
