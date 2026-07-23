@@ -68,6 +68,52 @@ type redisStore struct {
 func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 	log := internal.Logger(internal.Session).With("type", "redis")
 
+	if internal.IsSentinelURL(config.GetServerUri()) {
+		failoverOpts, useTLS, err := internal.ParseSentinelURL(config.GetServerUri())
+		if err != nil {
+			return nil, fmt.Errorf("parsing redis sentinel URL: %w", err)
+		}
+		if username := config.GetUsername(); username != "" {
+			failoverOpts.Username = username
+		}
+		if password := config.GetPassword(); password != "" {
+			failoverOpts.Password = password
+		}
+
+		log.Info("connecting to redis via sentinel",
+			"master", failoverOpts.MasterName,
+			"sentinels", failoverOpts.SentinelAddrs,
+			"user", failoverOpts.Username,
+			"tls", useTLS || config.GetTlsConfig() != nil,
+			"mtls", config.GetTlsConfig().GetClientCertPem() != "",
+		)
+
+		if tlscfg := config.GetTlsConfig(); tlscfg != nil {
+			failoverOpts.TLSConfig = &tls.Config{
+				InsecureSkipVerify: tlscfg.GetSkipVerifyPeerCert(),
+			}
+			if ca := tlscfg.GetTrustedCaPem(); ca != "" {
+				caCertPool := x509.NewCertPool()
+				if !caCertPool.AppendCertsFromPEM([]byte(ca)) {
+					return nil, ErrRedisConfigureCA
+				}
+				failoverOpts.TLSConfig.RootCAs = caCertPool
+			}
+			if certPEM := tlscfg.GetClientCertPem(); certPEM != "" {
+				cert, err := tls.X509KeyPair([]byte(certPEM), []byte(tlscfg.GetClientKeyPem()))
+				if err != nil {
+					return nil, fmt.Errorf("loading client certificate: %w", err)
+				}
+				failoverOpts.TLSConfig.Certificates = []tls.Certificate{cert}
+			}
+		} else if useTLS {
+			failoverOpts.TLSConfig = &tls.Config{}
+		}
+
+		log.Debug("connection options", "options", fmt.Sprintf("%+v", failoverOpts))
+		return redis.NewFailoverClient(failoverOpts), nil
+	}
+
 	opts, err := redis.ParseURL(config.GetServerUri())
 	if err != nil {
 		return nil, fmt.Errorf("parsing redis URL: %w", err)

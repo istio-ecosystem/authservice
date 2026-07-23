@@ -113,6 +113,30 @@ func TestValidateURLs(t *testing.T) {
 			errCheck{is: ErrInvalidURL},
 		},
 		{
+			"valid-sentinel-uri",
+			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{
+				ServerUri: "redis+sentinel://sentinel-0:26379,sentinel-1:26379/mymaster",
+			}},
+			errCheck{is: nil},
+		},
+		{
+			"invalid-sentinel-uri",
+			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{
+				ServerUri: "redis+sentinel://sentinel-0:26379",
+			}},
+			errCheck{is: ErrInvalidURL},
+		},
+		{
+			"valid-rediss-uri",
+			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "rediss://localhost:6379/0"}},
+			errCheck{is: nil},
+		},
+		{
+			"valid-unix-uri",
+			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{ServerUri: "unix:///var/run/redis.sock"}},
+			errCheck{is: nil},
+		},
+		{
 			"invalid-jwks-fetcher",
 			&oidcv1.OIDCConfig{
 				JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
@@ -172,6 +196,82 @@ func TestValidateURLs(t *testing.T) {
 					tt.check.Check(t, validateURLs(cfg))
 				})
 			}
+		})
+	}
+}
+
+func TestIsSentinelURL(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"redis+sentinel://h:26379/mymaster", true},
+		{"rediss+sentinel://h:26379/mymaster", true},
+		{"redis://h:6379", false},
+		{"rediss://h:6379", false},
+		{"unix:///tmp/redis.sock", false},
+		{"", false},
+	}
+	for _, tc := range tests {
+		require.Equal(t, tc.want, IsSentinelURL(tc.uri), tc.uri)
+	}
+}
+
+func TestParseSentinelURL(t *testing.T) {
+	tests := []struct {
+		name         string
+		uri          string
+		wantMaster   string
+		wantAddrs    []string
+		wantUser     string
+		wantPassword string
+		wantTLS      bool
+		wantErr      bool
+	}{
+		{
+			name:       "multiple sentinels",
+			uri:        "redis+sentinel://h1:26379,h2:26379,h3:26379/mymaster",
+			wantMaster: "mymaster",
+			wantAddrs:  []string{"h1:26379", "h2:26379", "h3:26379"},
+		},
+		{
+			name:         "credentials and tls",
+			uri:          "rediss+sentinel://user:p%40ss@h1:26379/primary",
+			wantMaster:   "primary",
+			wantAddrs:    []string{"h1:26379"},
+			wantUser:     "user",
+			wantPassword: "p@ss",
+			wantTLS:      true,
+		},
+		{
+			name:    "missing master name",
+			uri:     "redis+sentinel://h1:26379",
+			wantErr: true,
+		},
+		{
+			name:    "missing sentinel addresses",
+			uri:     "redis+sentinel:///mymaster",
+			wantErr: true,
+		},
+		{
+			name:    "master with extra path segment",
+			uri:     "redis+sentinel://h1:26379/mymaster/2",
+			wantErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			opts, useTLS, err := ParseSentinelURL(tc.uri)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.wantMaster, opts.MasterName)
+			require.Equal(t, tc.wantAddrs, opts.SentinelAddrs)
+			require.Equal(t, tc.wantUser, opts.Username)
+			require.Equal(t, tc.wantPassword, opts.Password)
+			require.Equal(t, tc.wantTLS, useTLS)
 		})
 	}
 }

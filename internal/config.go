@@ -256,7 +256,13 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 	}
 
 	if redisURL := c.GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
-		if _, err := redis.ParseURL(redisURL); err != nil {
+		var err error
+		if IsSentinelURL(redisURL) {
+			_, _, err = ParseSentinelURL(redisURL)
+		} else {
+			_, err = redis.ParseURL(redisURL)
+		}
+		if err != nil {
 			return fmt.Errorf("%w: invalid Redis session store URL: %w", ErrInvalidURL, err)
 		}
 	}
@@ -288,4 +294,35 @@ func hasRootPath(uri string) bool {
 // isRootPath returns true if the path is "/" or empty.
 func isRootPath(path string) bool {
 	return path == "/" || path == ""
+}
+
+// IsSentinelURL reports whether the redis server URI selects the Sentinel-aware client.
+func IsSentinelURL(uri string) bool {
+	return strings.HasPrefix(uri, "redis+sentinel://") || strings.HasPrefix(uri, "rediss+sentinel://")
+}
+
+// ParseSentinelURL parses a redis+sentinel:// uri into FailoverOptions, returning whether TLS was requested.
+func ParseSentinelURL(uri string) (*redis.FailoverOptions, bool, error) {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return nil, false, err
+	}
+	if u.Host == "" {
+		return nil, false, errors.New("redis sentinel URL is missing sentinel addresses")
+	}
+	master := strings.Trim(u.Path, "/")
+	if master == "" || strings.Contains(master, "/") {
+		return nil, false, errors.New("redis sentinel URL must have the master name as the only path segment")
+	}
+	opts := &redis.FailoverOptions{
+		MasterName:    master,
+		SentinelAddrs: strings.Split(u.Host, ","),
+	}
+	if u.User != nil {
+		opts.Username = u.User.Username()
+		if password, ok := u.User.Password(); ok {
+			opts.Password = password
+		}
+	}
+	return opts, u.Scheme == "rediss+sentinel", nil
 }

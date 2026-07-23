@@ -213,6 +213,41 @@ func TestRedisMTLS(t *testing.T) {
 	})
 }
 
+func TestRedisSentinel(t *testing.T) {
+	client, err := NewRedisClient(&oidc.RedisConfig{
+		ServerUri: "redis+sentinel://sentinel-0:26379,sentinel-1:26379/mymaster",
+	})
+	require.NoError(t, err)
+
+	rc, ok := client.(*redis.Client)
+	require.True(t, ok)
+	// go-redis sets Addr to "FailoverClient" on failover clients
+	require.Equal(t, "FailoverClient", rc.Options().Addr)
+}
+
+func TestRedisStandaloneNotFailover(t *testing.T) {
+	mr := miniredis.RunT(t)
+	tests := []struct {
+		name string
+		uri  string
+		addr string
+	}{
+		{"redis", "redis://" + mr.Addr(), mr.Addr()},
+		{"rediss", "rediss://" + mr.Addr(), mr.Addr()},
+		{"unix", "unix:///tmp/redis.sock", "/tmp/redis.sock"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client, err := NewRedisClient(&oidc.RedisConfig{ServerUri: tc.uri})
+			require.NoError(t, err)
+
+			rc, ok := client.(*redis.Client)
+			require.True(t, ok)
+			require.Equal(t, tc.addr, rc.Options().Addr)
+		})
+	}
+}
+
 func TestRedisTokenResponse(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client, err := NewRedisClient(&oidc.RedisConfig{ServerUri: "redis://" + mr.Addr()})

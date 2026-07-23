@@ -42,7 +42,7 @@ message TokenConfig {
 
 // When specified, the Authservice will use the configured Redis server to store session data
 message RedisConfig {
-  // The Redis server uri, e.g. "tcp://127.0.0.1:6379"
+  // The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1,host2/masterName" for Sentinel.
   string server_uri = 1 [(validate.rules).string.min_len = 1];
   // The username to use when connecting to the Redis server. It can also be configured in the `server_uri`.
   string username = 2;
