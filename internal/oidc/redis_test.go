@@ -215,7 +215,11 @@ func TestRedisMTLS(t *testing.T) {
 
 func TestRedisSentinel(t *testing.T) {
 	client, err := NewRedisClient(&oidc.RedisConfig{
-		ServerUri: "redis+sentinel://sentinel-0:26379,sentinel-1:26379/mymaster",
+		ServerUri: "redis+sentinel://sentinel-0:26379?master_name=mymaster&addr=sentinel-1:26379",
+		Username:  "user",
+		RedisPassword: &oidc.RedisConfig_Password{
+			Password: "pass",
+		},
 	})
 	require.NoError(t, err)
 
@@ -223,6 +227,8 @@ func TestRedisSentinel(t *testing.T) {
 	require.True(t, ok)
 	// go-redis sets Addr to "FailoverClient" on failover clients
 	require.Equal(t, "FailoverClient", rc.Options().Addr)
+	require.Equal(t, "user", rc.Options().Username)
+	require.Equal(t, "pass", rc.Options().Password)
 }
 
 func TestRedisStandaloneNotFailover(t *testing.T) {

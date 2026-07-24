@@ -69,7 +69,7 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 	log := internal.Logger(internal.Session).With("type", "redis")
 
 	if internal.IsSentinelURL(config.GetServerUri()) {
-		failoverOpts, useTLS, err := internal.ParseSentinelURL(config.GetServerUri())
+		failoverOpts, err := internal.ParseSentinelURL(config.GetServerUri())
 		if err != nil {
 			return nil, fmt.Errorf("parsing redis sentinel URL: %w", err)
 		}
@@ -84,7 +84,7 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 			"master", failoverOpts.MasterName,
 			"sentinels", failoverOpts.SentinelAddrs,
 			"user", failoverOpts.Username,
-			"tls", useTLS || config.GetTlsConfig() != nil,
+			"tls", failoverOpts.TLSConfig != nil || config.GetTlsConfig() != nil,
 			"mtls", config.GetTlsConfig().GetClientCertPem() != "",
 		)
 
@@ -106,8 +106,6 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 				}
 				failoverOpts.TLSConfig.Certificates = []tls.Certificate{cert}
 			}
-		} else if useTLS {
-			failoverOpts.TLSConfig = &tls.Config{}
 		}
 
 		log.Debug("connection options", "options", fmt.Sprintf("%+v", failoverOpts))

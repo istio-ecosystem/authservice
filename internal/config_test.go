@@ -115,7 +115,7 @@ func TestValidateURLs(t *testing.T) {
 		{
 			"valid-sentinel-uri",
 			&oidcv1.OIDCConfig{RedisSessionStoreConfig: &oidcv1.RedisConfig{
-				ServerUri: "redis+sentinel://sentinel-0:26379,sentinel-1:26379/mymaster",
+				ServerUri: "redis+sentinel://sentinel-0:26379?master_name=mymaster&addr=sentinel-1:26379",
 			}},
 			errCheck{is: nil},
 		},
@@ -219,29 +219,35 @@ func TestIsSentinelURL(t *testing.T) {
 
 func TestParseSentinelURL(t *testing.T) {
 	tests := []struct {
-		name         string
-		uri          string
-		wantMaster   string
-		wantAddrs    []string
-		wantUser     string
-		wantPassword string
-		wantTLS      bool
-		wantErr      bool
+		name                 string
+		uri                  string
+		wantMaster           string
+		wantAddrs            []string
+		wantDB               int
+		wantUser             string
+		wantPassword         string
+		wantSentinelUser     string
+		wantSentinelPassword string
+		wantTLS              bool
+		wantErr              bool
 	}{
 		{
 			name:       "multiple sentinels",
-			uri:        "redis+sentinel://h1:26379,h2:26379,h3:26379/mymaster",
+			uri:        "redis+sentinel://h1:26379?master_name=mymaster&addr=h2:26379&addr=h3:26379",
 			wantMaster: "mymaster",
 			wantAddrs:  []string{"h1:26379", "h2:26379", "h3:26379"},
 		},
 		{
-			name:         "credentials and tls",
-			uri:          "rediss+sentinel://user:p%40ss@h1:26379/primary",
-			wantMaster:   "primary",
-			wantAddrs:    []string{"h1:26379"},
-			wantUser:     "user",
-			wantPassword: "p@ss",
-			wantTLS:      true,
+			name:                 "credentials and tls",
+			uri:                  "rediss+sentinel://suser:sp%40ss@h1:26379/2?master_name=primary&username=user&password=pass",
+			wantMaster:           "primary",
+			wantAddrs:            []string{"h1:26379"},
+			wantDB:               2,
+			wantUser:             "user",
+			wantPassword:         "pass",
+			wantSentinelUser:     "suser",
+			wantSentinelPassword: "sp@ss",
+			wantTLS:              true,
 		},
 		{
 			name:    "missing master name",
@@ -249,19 +255,19 @@ func TestParseSentinelURL(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "missing sentinel addresses",
-			uri:     "redis+sentinel:///mymaster",
+			name:    "unknown query parameter",
+			uri:     "redis+sentinel://h1:26379?master_name=mymaster&bogus=1",
 			wantErr: true,
 		},
 		{
-			name:    "master with extra path segment",
-			uri:     "redis+sentinel://h1:26379/mymaster/2",
+			name:    "master name in path",
+			uri:     "redis+sentinel://h1:26379/mymaster",
 			wantErr: true,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			opts, useTLS, err := ParseSentinelURL(tc.uri)
+			opts, err := ParseSentinelURL(tc.uri)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
@@ -269,9 +275,15 @@ func TestParseSentinelURL(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.wantMaster, opts.MasterName)
 			require.Equal(t, tc.wantAddrs, opts.SentinelAddrs)
+			require.Equal(t, tc.wantDB, opts.DB)
 			require.Equal(t, tc.wantUser, opts.Username)
 			require.Equal(t, tc.wantPassword, opts.Password)
-			require.Equal(t, tc.wantTLS, useTLS)
+			require.Equal(t, tc.wantSentinelUser, opts.SentinelUsername)
+			require.Equal(t, tc.wantSentinelPassword, opts.SentinelPassword)
+			require.Equal(t, tc.wantTLS, opts.TLSConfig != nil)
+			if opts.TLSConfig != nil {
+				require.Empty(t, opts.TLSConfig.ServerName)
+			}
 		})
 	}
 }

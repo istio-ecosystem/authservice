@@ -211,7 +211,7 @@ When specified, the Authservice will use the configured Redis server to store se
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| server_uri | [string](#string) |  | The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1,host2/masterName" for Sentinel. |
+| server_uri | [string](#string) |  | The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1:26379?master_name=mymaster&addr=host2:26379" for Sentinel. |
 | username | [string](#string) |  | The username to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
 | password | [string](#string) |  | The password to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
 | password_file | [string](#string) |  | The file containing the password to use when connecting to the Redis server. This is useful when the password is stored in a Kubernetes Secret. |

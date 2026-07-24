@@ -258,7 +258,7 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 	if redisURL := c.GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
 		var err error
 		if IsSentinelURL(redisURL) {
-			_, _, err = ParseSentinelURL(redisURL)
+			_, err = ParseSentinelURL(redisURL)
 		} else {
 			_, err = redis.ParseURL(redisURL)
 		}
@@ -301,28 +301,21 @@ func IsSentinelURL(uri string) bool {
 	return strings.HasPrefix(uri, "redis+sentinel://") || strings.HasPrefix(uri, "rediss+sentinel://")
 }
 
-// ParseSentinelURL parses a redis+sentinel:// uri into FailoverOptions, returning whether TLS was requested.
-func ParseSentinelURL(uri string) (*redis.FailoverOptions, bool, error) {
-	u, err := url.Parse(uri)
+// ParseSentinelURL parses a redis+sentinel:// or rediss+sentinel:// uri into FailoverOptions.
+// Aside from the scheme, the uri follows the form accepted by redis.ParseFailoverURL, e.g.
+// redis+sentinel://sentinel-user:sentinel-pass@host1:26379/0?master_name=mymaster&addr=host2:26379
+func ParseSentinelURL(uri string) (*redis.FailoverOptions, error) {
+	opts, err := redis.ParseFailoverURL(strings.Replace(uri, "+sentinel://", "://", 1))
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	if u.Host == "" {
-		return nil, false, errors.New("redis sentinel URL is missing sentinel addresses")
+	if opts.MasterName == "" {
+		return nil, errors.New("redis sentinel URL must set the master_name parameter")
 	}
-	master := strings.Trim(u.Path, "/")
-	if master == "" || strings.Contains(master, "/") {
-		return nil, false, errors.New("redis sentinel URL must have the master name as the only path segment")
+	if opts.TLSConfig != nil {
+		// go-redis pins ServerName to the first sentinel host, but the same TLS config is reused
+		// when dialing the master; leave it empty so it is derived per connection instead.
+		opts.TLSConfig.ServerName = ""
 	}
-	opts := &redis.FailoverOptions{
-		MasterName:    master,
-		SentinelAddrs: strings.Split(u.Host, ","),
-	}
-	if u.User != nil {
-		opts.Username = u.User.Username()
-		if password, ok := u.User.Password(); ok {
-			opts.Password = password
-		}
-	}
-	return opts, u.Scheme == "rediss+sentinel", nil
+	return opts, nil
 }

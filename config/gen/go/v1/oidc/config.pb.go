@@ -180,7 +180,7 @@ type RedisConfig struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1,host2/masterName" for Sentinel.
+	// The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1:26379?master_name=mymaster&addr=host2:26379" for Sentinel.
 	ServerUri string `protobuf:"bytes,1,opt,name=server_uri,json=serverUri,proto3" json:"server_uri,omitempty"`
 	// The username to use when connecting to the Redis server. It can also be configured in the `server_uri`.
 	Username string `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
