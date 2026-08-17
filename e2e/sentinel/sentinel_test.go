@@ -29,12 +29,16 @@ import (
 
 const (
 	sentinelAddr  = "localhost:26379"
+	sentinelUser  = "sentinel-user"
+	sentinelPass  = "sentinel-pass"
 	masterName    = "mymaster"
 	masterService = "redis-master"
 )
 
 var redisConfig = &oidcv1.RedisConfig{
-	ServerUri: "redis+sentinel://" + sentinelAddr + "?master_name=" + masterName,
+	ServerUri:              "redis+sentinel://" + sentinelAddr + "?master_name=" + masterName,
+	SentinelUsername:       sentinelUser,
+	SentinelPasswordConfig: &oidcv1.RedisConfig_SentinelPassword{SentinelPassword: sentinelPass},
 }
 
 func TestSentinelStore(t *testing.T) {
@@ -111,7 +115,7 @@ func TestSentinelFailover(t *testing.T) {
 // waitForHealthyReplica blocks until the sentinel reports a healthy replica for the
 // monitored master, so that a failover has a candidate to promote.
 func waitForHealthyReplica(t *testing.T) {
-	sentinel := redis.NewSentinelClient(&redis.Options{Addr: sentinelAddr})
+	sentinel := redis.NewSentinelClient(&redis.Options{Addr: sentinelAddr, Username: sentinelUser, Password: sentinelPass})
 	t.Cleanup(func() { _ = sentinel.Close() })
 
 	require.Eventually(t, func() bool {
