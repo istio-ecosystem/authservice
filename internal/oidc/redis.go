@@ -79,6 +79,12 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 		if password := config.GetPassword(); password != "" {
 			failoverOpts.Password = password
 		}
+		if username := config.GetSentinelUsername(); username != "" {
+			failoverOpts.SentinelUsername = username
+		}
+		if password := config.GetSentinelPassword(); password != "" {
+			failoverOpts.SentinelPassword = password
+		}
 
 		log.Info("connecting to redis via sentinel",
 			"master", failoverOpts.MasterName,
@@ -89,26 +95,12 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 		)
 
 		if tlscfg := config.GetTlsConfig(); tlscfg != nil {
-			failoverOpts.TLSConfig = &tls.Config{
-				InsecureSkipVerify: tlscfg.GetSkipVerifyPeerCert(),
-			}
-			if ca := tlscfg.GetTrustedCaPem(); ca != "" {
-				caCertPool := x509.NewCertPool()
-				if !caCertPool.AppendCertsFromPEM([]byte(ca)) {
-					return nil, ErrRedisConfigureCA
-				}
-				failoverOpts.TLSConfig.RootCAs = caCertPool
-			}
-			if certPEM := tlscfg.GetClientCertPem(); certPEM != "" {
-				cert, err := tls.X509KeyPair([]byte(certPEM), []byte(tlscfg.GetClientKeyPem()))
-				if err != nil {
-					return nil, fmt.Errorf("loading client certificate: %w", err)
-				}
-				failoverOpts.TLSConfig.Certificates = []tls.Certificate{cert}
+			failoverOpts.TLSConfig, err = newRedisTLSConfig(tlscfg, "")
+			if err != nil {
+				return nil, err
 			}
 		}
 
-		log.Debug("connection options", "options", fmt.Sprintf("%+v", failoverOpts))
 		return redis.NewFailoverClient(failoverOpts), nil
 	}
 
@@ -133,31 +125,33 @@ func NewRedisClient(config *oidc.RedisConfig) (redis.Cmdable, error) {
 	if tlscfg := config.GetTlsConfig(); tlscfg != nil {
 		// No need to check the error as it has been already validated when generating the options from the URL.
 		u, _ := url.Parse(config.GetServerUri())
-		opts.TLSConfig = &tls.Config{
-			ServerName:         u.Hostname(),
-			InsecureSkipVerify: config.GetTlsConfig().GetSkipVerifyPeerCert(),
-		}
-
-		if ca := tlscfg.GetTrustedCaPem(); ca != "" {
-			caCertPool := x509.NewCertPool()
-			if !caCertPool.AppendCertsFromPEM([]byte(ca)) {
-				return nil, ErrRedisConfigureCA
-			}
-			opts.TLSConfig.RootCAs = caCertPool
-		}
-
-		if certPEM := tlscfg.GetClientCertPem(); certPEM != "" {
-			cert, err := tls.X509KeyPair([]byte(certPEM), []byte(tlscfg.GetClientKeyPem()))
-			if err != nil {
-				return nil, fmt.Errorf("loading client certificate: %w", err)
-			}
-			opts.TLSConfig.Certificates = []tls.Certificate{cert}
+		opts.TLSConfig, err = newRedisTLSConfig(tlscfg, u.Hostname())
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	log.Debug("connection options", "options", fmt.Sprintf("%+v", opts))
 
 	return redis.NewClient(opts), nil
+}
+
+func newRedisTLSConfig(config *oidc.RedisConfig_TLSConfig, serverName string) (*tls.Config, error) {
+	tlsConfig := &tls.Config{ServerName: serverName, InsecureSkipVerify: config.GetSkipVerifyPeerCert()}
+	if ca := config.GetTrustedCaPem(); ca != "" {
+		tlsConfig.RootCAs = x509.NewCertPool()
+		if !tlsConfig.RootCAs.AppendCertsFromPEM([]byte(ca)) {
+			return nil, ErrRedisConfigureCA
+		}
+	}
+	if certPEM := config.GetClientCertPem(); certPEM != "" {
+		cert, err := tls.X509KeyPair([]byte(certPEM), []byte(config.GetClientKeyPem()))
+		if err != nil {
+			return nil, fmt.Errorf("loading client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+	return tlsConfig, nil
 }
 
 // NewRedisStore creates a new SessionStore that stores the session data in a given Redis server.

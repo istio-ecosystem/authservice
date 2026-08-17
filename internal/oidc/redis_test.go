@@ -220,6 +220,10 @@ func TestRedisSentinel(t *testing.T) {
 		RedisPassword: &oidc.RedisConfig_Password{
 			Password: "pass",
 		},
+		SentinelUsername: "sentinel-user",
+		SentinelPasswordConfig: &oidc.RedisConfig_SentinelPassword{
+			SentinelPassword: "sentinel-pass",
+		},
 	})
 	require.NoError(t, err)
 

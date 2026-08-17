@@ -181,6 +181,21 @@ func (s *sessionStoreFactory) initializeRedisFileWatchers(cfg *oidcv1.OIDCConfig
 			errs = append(errs, s.fileWatcher.Watch(pf, s.redisCallBack(fl, cfg, callback)))
 		}
 	}
+	if pf := redisCfg.GetSentinelPasswordFile(); pf != "" {
+		password, err := os.ReadFile(pf)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to read redis sentinel password file: %w", err))
+		} else {
+			callback := func(value []byte) {
+				redisCfg.SentinelPasswordConfig = &oidcv1.RedisConfig_SentinelPassword{
+					SentinelPassword: string(value),
+				}
+			}
+			callback(password)
+			fl := log.With("field", "sentinel-password")
+			errs = append(errs, s.fileWatcher.Watch(pf, s.redisCallBack(fl, cfg, callback)))
+		}
+	}
 	if cf := redisCfg.GetTlsConfig().GetClientCertFile(); cf != "" {
 		clientCert, err := os.ReadFile(cf)
 		if err != nil {

@@ -151,6 +151,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmp+"/client.crt", clientCertPEM, 0600))
 	require.NoError(t, os.WriteFile(tmp+"/client.key", clientKeyPEM, 0600))
 	require.NoError(t, os.WriteFile(tmp+"/redis-password", []byte("redis-pass"), 0600))
+	require.NoError(t, os.WriteFile(tmp+"/sentinel-password", []byte("sentinel-pass"), 0600))
 
 	mr := miniredis.NewMiniRedis()
 	mr.RequireUserAuth("authservice", "redis-pass")
@@ -164,6 +165,9 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 		ServerUri:     "redis://" + mr.Addr(),
 		Username:      "authservice",
 		RedisPassword: &oidcv1.RedisConfig_PasswordFile{PasswordFile: tmp + "/redis-password"},
+		SentinelPasswordConfig: &oidcv1.RedisConfig_SentinelPasswordFile{
+			SentinelPasswordFile: tmp + "/sentinel-password",
+		},
 		TlsConfig: &oidcv1.RedisConfig_TLSConfig{
 			Ca:         &oidcv1.RedisConfig_TLSConfig_TrustedCaFile{TrustedCaFile: tmp + "/ca.crt"},
 			ClientCert: &oidcv1.RedisConfig_TLSConfig_ClientCertFile{ClientCertFile: tmp + "/client.crt"},
@@ -188,12 +192,14 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 
 	// Verify that the files have been initialized
 	require.Empty(t, redisConfig.GetPassword())
+	require.Empty(t, redisConfig.GetSentinelPassword())
 	require.Empty(t, redisConfig.GetTlsConfig().GetClientCertPem())
 	require.Empty(t, redisConfig.GetTlsConfig().GetClientKeyPem())
 	require.Empty(t, redisConfig.GetTlsConfig().GetTrustedCaPem())
 
 	require.NoError(t, factory.PreRun())
 	require.Equal(t, "redis-pass", redisConfig.GetPassword())
+	require.Equal(t, "sentinel-pass", redisConfig.GetSentinelPassword())
 	require.Equal(t, string(clientCertPEM), redisConfig.GetTlsConfig().GetClientCertPem())
 	require.Equal(t, string(clientKeyPEM), redisConfig.GetTlsConfig().GetClientKeyPem())
 	require.Equal(t, string(caPEM), redisConfig.GetTlsConfig().GetTrustedCaPem())
@@ -207,6 +213,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 	// Set new values. This will cause a redis connect failure, but we don't care about that here.
 	// We just want to verify that the values are updated
 	require.NoError(t, os.WriteFile(tmp+"/redis-password", []byte("new-redis-pass"), 0600))
+	require.NoError(t, os.WriteFile(tmp+"/sentinel-password", []byte("new-sentinel-pass"), 0600))
 	require.NoError(t, os.WriteFile(tmp+"/client.crt", []byte("updated-client-cert"), 0600))
 	require.NoError(t, os.WriteFile(tmp+"/client.key", []byte("updated-client-key"), 0600))
 	require.NoError(t, os.WriteFile(tmp+"/ca.crt", []byte("updated-ca"), 0600))
@@ -216,6 +223,7 @@ func TestSessionStoreFactoryRedisUpdate(t *testing.T) {
 		defer factory.redisCallbackLock.Unlock()
 
 		assert.Equal(t, "new-redis-pass", redisConfig.GetPassword())
+		assert.Equal(t, "new-sentinel-pass", redisConfig.GetSentinelPassword())
 		assert.Equal(t, "updated-client-cert", redisConfig.GetTlsConfig().GetClientCertPem())
 		assert.Equal(t, "updated-client-key", redisConfig.GetTlsConfig().GetClientKeyPem())
 		assert.Equal(t, "updated-ca", redisConfig.GetTlsConfig().GetTrustedCaPem())
