@@ -136,6 +136,10 @@ func TestRedisTLS(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		rc, ok := client.(*redis.Client)
+		require.True(t, ok)
+		require.NotNil(t, rc.Options().TLSConfig)
+		require.Equal(t, "127.0.0.1", rc.Options().TLSConfig.ServerName)
 
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
 		require.NoError(t, err)
@@ -224,6 +228,7 @@ func TestRedisSentinel(t *testing.T) {
 		SentinelPasswordConfig: &oidc.RedisConfig_SentinelPassword{
 			SentinelPassword: "sentinel-pass",
 		},
+		TlsConfig: &oidc.RedisConfig_TLSConfig{},
 	})
 	require.NoError(t, err)
 
@@ -233,6 +238,9 @@ func TestRedisSentinel(t *testing.T) {
 	require.Equal(t, "FailoverClient", rc.Options().Addr)
 	require.Equal(t, "user", rc.Options().Username)
 	require.Equal(t, "pass", rc.Options().Password)
+	require.NotNil(t, rc.Options().TLSConfig)
+	require.Empty(t, rc.Options().TLSConfig.ServerName)
+	require.False(t, rc.Options().TLSConfig.InsecureSkipVerify)
 }
 
 func TestRedisStandaloneNotFailover(t *testing.T) {

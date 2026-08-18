@@ -41,6 +41,14 @@ var redisConfig = &oidcv1.RedisConfig{
 	SentinelPasswordConfig: &oidcv1.RedisConfig_SentinelPassword{SentinelPassword: sentinelPass},
 }
 
+func TestSentinelRequiresAuthentication(t *testing.T) {
+	client, err := oidc.NewRedisClient(&oidcv1.RedisConfig{ServerUri: redisConfig.ServerUri})
+	require.NoError(t, err)
+
+	_, err = oidc.NewRedisStore(&oidc.Clock{}, client, 0, 1*time.Minute)
+	require.ErrorContains(t, err, "NOAUTH")
+}
+
 func TestSentinelStore(t *testing.T) {
 	client, err := oidc.NewRedisClient(redisConfig)
 	require.NoError(t, err)
