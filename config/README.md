@@ -211,11 +211,14 @@ When specified, the Authservice will use the configured Redis server to store se
 
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
-| server_uri | [string](#string) |  | The Redis server uri, e.g. "tcp://127.0.0.1:6379" |
+| server_uri | [string](#string) |  | The Redis server uri, e.g. "tcp://127.0.0.1:6379", or "redis+sentinel://host1:26379?master_name=mymaster&addr=host2:26379" for Sentinel. For Sentinel URIs, credentials before the host authenticate to Sentinel. The `username` and `password` query parameters authenticate to the Redis server. |
 | username | [string](#string) |  | The username to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
 | password | [string](#string) |  | The password to use when connecting to the Redis server. It can also be configured in the `server_uri`. |
 | password_file | [string](#string) |  | The file containing the password to use when connecting to the Redis server. This is useful when the password is stored in a Kubernetes Secret. |
 | tls_config | [RedisConfig.TLSConfig](#authservice-config-v1-oidc-RedisConfig-TLSConfig) |  | The TLS configuration to use when connecting to the Redis server. |
+| sentinel_username | [string](#string) |  | The username to use when connecting to Redis Sentinel. It can also be configured in the `server_uri`. |
+| sentinel_password | [string](#string) |  | The password to use when connecting to Redis Sentinel. It can also be configured in the `server_uri`. |
+| sentinel_password_file | [string](#string) |  | The file containing the password to use when connecting to Redis Sentinel. This is useful when the password is stored in a Kubernetes Secret. |
 
 
 

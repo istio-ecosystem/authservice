@@ -211,6 +211,8 @@ func (m *RedisConfig) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for SentinelUsername
+
 	switch v := m.RedisPassword.(type) {
 	case *RedisConfig_Password:
 		if v == nil {
@@ -236,6 +238,34 @@ func (m *RedisConfig) validate(all bool) error {
 			errors = append(errors, err)
 		}
 		// no validation rules for PasswordFile
+	default:
+		_ = v // ensures v is used
+	}
+	switch v := m.SentinelPasswordConfig.(type) {
+	case *RedisConfig_SentinelPassword:
+		if v == nil {
+			err := RedisConfigValidationError{
+				field:  "SentinelPasswordConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SentinelPassword
+	case *RedisConfig_SentinelPasswordFile:
+		if v == nil {
+			err := RedisConfigValidationError{
+				field:  "SentinelPasswordConfig",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+		// no validation rules for SentinelPasswordFile
 	default:
 		_ = v // ensures v is used
 	}

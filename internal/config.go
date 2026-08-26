@@ -256,7 +256,13 @@ func validateOIDCConfigURLs(c *oidcv1.OIDCConfig) error {
 	}
 
 	if redisURL := c.GetRedisSessionStoreConfig().GetServerUri(); redisURL != "" {
-		if _, err := redis.ParseURL(redisURL); err != nil {
+		var err error
+		if IsSentinelURL(redisURL) {
+			_, err = ParseSentinelURL(redisURL)
+		} else {
+			_, err = redis.ParseURL(redisURL)
+		}
+		if err != nil {
 			return fmt.Errorf("%w: invalid Redis session store URL: %w", ErrInvalidURL, err)
 		}
 	}
@@ -288,4 +294,28 @@ func hasRootPath(uri string) bool {
 // isRootPath returns true if the path is "/" or empty.
 func isRootPath(path string) bool {
 	return path == "/" || path == ""
+}
+
+// IsSentinelURL reports whether the redis server URI selects the Sentinel-aware client.
+func IsSentinelURL(uri string) bool {
+	return strings.HasPrefix(uri, "redis+sentinel://") || strings.HasPrefix(uri, "rediss+sentinel://")
+}
+
+// ParseSentinelURL parses a redis+sentinel:// or rediss+sentinel:// uri into FailoverOptions.
+// Aside from the scheme, the uri follows the form accepted by redis.ParseFailoverURL, e.g.
+// redis+sentinel://sentinel-user:sentinel-pass@host1:26379/0?master_name=mymaster&addr=host2:26379
+func ParseSentinelURL(uri string) (*redis.FailoverOptions, error) {
+	opts, err := redis.ParseFailoverURL(strings.Replace(uri, "+sentinel://", "://", 1))
+	if err != nil {
+		return nil, err
+	}
+	if opts.MasterName == "" {
+		return nil, errors.New("redis sentinel URL must set the master_name parameter")
+	}
+	if opts.TLSConfig != nil {
+		// go-redis pins ServerName to the first sentinel host, but the same TLS config is reused
+		// when dialing the master; leave it empty so it is derived per connection instead.
+		opts.TLSConfig.ServerName = ""
+	}
+	return opts, nil
 }

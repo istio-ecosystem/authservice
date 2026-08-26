@@ -136,6 +136,10 @@ func TestRedisTLS(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
+		rc, ok := client.(*redis.Client)
+		require.True(t, ok)
+		require.NotNil(t, rc.Options().TLSConfig)
+		require.Equal(t, "127.0.0.1", rc.Options().TLSConfig.ServerName)
 
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
 		require.NoError(t, err)
@@ -211,6 +215,55 @@ func TestRedisMTLS(t *testing.T) {
 		_, err = NewRedisStore(&Clock{}, client, 0, 1*time.Minute)
 		require.NoError(t, err)
 	})
+}
+
+func TestRedisSentinel(t *testing.T) {
+	client, err := NewRedisClient(&oidc.RedisConfig{
+		ServerUri: "redis+sentinel://sentinel-0:26379?master_name=mymaster&addr=sentinel-1:26379",
+		Username:  "user",
+		RedisPassword: &oidc.RedisConfig_Password{
+			Password: "pass",
+		},
+		SentinelUsername: "sentinel-user",
+		SentinelPasswordConfig: &oidc.RedisConfig_SentinelPassword{
+			SentinelPassword: "sentinel-pass",
+		},
+		TlsConfig: &oidc.RedisConfig_TLSConfig{},
+	})
+	require.NoError(t, err)
+
+	rc, ok := client.(*redis.Client)
+	require.True(t, ok)
+	// go-redis sets Addr to "FailoverClient" on failover clients
+	require.Equal(t, "FailoverClient", rc.Options().Addr)
+	require.Equal(t, "user", rc.Options().Username)
+	require.Equal(t, "pass", rc.Options().Password)
+	require.NotNil(t, rc.Options().TLSConfig)
+	require.Empty(t, rc.Options().TLSConfig.ServerName)
+	require.False(t, rc.Options().TLSConfig.InsecureSkipVerify)
+}
+
+func TestRedisStandaloneNotFailover(t *testing.T) {
+	mr := miniredis.RunT(t)
+	tests := []struct {
+		name string
+		uri  string
+		addr string
+	}{
+		{"redis", "redis://" + mr.Addr(), mr.Addr()},
+		{"rediss", "rediss://" + mr.Addr(), mr.Addr()},
+		{"unix", "unix:///tmp/redis.sock", "/tmp/redis.sock"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client, err := NewRedisClient(&oidc.RedisConfig{ServerUri: tc.uri})
+			require.NoError(t, err)
+
+			rc, ok := client.(*redis.Client)
+			require.True(t, ok)
+			require.Equal(t, tc.addr, rc.Options().Addr)
+		})
+	}
 }
 
 func TestRedisTokenResponse(t *testing.T) {

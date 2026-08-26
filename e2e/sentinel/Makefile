@@ -1,4 +1,4 @@
-# Copyright 2025 Tetrate
+# Copyright 2026 Tetrate
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SUITES_DOCKER := mock redis sentinel keycloak
-SUITES_K8S    := istio
-SUITES        := $(SUITES_DOCKER) $(SUITES_K8S) legacy
-
-.PHONY: e2e
-e2e: $(SUITES:%=e2e/%)  ## Run all e2e tests
-
-.PHONY: e2e/docker
-e2e/docker: $(SUITES_DOCKER:%=e2e/%)
-
-.PHONY: e2e/k8s
-e2e/k8s: $(SUITES_K8S:%=e2e/%)
-
-e2e/%:
-	@$(MAKE) -C $(@F) $(@D)
-
-.PHONY: clean
-clean: $(SUITES:%=clean/%)
-
-clean/%:
-	@$(MAKE) -C $(@F) $(@D)
+include ../suite-docker.mk
