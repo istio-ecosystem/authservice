@@ -12,71 +12,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-issues:
-  exclude-files:
-    - ".*\\.pb.*\\.go"
+version: "2"
 linters:
+  # errcheck, govet, ineffassign, staticcheck and unused are enabled by default.
+  # gosimple was merged into staticcheck.
   enable:
-    - errcheck
     - goconst
-    - revive
-    - ineffassign
     - lll
     - misspell
-    - unconvert
-    - govet
     - prealloc
-    - unused
-    - staticcheck
-    - gosimple
-  disable:
-    - goimports # already run in `make format`
-linters-settings:
-  lll:
-    line-length: 160
-  goconst:
-    min-occurrences: 4
-  govet:
-    enable:
-      - shadow
-  revive:
-    ignore-generated-header: false
-    severity: error
-    confidence: 0.8
-    rules:
-      - name: atomic
-      - name: blank-imports
-      - name: confusing-naming
-      - name: get-return
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      # A true empty block is hard to recognize, see https://github.com/mgechev/revive/issues/386
-      #- name: empty-block
-      - name: error-naming
-      - name: error-return
-      - name: error-strings
-      - name: errorf
-      - name: exported
-      - name: if-return
-      - name: increment-decrement
-      - name: indent-error-flow
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: redefines-builtin-id
-      - name: superfluous-else
-      - name: struct-tag
-      - name: time-naming
-      - name: unexported-naming
-      - name: unexported-return
-      - name: unhandled-error
-        arguments: [
-            "fmt.Printf",
-            "fmt.Println",
-            "fmt.Fprintf",
-        ]
-      - name: unreachable-code
-      - name: unused-parameter
-      - name: var-declaration
-      - name: var-naming
+    - revive
+    - unconvert
+  settings:
+    goconst:
+      min-occurrences: 4
+      # Table-driven tests legitimately repeat literals such as paths and hostnames.
+      ignore-tests: true
+    govet:
+      enable:
+        - shadow
+    lll:
+      line-length: 160
+    revive:
+      confidence: 0.8
+      severity: error
+      rules:
+        - name: atomic
+        - name: blank-imports
+        - name: confusing-naming
+        - name: get-return
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        # A true empty block is hard to recognize, see https://github.com/mgechev/revive/issues/386
+        #- name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: struct-tag
+        - name: time-naming
+        - name: unexported-naming
+        - name: unexported-return
+        - name: unhandled-error
+          arguments:
+            - fmt.Printf
+            - fmt.Println
+            - fmt.Fprintf
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: var-declaration
+        - name: var-naming
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - .*\.pb.*\.go
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  # goimports is already run in `make format`
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

@@ -181,7 +181,7 @@ func (s *SecretController) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	log := s.log.Context(ctx).With("secret", req.String())
 	log.Debug("reconciling secret")
 
-	changedSecret := req.NamespacedName.String()
+	changedSecret := req.String()
 	oidcConfigsUpdateFuncs, exist := s.secrets[changedSecret]
 
 	// If the secret is not used in the configuration, we can ignore it

@@ -171,7 +171,7 @@ func newNotifier(log telemetry.Logger, name string, options FileWatcherOptions, 
 	}
 
 	// Register the callbacks to be notified on changes or errors.
-	if err = not.WithCallbacks.Watch(name, callbacks...); err != nil {
+	if err = not.Watch(name, callbacks...); err != nil {
 		return nil, err
 	}
 

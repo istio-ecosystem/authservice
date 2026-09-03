@@ -208,7 +208,7 @@ func encodeConfig(config TLSConfig) tlsConfigEncoder {
 // hash returns the hash of the tls config.
 func (c tlsConfigEncoder) hash() string {
 	buff := bytes.Buffer{}
-	_, _ = buff.WriteString(fmt.Sprintf("%t", c.SkipVerifyPeerCert))
+	_, _ = fmt.Fprintf(&buff, "%t", c.SkipVerifyPeerCert)
 	_, _ = buff.WriteString(c.TrustedCA)
 	_, _ = buff.WriteString(c.TrustedCAFile)
 	_, _ = buff.WriteString(c.TrustedCARefreshInterval)
