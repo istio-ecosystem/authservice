@@ -338,7 +338,7 @@ func TestLoadOIDC(t *testing.T) {
 								JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
 									JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{
 										JwksUri:            "http://fake/jwks",
-										SkipVerifyPeerCert: structpb.NewStringValue("true"),
+										SkipVerifyPeerCert: structpb.NewStringValue("true"), //nolint: staticcheck // deprecated field kept for backwards-compatibility testing
 									},
 								},
 								ClientId:                   "fake-client-id",

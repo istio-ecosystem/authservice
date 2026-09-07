@@ -302,8 +302,8 @@ func (s *sessionStoreFactory) setSessionStore(key string, store SessionStore) {
 func hashInMemoryConfig(cfg *oidcv1.OIDCConfig) string {
 	buff := bytes.Buffer{}
 	_, _ = buff.WriteString("memory")
-	_, _ = buff.WriteString(fmt.Sprintf("%v", cfg.GetAbsoluteSessionTimeout()))
-	_, _ = buff.WriteString(fmt.Sprintf("%v", cfg.GetIdleSessionTimeout()))
+	_, _ = fmt.Fprintf(&buff, "%v", cfg.GetAbsoluteSessionTimeout())
+	_, _ = fmt.Fprintf(&buff, "%v", cfg.GetIdleSessionTimeout())
 
 	hash := fnv.New64a()
 	_, _ = hash.Write(buff.Bytes())
