@@ -422,6 +422,11 @@ type OIDCConfig struct {
 	// is configured with multiple `oidc` filters (across multiple `chains`), each
 	// sharing a Redis server for their session storage, to avoid having those
 	// `oidc` filters read/write the same sessions in Redis.
+	// The session cookie is named `__Host-<cookie_name_prefix>-authservice-session-id-cookie`,
+	// or `__Host-authservice-session-id-cookie` if no prefix is set. If
+	// `cookie_attributes.domain` is set, the `__Host-` prefix is replaced with
+	// `__Secure-`, because browsers reject `__Host-` cookies that have a `Domain`
+	// attribute.
 	// Optional.
 	CookieNamePrefix string `protobuf:"bytes,8,opt,name=cookie_name_prefix,json=cookieNamePrefix,proto3" json:"cookie_name_prefix,omitempty"`
 	// Configure the cookie attributes to set for Authservice session cookies.
@@ -1134,7 +1139,8 @@ type OIDCConfig_CookieAttributes struct {
 	// top-level domain (e.g. `example.com`), which will allow the cookie to be
 	// sent with requests to any subdomain of that domain (e.g.,
 	// `api.example.com`, `www.example.com`, etc.).
-	// This attribute only applies when `same_site` is set to `SAME_SITE_NONE`.
+	// Setting this changes the session cookie name prefix from `__Host-` to
+	// `__Secure-`. See `cookie_name_prefix` for details.
 	Domain string `protobuf:"bytes,2,opt,name=domain,proto3" json:"domain,omitempty"`
 	// If partitioned is set to true, the cookie will be partitioned by the
 	// top-level site that the request is made to. This means that the cookie
