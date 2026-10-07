@@ -243,6 +243,11 @@ message OIDCConfig {
   // is configured with multiple `oidc` filters (across multiple `chains`), each
   // sharing a Redis server for their session storage, to avoid having those
   // `oidc` filters read/write the same sessions in Redis.
+  // The session cookie is named `__Host-<cookie_name_prefix>-authservice-session-id-cookie`,
+  // or `__Host-authservice-session-id-cookie` if no prefix is set. If
+  // `cookie_attributes.domain` is set, the `__Host-` prefix is replaced with
+  // `__Secure-`, because browsers reject `__Host-` cookies that have a `Domain`
+  // attribute.
   // Optional.
   string cookie_name_prefix = 8;
 
@@ -282,7 +287,8 @@ message OIDCConfig {
     // top-level domain (e.g. `example.com`), which will allow the cookie to be
     // sent with requests to any subdomain of that domain (e.g.,
     // `api.example.com`, `www.example.com`, etc.).
-    // This attribute only applies when `same_site` is set to `SAME_SITE_NONE`.
+    // Setting this changes the session cookie name prefix from `__Host-` to
+    // `__Secure-`. See `cookie_name_prefix` for details.
     string domain = 2 [(validate.rules).string = {ignore_empty: true, hostname: true}];
 
     // If partitioned is set to true, the cookie will be partitioned by the

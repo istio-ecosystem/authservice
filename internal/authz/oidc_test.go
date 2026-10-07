@@ -2428,3 +2428,41 @@ var _ watch.Callbacker = (*noopWatcher)(nil)
 type noopWatcher struct{}
 
 func (n noopWatcher) Watch(string, ...watch.Callback) error { return nil }
+
+func TestGetCookieNamePrefixWithDomain(t *testing.T) {
+	// The __Host- prefix forbids a Domain attribute, so a configured cookie
+	// domain must downgrade the prefix to __Secure- or browsers reject the
+	// cookie outright and the user never completes login.
+	tests := []struct {
+		name   string
+		prefix string
+		domain string
+		want   string
+	}{
+		{"no prefix, no domain", "", "", "__Host-authservice-session-id-cookie"},
+		{"prefix, no domain", "gtsyd", "", "__Host-gtsyd-authservice-session-id-cookie"},
+		{"no prefix, domain", "", "example.com", "__Secure-authservice-session-id-cookie"},
+		{"prefix and domain", "gtsyd", "example.com", "__Secure-gtsyd-authservice-session-id-cookie"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &oidcv1.OIDCConfig{CookieNamePrefix: tt.prefix}
+			if tt.domain != "" {
+				cfg.CookieAttributes = &oidcv1.OIDCConfig_CookieAttributes{Domain: tt.domain}
+			}
+			require.Equal(t, tt.want, getCookieName(cfg))
+		})
+	}
+}
+
+func TestSetCookieHeaderNeverPairsHostPrefixWithDomain(t *testing.T) {
+	cfg := &oidcv1.OIDCConfig{
+		CookieNamePrefix: "gtsyd",
+		CookieAttributes: &oidcv1.OIDCConfig_CookieAttributes{Domain: "example.com"},
+	}
+	header := generateSetCookieHeader(cfg, getCookieName(cfg), "abc", 0)
+	require.Contains(t, header, "Domain=example.com")
+	require.NotContains(t, header, "__Host-")
+	require.Contains(t, header, "__Secure-")
+}

@@ -953,17 +953,31 @@ func getSessionIDFromCookie(log telemetry.Logger, headers map[string]string, con
 }
 
 const (
-	prefixCookieName  = "__Host-"
-	suffixCookieName  = "-authservice-session-id-cookie"
-	defaultCookieName = "__Host-authservice-session-id-cookie"
+	hostPrefixCookieName   = "__Host-"
+	securePrefixCookieName = "__Secure-"
+	suffixCookieName       = "-authservice-session-id-cookie"
+	defaultCookieBaseName  = "authservice-session-id-cookie"
+	defaultCookieName      = hostPrefixCookieName + defaultCookieBaseName
 )
 
 // getCookieName returns the cookie name to use for the session id.
+//
+// The __Host- prefix requires that the cookie carries no Domain attribute
+// (RFC 6265bis, section 4.1.3). When cookie_attributes.domain is configured
+// the Set-Cookie header does include Domain, so keeping __Host- produces a
+// cookie that every browser silently rejects, leaving the user in an endless
+// redirect loop. Fall back to __Secure-, which enforces the same
+// Secure-only transport guarantee but permits Domain.
 func getCookieName(config *oidcv1.OIDCConfig) string {
-	if prefix := config.GetCookieNamePrefix(); prefix != "" {
-		return prefixCookieName + prefix + suffixCookieName
+	prefix := hostPrefixCookieName
+	if config.GetCookieAttributes().GetDomain() != "" {
+		prefix = securePrefixCookieName
 	}
-	return defaultCookieName
+
+	if name := config.GetCookieNamePrefix(); name != "" {
+		return prefix + name + suffixCookieName
+	}
+	return prefix + defaultCookieBaseName
 }
 
 // loadWellKnownConfig loads the OIDC well-known configuration into the given OIDCConfig.
