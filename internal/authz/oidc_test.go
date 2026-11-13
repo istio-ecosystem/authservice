@@ -271,7 +271,7 @@ func TestUnsupportedClientAuthenticationMethod(t *testing.T) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(noneAuthMethodOIDCConfig)
 	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
-	h, err := NewOIDCHandler(noneAuthMethodOIDCConfig, tlsPool,
+	h, err := NewOIDCHandler(t.Context(), noneAuthMethodOIDCConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
@@ -328,7 +328,7 @@ func testOIDCProcess(t *testing.T, oidcConfig *oidcv1.OIDCConfig) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(oidcConfig)
 	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
-	h, err := NewOIDCHandler(oidcConfig, tlsPool,
+	h, err := NewOIDCHandler(t.Context(), oidcConfig, tlsPool,
 		oidc.NewJWKSProvider(newConfigFor(oidcConfig), tlsPool), sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
@@ -1396,7 +1396,7 @@ func TestOIDCProcessWithFailingSessionStore(t *testing.T) {
 		Jwks: string(bytes),
 	}
 
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+	h, err := NewOIDCHandler(t.Context(), basicOIDCConfig, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 		sessions, oidc.Clock{}, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
@@ -1541,7 +1541,7 @@ func TestOIDCProcessWithFailingJWKSProvider(t *testing.T) {
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
 	store := sessions.Get(basicOIDCConfig)
 	tlsPool := inthttp.NewTLSConfigPool(noopWatcher{})
-	h, err := NewOIDCHandler(basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock,
+	h, err := NewOIDCHandler(t.Context(), basicOIDCConfig, tlsPool, funcJWKSProvider, sessions, clock,
 		oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.NoError(t, err)
 
@@ -1751,7 +1751,7 @@ func TestEncodeTokensToHeaders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewOIDCHandler(tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
+			h, err := NewOIDCHandler(t.Context(), tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
 			require.NoError(t, err)
 
 			tokResp := &oidc.TokenResponse{
@@ -1824,7 +1824,7 @@ func TestAreTokensExpired(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := NewOIDCHandler(tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
+			h, err := NewOIDCHandler(t.Context(), tt.config, tlsPool, nil, sessions, oidc.Clock{}, nil)
 			require.NoError(t, err)
 
 			tokResp := &oidc.TokenResponse{
@@ -1848,7 +1848,7 @@ func TestLoadWellKnownConfig(t *testing.T) {
 	t.Cleanup(idpServer.Stop)
 
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
-	require.NoError(t, loadWellKnownConfig(idpServer.newHTTPClient(), cfg))
+	require.NoError(t, loadWellKnownConfig(t.Context(), idpServer.newHTTPClient(), cfg))
 	require.Equal(t, cfg.AuthorizationUri, "http://idp-test-server/authorize")
 	require.Equal(t, cfg.TokenUri, "http://idp-test-server/token")
 	require.Equal(t, cfg.GetJwksFetcher().GetJwksUri(), "http://idp-test-server/jwks")
@@ -1862,7 +1862,7 @@ func TestLoadWellKnownConfigMissingLogoutRedirectURI(t *testing.T) {
 
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
 	cfg.ConfigurationUri = "http://missing-logout/.well-known/openid-configuration"
-	require.ErrorIs(t, loadWellKnownConfig(idpServer.newHTTPClient(), cfg), ErrMissingLogoutRedirectURI)
+	require.ErrorIs(t, loadWellKnownConfig(t.Context(), idpServer.newHTTPClient(), cfg), ErrMissingLogoutRedirectURI)
 }
 
 func TestLoadWellKnownConfigError(t *testing.T) {
@@ -1871,7 +1871,7 @@ func TestLoadWellKnownConfigError(t *testing.T) {
 	cfg := proto.Clone(dynamicOIDCConfig).(*oidcv1.OIDCConfig)
 	cfg.ConfigurationUri = "http://stopped-server/.well-known/openid-configuration"
 	sessions := &mockSessionStoreFactory{store: oidc.NewMemoryStore(&clock, time.Hour, time.Hour)}
-	_, err := NewOIDCHandler(cfg, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+	_, err := NewOIDCHandler(t.Context(), cfg, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 		sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 	require.Error(t, err) // Fail to retrieve the dynamic config since the test server is not running
 }
@@ -1893,7 +1893,7 @@ func TestNewOIDCHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			_, err := NewOIDCHandler(tt.config, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
+			_, err := NewOIDCHandler(t.Context(), tt.config, tlsPool, oidc.NewJWKSProvider(newConfigFor(basicOIDCConfig), tlsPool),
 				sessions, clock, oidc.NewStaticGenerator(newSessionID, newNonce, newState, newCodeVerifier))
 			if tt.wantErr {
 				require.Error(t, err)

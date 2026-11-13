@@ -15,9 +15,14 @@
 package oidc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
+
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // WellKnownConfig represents the OIDC well-known configuration
@@ -44,33 +49,50 @@ var (
 	// wellKnownConfigs is a map of issuer URL to the OIDC well-known configuration
 	// It is used to cache well-known configurations as they usually don't change. URLs are usually stable, and the only
 	// things that are subject to change are the signing keys, but those are already watched periodically by the JWKS fetcher.
-	wellKnownConfigs = make(map[string]WellKnownConfig)
+	wellKnownConfigs   = make(map[string]WellKnownConfig)
+	wellKnownConfigsMu sync.RWMutex
 )
 
 // GetWellKnownConfig retrieves the OIDC well-known configuration from the given issuer URL.
-func GetWellKnownConfig(client *http.Client, url string) (WellKnownConfig, error) {
+func GetWellKnownConfig(ctx context.Context, client *http.Client, url string) (WellKnownConfig, error) {
+	if err := ctx.Err(); err != nil {
+		return WellKnownConfig{}, err
+	}
+	wellKnownConfigsMu.RLock()
 	cfg, ok := wellKnownConfigs[url]
+	wellKnownConfigsMu.RUnlock()
 	if ok {
 		return cfg, nil
 	}
 
 	// Make a GET request to the well-known configuration endpoint
-	response, err := client.Get(url)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return WellKnownConfig{}, err
+	}
+	start := time.Now()
+	response, err := client.Do(request)
+	if err != nil {
+		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
+			"OIDC discovery request failed", err, "dependency", request.URL.Host, "duration", time.Since(start))
 	}
 	defer func() { _ = response.Body.Close() }()
 
 	// Check if the response status code is successful
 	if response.StatusCode != http.StatusOK {
-		return WellKnownConfig{}, fmt.Errorf("failed to retrieve OIDC config: %s", response.Status)
+		err = fmt.Errorf("failed to retrieve OIDC config: HTTP %d", response.StatusCode)
+		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
+			"OIDC discovery failed", err, "dependency", request.URL.Host, "status", response.StatusCode, "duration", time.Since(start))
 	}
 
 	// Decode the JSON response into the OIDCConfig struct
 	if err = json.NewDecoder(response.Body).Decode(&cfg); err != nil {
-		return WellKnownConfig{}, err
+		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
+			"invalid OIDC discovery response", err, "dependency", request.URL.Host, "duration", time.Since(start))
 	}
 
+	wellKnownConfigsMu.Lock()
 	wellKnownConfigs[url] = cfg
+	wellKnownConfigsMu.Unlock()
 	return cfg, nil
 }

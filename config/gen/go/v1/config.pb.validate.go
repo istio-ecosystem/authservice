@@ -822,6 +822,17 @@ func (m *Config) validate(all bool) error {
 
 	// no validation rules for HealthListenPath
 
+	if _, ok := _Config_LogFormat_InLookup[m.GetLogFormat()]; !ok {
+		err := ConfigValidationError{
+			field:  "LogFormat",
+			reason: "value must be in list [ logfmt text json]",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if len(errors) > 0 {
 		return ConfigMultiError(errors)
 	}
@@ -905,6 +916,13 @@ var _Config_LogLevel_InLookup = map[string]struct{}{
 	"info":     {},
 	"error":    {},
 	"critical": {},
+}
+
+var _Config_LogFormat_InLookup = map[string]struct{}{
+	"":       {},
+	"logfmt": {},
+	"text":   {},
+	"json":   {},
 }
 
 // Validate checks the field values on TriggerRule with the rules defined in

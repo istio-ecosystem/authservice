@@ -307,3 +307,52 @@ func newKey(t *testing.T) jwk.Key {
 
 	return pub
 }
+
+func TestJWKSFetchStopsWithService(t *testing.T) {
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		close(started)
+		<-req.Context().Done()
+		close(stopped)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, inthttp.NewTLSConfigPool(noopWatcher{}))
+	serviceDone := make(chan error, 1)
+	go func() { serviceDone <- provider.ServeContext(ctx) }()
+	cfg := &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: server.URL},
+	}}
+	done := make(chan error, 1)
+	go func() { _, err := provider.Get(t.Context(), cfg); done <- err }()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS fetch did not start")
+	}
+	cancel()
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS request ignored service shutdown")
+	}
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS lookup did not stop")
+	}
+	require.NoError(t, <-serviceDone)
+}
+
+func TestJWKSWaitForStartupCancels(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, nil)
+	_, err := provider.Get(ctx, &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: "https://example.com/jwks"},
+	}})
+	require.ErrorIs(t, err, context.Canceled)
+}

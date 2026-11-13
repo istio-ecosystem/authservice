@@ -18,9 +18,11 @@ package http
 
 import (
 	"net/http"
-	"net/http/httputil"
+	"time"
 
 	"github.com/tetratelabs/telemetry"
+
+	"github.com/istio-ecosystem/authservice/internal"
 )
 
 // LoggingRoundTripper is a http.RoundTripper that logs requests and responses.
@@ -31,20 +33,16 @@ type LoggingRoundTripper struct {
 
 // RoundTrip logs all the requests and responses using the configured settings.
 func (l LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	if l.Log.Level() < telemetry.LevelDebug {
-		return l.Delegate.RoundTrip(req)
-	}
-
-	if dump, derr := httputil.DumpRequest(req, true); derr == nil {
-		l.Log.Debug("request", "data", string(dump))
-	}
-
+	log := l.Log.Context(req.Context())
+	fields := []any{"method", req.Method, "dependency", req.URL.Host}
+	log.Debug("HTTP request", fields...)
+	start := time.Now()
 	res, err := l.Delegate.RoundTrip(req)
-
-	if err == nil {
-		if dump, derr := httputil.DumpResponse(res, true); derr == nil {
-			l.Log.Debug("response", "data", string(dump))
-		}
+	fields = append(fields, "duration", time.Since(start))
+	if err != nil {
+		err = internal.LogRequestError(req.Context(), log, "HTTP request failed", err, fields...)
+	} else {
+		log.Debug("HTTP response", append(fields, "status", res.StatusCode)...)
 	}
 
 	return res, err
