@@ -34,6 +34,7 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/proto"
 
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
 	"github.com/istio-ecosystem/authservice/internal"
@@ -74,15 +75,19 @@ type oidcHandler struct {
 }
 
 // NewOIDCHandler creates a new OIDC implementation of the Handler interface.
-func NewOIDCHandler(cfg *oidcv1.OIDCConfig, tlsPool inthttp.TLSConfigPool, jwks oidc.JWKSProvider,
+func NewOIDCHandler(ctx context.Context, cfg *oidcv1.OIDCConfig, tlsPool inthttp.TLSConfigPool, jwks oidc.JWKSProvider,
 	sessions oidc.SessionStoreFactory, clock oidc.Clock, sessionGen oidc.SessionGenerator) (Handler, error) {
 
+	if cfg.GetConfigurationUri() != "" {
+		// Discovery fills endpoint fields; keep each request isolated from shared configuration.
+		cfg = proto.Clone(cfg).(*oidcv1.OIDCConfig)
+	}
 	client, err := inthttp.NewHTTPClient(cfg, tlsPool, internal.Logger(internal.IDP))
 	if err != nil {
 		return nil, err
 	}
 
-	if err := loadWellKnownConfig(client, cfg); err != nil {
+	if err := loadWellKnownConfig(ctx, client, cfg); err != nil {
 		return nil, err
 	}
 
@@ -125,16 +130,15 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	if matchesLogoutPath(log, o.config, req.GetAttributes().GetRequest().GetHttp()) {
 		log.Info("handling logout request")
 		if sessionID != "" {
-			log.Info("removing session from session store during logout", "session-id", sessionID)
+			log.Info("removing session from session store during logout")
 			store := o.sessions.Get(o.config)
 			if err := store.RemoveSession(ctx, sessionID); err != nil {
-				log.Error("error removing session", err)
+				_ = internal.LogRequestError(ctx, log, "error removing session", err)
 				setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 				return nil
 			}
 		}
-		log.Info("logout complete. Redirecting to logout redirect uri",
-			"uri", o.config.GetLogout().GetRedirectUri())
+		log.Info("logout complete. Redirecting to logout redirect uri")
 		deny := newDenyResponse()
 		// add IDP logout location
 		setRedirect(deny, o.config.GetLogout().GetRedirectUri())
@@ -152,8 +156,6 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		return nil
 	}
 
-	log = log.With("session-id", sessionID)
-
 	// If the request path is the callback for receiving the authorization code,
 	// has a session id then exchange it for tokens and redirects end-user back to
 	// their originally requested URL.
@@ -168,7 +170,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	store := o.sessions.Get(o.config)
 	tokenResponse, err := store.GetTokenResponse(ctx, sessionID)
 	if err != nil {
-		log.Error("error retrieving tokens from session store", err)
+		_ = internal.LogRequestError(ctx, log, "error retrieving tokens from session store", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return nil
 	}
@@ -186,7 +188,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 	log.Debug("checking tokens expiration")
 	expired, err := o.areRequiredTokensExpired(log, tokenResponse)
 	if err != nil {
-		log.Error("error checking token expiration", err)
+		_ = internal.LogRequestError(ctx, log, "error checking token expiration", err)
 		setDenyResponse(resp, newDenyResponse(), codes.Internal)
 		return nil
 	}
@@ -217,7 +219,7 @@ func (o *oidcHandler) Process(ctx context.Context, req *envoy.CheckRequest, resp
 		return nil
 	}
 	if err := store.SetTokenResponse(ctx, sessionID, refreshedTokens); err != nil {
-		log.Error("error saving refreshed tokens to session store", err)
+		_ = internal.LogRequestError(ctx, log, "error saving refreshed tokens to session store", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return nil
 	}
@@ -237,7 +239,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 	if oldSessionID != "" {
 		// remove old session and regenerate session_id to prevent session fixation attacks
 		if err := store.RemoveSession(ctx, oldSessionID); err != nil {
-			log.Error("error removing old session", err)
+			_ = internal.LogRequestError(ctx, log, "error removing old session", err)
 			setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 			return
 		}
@@ -261,7 +263,7 @@ func (o *oidcHandler) redirectToIDP(ctx context.Context, log telemetry.Logger,
 		RequestedURL: requestedURL,
 		CodeVerifier: codeVerifier,
 	}); err != nil {
-		log.Error("error storing the new authorization state", err)
+		_ = internal.LogRequestError(ctx, log, "error storing the new authorization state", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
@@ -297,11 +299,11 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	queryParams, err := url.ParseQuery(query)
 	switch {
 	case err != nil:
-		log.Error("error parsing query", err, "query", query)
+		log.Info("invalid callback query")
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return
 	case len(queryParams) == 0:
-		log.Info("form data is invalid, no query parameters found", "query", query)
+		log.Info("form data is invalid, no query parameters found")
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return
 	}
@@ -309,14 +311,14 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	stateFromReq := queryParams.Get("state")
 	codeFromReq := queryParams.Get("code")
 	if stateFromReq == "" || codeFromReq == "" {
-		log.Info("form data is invalid, missing state or code", "state", stateFromReq, "code", codeFromReq)
+		log.Info("form data is invalid, missing state or code")
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return
 	}
 
 	stateFromStore, err := store.GetAuthorizationState(ctx, sessionID)
 	if err != nil {
-		log.Error("error retrieving authorization state from session store", err)
+		_ = internal.LogRequestError(ctx, log, "error retrieving authorization state from session store", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
@@ -332,27 +334,27 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 
 	// compare the state from the request with the state from the store
 	if stateFromReq != stateFromStore.State {
-		log.Info("state from request does not match state from store", "state-from-request", stateFromReq, "state-from-store", stateFromStore.State)
+		log.Info("state from request does not match state from store")
 		setDenyResponse(resp, newDenyResponse(), codes.InvalidArgument)
 		return
 	}
 
 	headers, err := buildAuthHeader(o.config)
 	if err != nil {
-		log.Error("error building auth header", err)
+		_ = internal.LogRequestError(ctx, log, "error building auth header", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
 
 	form, err := buildAuthParams(o.config, codeFromReq, stateFromStore.CodeVerifier)
 	if err != nil {
-		log.Error("error building auth params", err)
+		_ = internal.LogRequestError(ctx, log, "error building auth params", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
 
 	log.Info("performing request to retrieve new tokens")
-	bodyTokens, errCode := performIDPRequest(log, o.httpClient, o.config.GetTokenUri(), form, headers)
+	bodyTokens, errCode := performIDPRequest(ctx, log, o.httpClient, o.config.GetTokenUri(), form, headers)
 	if errCode != codes.OK {
 		setDenyResponse(resp, newDenyResponse(), errCode)
 		return
@@ -373,7 +375,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 
 	if o.config.GetTokenExchange() != nil {
 		var exchangedTokens *idpTokensResponse
-		exchangedTokens, errCode = o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		exchangedTokens, errCode = o.exchangeAccessToken(ctx, log, bodyTokens.AccessToken)
 		if errCode != codes.OK {
 			setDenyResponse(resp, newDenyResponse(), errCode)
 			return
@@ -385,7 +387,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 	}
 
 	if err := store.ClearAuthorizationState(ctx, sessionID); err != nil {
-		log.Error("error clearing authorization state", err)
+		_ = internal.LogRequestError(ctx, log, "error clearing authorization state", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
@@ -402,7 +404,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 		RefreshToken:         bodyTokens.RefreshToken,
 		AccessTokenExpiresAt: accessTokenExpiration,
 	}); err != nil {
-		log.Error("error saving tokens to session store", err)
+		_ = internal.LogRequestError(ctx, log, "error saving tokens to session store", err)
 		setDenyResponse(resp, newSessionErrorResponse(), codes.Unauthenticated)
 		return
 	}
@@ -417,7 +419,7 @@ func (o *oidcHandler) retrieveTokens(ctx context.Context, log telemetry.Logger, 
 }
 
 // exchangeAccessToken exchanges the given access token for a new access token using the configured token exchange endpoint.
-func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken string) (*idpTokensResponse, codes.Code) {
+func (o *oidcHandler) exchangeAccessToken(ctx context.Context, log telemetry.Logger, accessToken string) (*idpTokensResponse, codes.Code) {
 	cfg := o.config.GetTokenExchange()
 	headers := http.Header{inthttp.HeaderContentType: []string{inthttp.HeaderContentTypeFormURLEncoded}}
 
@@ -449,7 +451,7 @@ func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken stri
 			// Read the file at the exchange time. This shouldn't be frequent, and we always get the latest token.
 			b, err := os.ReadFile(bearerFile)
 			if err != nil {
-				log.Error("reading token file", err)
+				_ = internal.LogRequestError(ctx, log, "reading token file", err)
 				return nil, codes.Internal
 			}
 			bearer = string(b)
@@ -466,7 +468,7 @@ func (o *oidcHandler) exchangeAccessToken(log telemetry.Logger, accessToken stri
 
 	log.Info("performing token exchange request")
 
-	return performIDPRequest(log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
+	return performIDPRequest(ctx, log, o.httpClient, cfg.GetTokenExchangeUri(), form, headers)
 }
 
 // buildAuthHeader builds the authorization header for the client according to the
@@ -531,7 +533,7 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 	}
 
 	log.Info("performing request to refresh access token")
-	bodyTokens, errCode := performIDPRequest(log, o.httpClient, o.config.GetTokenUri(), form, headers)
+	bodyTokens, errCode := performIDPRequest(ctx, log, o.httpClient, o.config.GetTokenUri(), form, headers)
 
 	if errCode != codes.OK {
 		return nil
@@ -544,7 +546,7 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 	}
 
 	if o.config.GetTokenExchange() != nil && bodyTokens.AccessToken != "" {
-		exchangedTokens, errCode := o.exchangeAccessToken(log, bodyTokens.AccessToken)
+		exchangedTokens, errCode := o.exchangeAccessToken(ctx, log, bodyTokens.AccessToken)
 		if errCode != codes.OK {
 			return nil
 		}
@@ -557,7 +559,7 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 
 	_, err := oidc.ParseToken(bodyTokens.IDToken)
 	if err != nil {
-		log.Error("error parsing new id token, using the old one", err)
+		_ = internal.LogRequestError(ctx, log, "error parsing new id token, using the old one", err)
 		newTokenResponse.IDToken = expiredTokens.IDToken
 	} else {
 		log.Debug("updating id token")
@@ -590,7 +592,7 @@ func (o *oidcHandler) refreshToken(ctx context.Context, log telemetry.Logger, ex
 
 	stateFromStore, err := store.GetAuthorizationState(ctx, sessionID)
 	if err != nil {
-		log.Error("error retrieving authorization state from session store", err)
+		_ = internal.LogRequestError(ctx, log, "error retrieving authorization state from session store", err)
 		return nil
 	}
 	var expectedNonce string
@@ -618,36 +620,46 @@ type idpTokensResponse struct {
 }
 
 // performIDPRequest performs a request to the Identity Provider to retrieve tokens.
-func performIDPRequest(log telemetry.Logger, client *http.Client, uri string, form url.Values, headers http.Header) (*idpTokensResponse, codes.Code) {
-	oidcReq, err := http.NewRequest("POST", uri, strings.NewReader(form.Encode()))
+func performIDPRequest(ctx context.Context, log telemetry.Logger, client *http.Client, uri string,
+	form url.Values, headers http.Header) (*idpTokensResponse, codes.Code) {
+	ctx = telemetry.KeyValuesToContext(ctx, "operation", "oidc_token")
+	log = log.Context(ctx)
+	start := time.Now()
+	oidcReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uri, strings.NewReader(form.Encode()))
 	if err != nil {
-		log.Error("error creating tokens request to OIDC", err)
+		_ = internal.LogRequestError(ctx, log, "invalid OIDC token request", err)
 		return nil, codes.Internal
 	}
 	oidcReq.Header = headers
-
+	fields := func() []any {
+		return []any{"dependency", oidcReq.URL.Host, "duration", time.Since(start)}
+	}
 	oidcResp, err := client.Do(oidcReq)
 	if err != nil {
-		log.Error("error performing tokens request to OIDC", err)
+		_ = internal.LogRequestError(ctx, log, "OIDC token request failed", err, fields()...)
 		return nil, codes.Internal
 	}
+	defer func() { _ = oidcResp.Body.Close() }()
 
 	if oidcResp.StatusCode != http.StatusOK {
-		log.Info("OIDC server returned non-200 status code", "status-code", oidcResp.StatusCode, "url", oidcReq.URL.String())
+		kvs := append(fields(), "status", oidcResp.StatusCode)
+		if oidcResp.StatusCode >= http.StatusInternalServerError {
+			_ = internal.LogRequestError(ctx, log, "OIDC token endpoint failed", errors.New("unexpected HTTP status"), kvs...)
+		} else {
+			log.Info("OIDC token request rejected", kvs...)
+		}
 		return nil, inthttp.StatusToGrpcCode(oidcResp.StatusCode)
 	}
 
 	respBody, err := io.ReadAll(oidcResp.Body)
-	_ = oidcResp.Body.Close()
 	if err != nil {
-		log.Error("error reading tokens response", err)
+		_ = internal.LogRequestError(ctx, log, "error reading tokens response", err, fields()...)
 		return nil, codes.Internal
 	}
 
 	bodyTokens := &idpTokensResponse{}
-	err = json.Unmarshal(respBody, &bodyTokens)
-	if err != nil {
-		log.Error("error unmarshalling tokens response", err)
+	if err = json.Unmarshal(respBody, &bodyTokens); err != nil {
+		_ = internal.LogRequestError(ctx, log, "invalid OIDC token response", err, fields()...)
 		return nil, codes.Internal
 	}
 
@@ -704,7 +716,7 @@ func isValidIDPRefreshTokenResponse(log telemetry.Logger, tokenResponse *idpToke
 func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, idTokenString, expectedNonce string, isNonceRequired bool) (bool, codes.Code) {
 	idToken, err := oidc.ParseToken(idTokenString)
 	if err != nil {
-		log.Error("error parsing id token", err)
+		_ = internal.LogRequestError(ctx, log, "error parsing id token", err)
 		return false, codes.Internal
 	}
 
@@ -717,7 +729,7 @@ func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, 
 		tokenNonce := oidcNonce.(string)
 		// if nonce is not required, both token and expected nonce must be present to perform the check
 		if (isNonceRequired || tokenNonce != "" && expectedNonce != "") && tokenNonce != expectedNonce {
-			log.Info("id token nonce does not match", "nonce-from-id-token", oidcNonce, "nonce-from-store", expectedNonce)
+			log.Info("id token nonce does not match")
 			return false, codes.InvalidArgument
 		}
 	}
@@ -730,20 +742,20 @@ func (o *oidcHandler) isValidIDToken(ctx context.Context, log telemetry.Logger, 
 		}
 	}
 	if !audMatches {
-		log.Info("id token audience does not match", "aud-from-id-token", idToken.Audience(), "aud-from-config", o.config.GetClientId())
+		log.Info("id token audience does not match")
 		return false, codes.InvalidArgument
 	}
 
 	jwtSet, err := o.jwks.Get(ctx, o.config)
 	if err != nil {
-		log.Error("error fetching jwks", err)
+		_ = internal.LogRequestError(ctx, log, "error fetching jwks", err)
 		return false, codes.Internal
 	}
 
 	// We use jws.WithInferAlgorithmFromKey(true) in case the keys are missing the "alg" value;
 	// some providers (e.g. Microsoft Identity) exclude the "alg" value from their keys.
 	if _, err := jws.Verify([]byte(idTokenString), jws.WithKeySet(jwtSet, jws.WithInferAlgorithmFromKey(true))); err != nil {
-		log.Error("error verifying id token with fetched jwks", err)
+		_ = internal.LogRequestError(ctx, log, "error verifying id token with fetched jwks", err)
 		return false, codes.Internal
 	}
 
@@ -981,12 +993,12 @@ func getCookieName(config *oidcv1.OIDCConfig) string {
 }
 
 // loadWellKnownConfig loads the OIDC well-known configuration into the given OIDCConfig.
-func loadWellKnownConfig(client *http.Client, cfg *oidcv1.OIDCConfig) error {
+func loadWellKnownConfig(ctx context.Context, client *http.Client, cfg *oidcv1.OIDCConfig) error {
 	if cfg.GetConfigurationUri() == "" {
 		return nil
 	}
 
-	wellKnownConfig, err := oidc.GetWellKnownConfig(client, cfg.GetConfigurationUri())
+	wellKnownConfig, err := oidc.GetWellKnownConfig(telemetry.KeyValuesToContext(ctx, "operation", "oidc_discovery"), client, cfg.GetConfigurationUri())
 	if err != nil {
 		return err
 	}

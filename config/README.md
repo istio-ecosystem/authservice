@@ -345,6 +345,7 @@ For a simple example, see the [sample JSON in the bookinfo configmap template](h
 | health_listen_address | [string](#string) |  | The Authservice provides an HTTP server to check the health state. This configures the address for the health server to listen for. Optional. Defaults to the value of `listen_address`. |
 | health_listen_port | [int32](#int32) |  | The TCP port for the health server to listen for. Optional. Defaults 10004. |
 | health_listen_path | [string](#string) |  | The path for the health server to attend. Optional. Defaults to "/healthz". |
+| log_format | [string](#string) |  | The log output format: `logfmt` (also accepted as `text`) or `json`. Optional. Defaults to `logfmt` for backward compatibility. |
 
 
 

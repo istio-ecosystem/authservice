@@ -18,6 +18,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/lestrrat-go/httprc"
@@ -51,11 +53,12 @@ type JWKSProvider interface {
 
 // DefaultJWKSProvider provides a JWKS set
 type DefaultJWKSProvider struct {
-	log     telemetry.Logger
-	cache   *jwk.Cache
-	config  *configv1.Config
-	tlsPool inthttp.TLSConfigPool
-	started chan struct{}
+	log            telemetry.Logger
+	cache          *jwk.Cache
+	config         *configv1.Config
+	tlsPool        inthttp.TLSConfigPool
+	started        chan struct{}
+	serviceContext context.Context
 }
 
 // NewJWKSProvider returns a new JWKSProvider.
@@ -72,8 +75,17 @@ func NewJWKSProvider(cfg *configv1.Config, tlsPool inthttp.TLSConfigPool) *Defau
 func (j *DefaultJWKSProvider) Name() string { return "JWKS" }
 
 func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
+	j.serviceContext = ctx
 	errSink := httprc.ErrSinkFunc(func(err error) {
-		j.log.Debug("jwks auto refresh error", "error", err)
+		log := j.log.With("operation", "jwks_refresh")
+		var refresh *httprc.RefreshError
+		if errors.As(err, &refresh) {
+			if endpoint, parseErr := url.Parse(refresh.URL); parseErr == nil {
+				log = log.With("dependency", endpoint.Host)
+			}
+			err = refresh.Err
+		}
+		_ = internal.LogRequestError(ctx, log, "JWKS auto refresh failed", err)
 	})
 	j.cache = jwk.NewCache(ctx,
 		jwk.WithErrSink(errSink),
@@ -88,8 +100,18 @@ func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
 // Get the JWKS for the given OIDC configuration
 func (j *DefaultJWKSProvider) Get(ctx context.Context, config *oidcv1.OIDCConfig) (jwk.Set, error) {
 	if config.GetJwksFetcher() != nil {
-		<-j.started // wait until the service is fully started
-		return j.fetchDynamic(ctx, config)
+		select {
+		case <-j.started: // wait until the service is fully started
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		// The cache worker can stop before replying to a lookup during shutdown.
+		// Let either the caller or the service release the waiting lookup.
+		fetchContext, cancel := context.WithCancel(ctx)
+		stop := context.AfterFunc(j.serviceContext, cancel)
+		defer stop()
+		defer cancel()
+		return j.fetchDynamic(fetchContext, config)
 	}
 	return j.fetchStatic(config.GetJwks())
 }
@@ -112,28 +134,43 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 			refreshInterval = DefaultFetchInterval
 		}
 
-		log.Info("configuring JWKS auto refresh", "jwks", jwksConfig.JwksUri, "interval", refreshInterval, "skip_verify", config.GetSkipVerifyPeerCert())
+		log.Info("configuring JWKS auto refresh", "interval", refreshInterval, "skip_verify", config.GetSkipVerifyPeerCert())
 
 		if err = j.cache.Register(jwksConfig.JwksUri,
-			jwk.WithHTTPClient(client),
+			jwk.WithHTTPClient(jwksHTTPClient{client: client, ctx: j.serviceContext}),
 			jwk.WithRefreshInterval(refreshInterval),
 		); err != nil {
 			return nil, fmt.Errorf("error registering JWKS: %w", err)
 		}
 	}
 
-	log.Debug("fetching JWKS", "jwks", jwksConfig.JwksUri)
+	log.Debug("fetching JWKS")
 
 	jwks, err := j.cache.Get(ctx, jwksConfig.JwksUri)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrJWKSFetch, err)
+		return nil, fmt.Errorf("%w: %w", ErrJWKSFetch, err)
 	}
 	return jwks, nil
 }
 
+// jwksHTTPClient supplies the service context to the cache library's Get calls.
+// Shared fetches can outlive one caller, but must stop when the service stops.
+type jwksHTTPClient struct {
+	client *http.Client
+	ctx    context.Context
+}
+
+func (c jwksHTTPClient) Get(uri string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(c.ctx, http.MethodGet, uri, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.client.Do(req)
+}
+
 // fetchStatic parses the given raw JWKS document.
 func (j *DefaultJWKSProvider) fetchStatic(raw string) (jwk.Set, error) {
-	j.log.Debug("parsing static JWKS", "jwks", raw)
+	j.log.Debug("parsing static JWKS")
 
 	jwks, err := jwk.Parse([]byte(raw))
 	if err != nil {

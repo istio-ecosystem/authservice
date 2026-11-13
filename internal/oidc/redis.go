@@ -170,8 +170,8 @@ func NewRedisStore(clock *Clock, client redis.Cmdable, absoluteSessionTimeout, i
 }
 
 func (r *redisStore) SetTokenResponse(ctx context.Context, sessionID string, tokenResponse *TokenResponse) error {
-	log := r.log.Context(ctx).With("session-id", sessionID)
-	log.Debug("setting token response", "token_response", tokenResponse)
+	log := r.log.Context(ctx)
+	log.Debug("setting token response")
 
 	if err := r.client.HSet(ctx, sessionID, keyIDToken, tokenResponse.IDToken).Err(); err != nil {
 		return err
@@ -220,7 +220,7 @@ func (r *redisStore) SetTokenResponse(ctx context.Context, sessionID string, tok
 }
 
 func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*TokenResponse, error) {
-	log := r.log.Context(ctx).With("session-id", sessionID)
+	log := r.log.Context(ctx)
 	log.Debug("getting token response")
 
 	res := r.client.HMGet(ctx, sessionID, tokenResponseKeys...)
@@ -240,7 +240,7 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 
 	tokenResponse := token.TokenResponse()
 	if _, err := tokenResponse.ParseIDToken(); err != nil {
-		log.Error("failed to parse id token", err, "token", token)
+		log.Error("failed to parse id token", nil)
 		return nil, nil
 	}
 
@@ -248,14 +248,14 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 		return nil, err
 	}
 
-	log.Debug("token response", "token_response", tokenResponse)
+	log.Debug("token response retrieved")
 
 	return tokenResponse, nil
 }
 
 func (r *redisStore) SetAuthorizationState(ctx context.Context, sessionID string, authorizationState *AuthorizationState) error {
-	log := r.log.Context(ctx).With("session-id", sessionID)
-	log.Debug("setting authorization state", "state", authorizationState)
+	log := r.log.Context(ctx)
+	log.Debug("setting authorization state")
 
 	state := map[string]any{
 		keyState:        authorizationState.State,
@@ -277,7 +277,7 @@ func (r *redisStore) SetAuthorizationState(ctx context.Context, sessionID string
 }
 
 func (r *redisStore) GetAuthorizationState(ctx context.Context, sessionID string) (*AuthorizationState, error) {
-	log := r.log.Context(ctx).With("session-id", sessionID)
+	log := r.log.Context(ctx)
 	log.Debug("getting authorization state")
 
 	res := r.client.HMGet(ctx, sessionID, authorizationStateKeys...)
@@ -298,13 +298,13 @@ func (r *redisStore) GetAuthorizationState(ctx context.Context, sessionID string
 		return nil, err
 	}
 
-	log.Debug("authorization state", "state", state.AuthorizationState())
+	log.Debug("authorization state retrieved")
 
 	return state.AuthorizationState(), nil
 }
 
 func (r *redisStore) ClearAuthorizationState(ctx context.Context, sessionID string) error {
-	log := r.log.Context(ctx).With("session-id", sessionID)
+	log := r.log.Context(ctx)
 	log.Debug("clearing authorization state")
 
 	if err := r.client.HDel(ctx, sessionID, keyState, keyNonce, keyRequestedURL).Err(); err != nil {
@@ -315,7 +315,7 @@ func (r *redisStore) ClearAuthorizationState(ctx context.Context, sessionID stri
 }
 
 func (r *redisStore) RemoveSession(ctx context.Context, sessionID string) error {
-	r.log.Context(ctx).With("session-id", sessionID).Debug("removing session")
+	r.log.Context(ctx).Debug("removing session")
 	return r.client.Del(ctx, sessionID).Err()
 }
 
@@ -325,7 +325,7 @@ func (r *redisStore) RemoveAllExpired(context.Context) error {
 }
 
 func (r *redisStore) refreshExpiration(ctx context.Context, sessionID string, timeAdded time.Time) error {
-	log := r.log.Context(ctx).With("session-id", sessionID)
+	log := r.log.Context(ctx)
 
 	if timeAdded.IsZero() {
 		timeAdded, _ = r.client.HGet(ctx, sessionID, keyTimeAdded).Time()

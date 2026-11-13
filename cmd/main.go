@@ -15,13 +15,11 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/tetratelabs/log"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/run/pkg/signal"
-	"github.com/tetratelabs/telemetry"
 
 	"github.com/istio-ecosystem/authservice/internal"
 	"github.com/istio-ecosystem/authservice/internal/http"
@@ -47,9 +45,7 @@ func main() {
 
 	configLog := run.NewPreRunner("config-log", func() error {
 		cfgLog := internal.Logger(internal.Config)
-		if cfgLog.Level() == telemetry.LevelDebug {
-			cfgLog.Debug("configuration loaded", "config", internal.ConfigToJSONString(&configFile.Config))
-		}
+		cfgLog.Debug("configuration loaded", "chains", len(configFile.Config.GetChains()))
 		return nil
 	})
 	fipsLog := run.NewPreRunner("fips", func() error {
@@ -74,7 +70,7 @@ func main() {
 	)
 
 	if err := g.Run(); err != nil {
-		fmt.Printf("Unexpected exit: %v\n", err)
+		internal.Logger(internal.Default).Error("unexpected exit", err)
 		os.Exit(-1)
 	}
 }

@@ -17,6 +17,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/tetratelabs/run"
@@ -61,6 +62,9 @@ var scopes = map[string]string{
 // ErrInvalidLogLevel is returned when the configured log level is invalid.
 var ErrInvalidLogLevel = errors.New("invalid log level")
 
+// ErrInvalidLogFormat is returned when the configured log format is invalid.
+var ErrInvalidLogFormat = errors.New("invalid log format")
+
 // Logger gets the given logging scope, or return the Noop logger if no scope
 // has been registered with the given name.
 func Logger(name string) telemetry.Logger {
@@ -83,7 +87,7 @@ type setupLogging struct {
 func NewLogSystem(log telemetry.Logger, cfg *configv1.Config) run.Unit {
 	// Set the defaults in the constructor to make sure this runs as early as possible,
 	// not even as part of hte run.Group phases
-	scope.UseLogger(log)
+	scope.UseLogger(newFormatLogger(log, cfg, os.Stdout))
 	scope.SetAllScopes(telemetry.LevelInfo)
 	for name, description := range scopes {
 		scope.Register(name, description)
@@ -99,6 +103,11 @@ func (s *setupLogging) Name() string { return "Logging" }
 
 // PreRun initializes the logging system.
 func (s *setupLogging) PreRun() error {
+	switch s.cfg.GetLogFormat() {
+	case "", "logfmt", "text", "json":
+	default:
+		return ErrInvalidLogFormat
+	}
 	if s.cfg.LogLevel == "" {
 		s.cfg.LogLevel = "info"
 	}

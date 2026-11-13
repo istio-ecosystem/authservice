@@ -16,12 +16,12 @@ package server
 
 import (
 	"context"
-	"encoding/json"
+	"time"
 
 	"github.com/tetratelabs/telemetry"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/istio-ecosystem/authservice/internal"
 )
@@ -47,20 +47,20 @@ func (l LogMiddleware) UnaryServerInterceptor(
 ) (interface{}, error) {
 	log := l.log.Context(ctx)
 
-	log.Debug("request", "method", info.FullMethod, "data", toJSON(req))
+	log.Debug("gRPC request", "method", info.FullMethod)
+	start := time.Now()
 	resp, err := handler(ctx, req)
-	log.Debug("response", "method", info.FullMethod, "data", toJSON(resp), "error", err)
+	fields := []any{"method", info.FullMethod, "duration", time.Since(start), "code", status.Code(err).String()}
+	if err != nil {
+		switch status.Code(err) {
+		case codes.Unauthenticated, codes.PermissionDenied, codes.InvalidArgument:
+			log.Info("gRPC request rejected", fields...)
+		default:
+			_ = internal.LogRequestError(ctx, log, "gRPC request failed", err, fields...)
+		}
+	} else {
+		log.Debug("gRPC response", fields...)
+	}
 
 	return resp, err
-}
-
-func toJSON(obj interface{}) string {
-	var data []byte
-	message, ok := obj.(proto.Message)
-	if !ok {
-		data, _ = json.Marshal(obj)
-	} else {
-		data, _ = protojson.Marshal(message)
-	}
-	return string(data)
 }

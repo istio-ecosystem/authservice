@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Copyright (c) Tetrate, Inc 2024 All Rights Reserved.
-
 package http
 
 import (
-	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -27,75 +28,74 @@ import (
 	"github.com/tetratelabs/telemetry/function"
 )
 
-const (
-	request  = "POST / HTTP/1.1\r\nHost: example.com\r\n\r\nreq body"
-	response = "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nresp body"
-)
-
 func TestLoggingRoundTripper(t *testing.T) {
-	var (
-		rt  = &recordedRoundTrip{logs: make([]logEntry, 0)}
-		lrt = LoggingRoundTripper{
-			Log: function.NewLogger(rt.log),
-			Delegate: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-				return http.ReadResponse(bufio.NewReader(strings.NewReader(response)), req)
-			}),
-		}
-	)
-
-	tests := []struct {
-		name  string
-		level telemetry.Level
-		want  []logEntry
+	for _, test := range []struct {
+		name         string
+		level        telemetry.Level
+		fail, cancel bool
+		count        int
 	}{
-		{"no-debug", telemetry.LevelInfo, []logEntry{}},
-		{"debug", telemetry.LevelDebug, []logEntry{
-			{
-				level:  telemetry.LevelDebug,
-				msg:    "request",
-				values: []any{"data", request},
-			},
-			{
-				level:  telemetry.LevelDebug,
-				msg:    "response",
-				values: []any{"data", response},
-			},
-		}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lrt.Log.SetLevel(tt.level)
-			req, err := http.NewRequest("POST", "http://example.com", strings.NewReader("req body"))
+		{"info-success", telemetry.LevelInfo, false, false, 0},
+		{"debug-success", telemetry.LevelDebug, false, false, 2},
+		{"info-failure", telemetry.LevelInfo, true, false, 1},
+		{"caller-cancel", telemetry.LevelInfo, true, true, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var logs []string
+			var levels []telemetry.Level
+			log := function.NewLogger(func(level telemetry.Level, msg string, err error, values function.Values) {
+				levels = append(levels, level)
+				logs = append(logs, fmt.Sprint(msg, err, values))
+			})
+			log.SetLevel(test.level)
+			ctx, cancel := context.WithCancel(telemetry.KeyValuesToContext(t.Context(), "x-request-id", "public-request"))
+			defer cancel()
+			secret := "private-credential"
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+				"https://user:"+secret+"@example.com/"+secret+"?code="+secret, strings.NewReader(secret))
 			require.NoError(t, err)
-
-			_, err = lrt.RoundTrip(req)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, rt.logs)
+			req.Header.Set("Authorization", "Bearer "+secret)
+			req.Header.Set("Cookie", "session="+secret)
+			original := errors.New(secret)
+			if test.cancel {
+				cancel()
+				original = context.Canceled
+			}
+			lrt := LoggingRoundTripper{Log: log, Delegate: roundTripperFunc(func(got *http.Request) (*http.Response, error) {
+				body, readErr := io.ReadAll(got.Body)
+				require.NoError(t, readErr)
+				require.Equal(t, secret, string(body))
+				require.Equal(t, "Bearer "+secret, got.Header.Get("Authorization"))
+				if test.fail {
+					return nil, original
+				}
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(secret))}, nil
+			})}
+			res, err := lrt.RoundTrip(req)
+			if test.fail {
+				require.ErrorIs(t, err, original)
+			} else {
+				require.NoError(t, err)
+				body, readErr := io.ReadAll(res.Body)
+				require.NoError(t, readErr)
+				require.Equal(t, secret, string(body))
+				require.NoError(t, res.Body.Close())
+			}
+			require.Len(t, logs, test.count)
+			if len(logs) > 0 {
+				rendered := strings.Join(logs, "\n")
+				require.Contains(t, rendered, "public-request")
+				require.Contains(t, rendered, "example.com")
+				require.Contains(t, rendered, "duration")
+				require.NotContains(t, rendered, secret)
+			}
+			if test.fail && !test.cancel {
+				require.Equal(t, []telemetry.Level{telemetry.LevelError}, levels)
+			}
 		})
 	}
 }
 
 type roundTripperFunc func(req *http.Request) (*http.Response, error)
 
-func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return fn(req)
-}
-
-type recordedRoundTrip struct {
-	logs []logEntry
-}
-
-type logEntry struct {
-	level  telemetry.Level
-	msg    string
-	values []any
-}
-
-func (r *recordedRoundTrip) log(level telemetry.Level, msg string, _ error, values function.Values) {
-	r.logs = append(r.logs, logEntry{
-		level:  level,
-		msg:    msg,
-		values: values.FromMethod,
-	})
-}
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return fn(req) }

@@ -153,6 +153,10 @@ message Config {
   // The path for the health server to attend.
   // Optional. Defaults to "/healthz".
   string health_listen_path = 14;
+
+  // The log output format: `logfmt` (also accepted as `text`) or `json`.
+  // Optional. Defaults to `logfmt` for backward compatibility.
+  string log_format = 15 [(validate.rules).string = {in: ["", "logfmt", "text", "json"]}];
 }
 
 // Trigger rule to match against a request. The trigger rule is satisfied if
