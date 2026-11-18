@@ -50,7 +50,7 @@ func (l LogMiddleware) UnaryServerInterceptor(
 	log.Debug("gRPC request", "method", info.FullMethod)
 	start := time.Now()
 	resp, err := handler(ctx, req)
-	fields := []any{"method", info.FullMethod, "duration", time.Since(start), "code", status.Code(err).String()}
+	fields := []any{"method", info.FullMethod, "duration_ms", float64(time.Since(start)) / float64(time.Millisecond), "code", status.Code(err).String()}
 	if err != nil {
 		switch status.Code(err) {
 		case codes.Unauthenticated, codes.PermissionDenied, codes.InvalidArgument:

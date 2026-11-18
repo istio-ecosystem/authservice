@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
@@ -175,7 +176,7 @@ func TestNewHTTPClient(t *testing.T) {
 	})
 
 	t.Run("info-logger", func(t *testing.T) {
-		cfg := &oidcv1.OIDCConfig{}
+		cfg := &oidcv1.OIDCConfig{IdpRequestTimeoutSec: proto.Uint32(0)}
 		pool := NewTLSConfigPool(noopWatcher{})
 		log := telemetry.NoopLogger()
 		log.SetLevel(telemetry.LevelInfo)
@@ -208,9 +209,10 @@ func TestHTTPClientBoundsResponseBody(t *testing.T) {
 		close(stopped)
 	}))
 	defer server.Close()
-	client, err := NewHTTPClient(&oidcv1.OIDCConfig{}, NewTLSConfigPool(noopWatcher{}), nil)
+	cfg := &oidcv1.OIDCConfig{IdpRequestTimeoutSec: proto.Uint32(1)}
+	client, err := NewHTTPClient(cfg, NewTLSConfigPool(noopWatcher{}), nil)
 	require.NoError(t, err)
-	client.Timeout = 100 * time.Millisecond
+	require.Equal(t, time.Second, client.Timeout)
 	response, err := client.Get(server.URL)
 	require.NoError(t, err)
 	defer func() { _ = response.Body.Close() }()

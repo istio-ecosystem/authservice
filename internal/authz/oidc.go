@@ -632,7 +632,7 @@ func performIDPRequest(ctx context.Context, log telemetry.Logger, client *http.C
 	}
 	oidcReq.Header = headers
 	fields := func() []any {
-		return []any{"dependency", oidcReq.URL.Host, "duration", time.Since(start)}
+		return []any{"dependency", oidcReq.URL.Host, "duration_ms", float64(time.Since(start)) / float64(time.Millisecond)}
 	}
 	oidcResp, err := client.Do(oidcReq)
 	if err != nil {
@@ -642,7 +642,11 @@ func performIDPRequest(ctx context.Context, log telemetry.Logger, client *http.C
 	defer func() { _ = oidcResp.Body.Close() }()
 
 	if oidcResp.StatusCode != http.StatusOK {
+		oauthError := readOAuthErrorCode(oidcResp.Body)
 		kvs := append(fields(), "status", oidcResp.StatusCode)
+		if oauthError != "" {
+			kvs = append(kvs, "oauth_error", oauthError)
+		}
 		if oidcResp.StatusCode >= http.StatusInternalServerError {
 			_ = internal.LogRequestError(ctx, log, "OIDC token endpoint failed", errors.New("unexpected HTTP status"), kvs...)
 		} else {
@@ -664,6 +668,23 @@ func performIDPRequest(ctx context.Context, log telemetry.Logger, client *http.C
 	}
 
 	return bodyTokens, codes.OK
+}
+
+func readOAuthErrorCode(body io.Reader) string {
+	var response struct {
+		Error string `json:"error"`
+	}
+	if err := json.NewDecoder(io.LimitReader(body, 4096)).Decode(&response); err != nil {
+		return ""
+	}
+	// Log only OAuth 2.0 token endpoint and token exchange error codes.
+	switch response.Error {
+	case "invalid_request", "invalid_client", "invalid_grant", "unauthorized_client",
+		"unsupported_grant_type", "invalid_scope", "invalid_target":
+		return response.Error
+	default:
+		return ""
+	}
 }
 
 // isValidIDPNewTokensResponse checks if the response from the Identity Provider is valid according to the OpenID Connect specification.

@@ -103,6 +103,7 @@ func (s *setupLogging) Name() string { return "Logging" }
 
 // PreRun initializes the logging system.
 func (s *setupLogging) PreRun() error {
+	// The config file loader validates this too. Direct callers can supply an unvalidated config.
 	switch s.cfg.GetLogFormat() {
 	case "", "logfmt", "text", "json":
 	default:

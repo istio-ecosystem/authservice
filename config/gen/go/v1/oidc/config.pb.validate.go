@@ -953,6 +953,10 @@ func (m *OIDCConfig) validate(all bool) error {
 		_ = v // ensures v is used
 	}
 
+	if m.IdpRequestTimeoutSec != nil {
+		// no validation rules for IdpRequestTimeoutSec
+	}
+
 	if len(errors) > 0 {
 		return OIDCConfigMultiError(errors)
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
@@ -345,6 +346,25 @@ func TestJWKSFetchStopsWithService(t *testing.T) {
 		t.Fatal("JWKS lookup did not stop")
 	}
 	require.NoError(t, <-serviceDone)
+}
+
+func TestJWKSCacheRespectsRequestTimeout(t *testing.T) {
+	server := newTestServer(t, newKeySet(t, newKey(t)))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, inthttp.NewTLSConfigPool(noopWatcher{}))
+	go func() { _ = provider.ServeContext(ctx) }()
+
+	cfg := &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: server.URL},
+	}}
+	shorter := proto.CloneOf(cfg)
+	shorter.IdpRequestTimeoutSec = proto.Uint32(1)
+	for _, config := range []*oidcv1.OIDCConfig{cfg, shorter, cfg, shorter} {
+		_, err := provider.Get(ctx, config)
+		require.NoError(t, err)
+	}
+	require.Equal(t, int32(2), atomic.LoadInt32(server.requestCount))
 }
 
 func TestJWKSWaitForStartupCancels(t *testing.T) {

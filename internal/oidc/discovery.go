@@ -71,10 +71,13 @@ func GetWellKnownConfig(ctx context.Context, client *http.Client, url string) (W
 		return WellKnownConfig{}, err
 	}
 	start := time.Now()
+	fields := func() []any {
+		return []any{"dependency", request.URL.Host, "duration_ms", float64(time.Since(start)) / float64(time.Millisecond)}
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
-			"OIDC discovery request failed", err, "dependency", request.URL.Host, "duration", time.Since(start))
+			"OIDC discovery request failed", err, fields()...)
 	}
 	defer func() { _ = response.Body.Close() }()
 
@@ -82,13 +85,13 @@ func GetWellKnownConfig(ctx context.Context, client *http.Client, url string) (W
 	if response.StatusCode != http.StatusOK {
 		err = fmt.Errorf("failed to retrieve OIDC config: HTTP %d", response.StatusCode)
 		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
-			"OIDC discovery failed", err, "dependency", request.URL.Host, "status", response.StatusCode, "duration", time.Since(start))
+			"OIDC discovery failed", err, append(fields(), "status", response.StatusCode)...)
 	}
 
 	// Decode the JSON response into the OIDCConfig struct
 	if err = json.NewDecoder(response.Body).Decode(&cfg); err != nil {
 		return WellKnownConfig{}, internal.LogRequestError(ctx, internal.Logger(internal.IDP).Context(ctx),
-			"invalid OIDC discovery response", err, "dependency", request.URL.Host, "duration", time.Since(start))
+			"invalid OIDC discovery response", err, fields()...)
 	}
 
 	wellKnownConfigsMu.Lock()

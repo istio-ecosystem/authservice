@@ -58,10 +58,30 @@ func newFormatLogger(text telemetry.Logger, cfg *configv1.Config, out io.Writer)
 			jsonLevel = slog.LevelInfo
 		}
 		record := slog.NewRecord(time.Now(), jsonLevel, msg, 0)
-		record.Add(kvs...)
 		if err != nil {
-			record.Add("error", err.Error())
+			kvs = append(kvs, "error", err.Error())
 		}
+		record.AddAttrs(uniqueLogAttrs(kvs)...)
 		_ = handler.Handle(context.Background(), record)
 	})
+}
+
+func uniqueLogAttrs(kvs []any) []slog.Attr {
+	attrs := slog.Group("fields", kvs...).Value.Group()
+	unique := attrs[:0]
+	positions := make(map[string]int, len(attrs))
+	for _, attr := range attrs {
+		switch attr.Key {
+		case slog.TimeKey, slog.LevelKey, slog.MessageKey:
+			continue
+		}
+		// Method fields override logger fields, which override context fields.
+		if position, ok := positions[attr.Key]; ok {
+			unique[position] = attr
+			continue
+		}
+		positions[attr.Key] = len(unique)
+		unique = append(unique, attr)
+	}
+	return unique
 }

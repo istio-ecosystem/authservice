@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/lestrrat-go/httprc"
@@ -54,7 +55,8 @@ type JWKSProvider interface {
 // DefaultJWKSProvider provides a JWKS set
 type DefaultJWKSProvider struct {
 	log            telemetry.Logger
-	cache          *jwk.Cache
+	cacheMu        sync.Mutex
+	cacheByTimeout map[time.Duration]*jwk.Cache
 	config         *configv1.Config
 	tlsPool        inthttp.TLSConfigPool
 	started        chan struct{}
@@ -64,10 +66,11 @@ type DefaultJWKSProvider struct {
 // NewJWKSProvider returns a new JWKSProvider.
 func NewJWKSProvider(cfg *configv1.Config, tlsPool inthttp.TLSConfigPool) *DefaultJWKSProvider {
 	return &DefaultJWKSProvider{
-		log:     internal.Logger(internal.JWKS),
-		config:  cfg,
-		tlsPool: tlsPool,
-		started: make(chan struct{}),
+		log:            internal.Logger(internal.JWKS),
+		cacheByTimeout: make(map[time.Duration]*jwk.Cache),
+		config:         cfg,
+		tlsPool:        tlsPool,
+		started:        make(chan struct{}),
 	}
 }
 
@@ -76,6 +79,19 @@ func (j *DefaultJWKSProvider) Name() string { return "JWKS" }
 
 func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
 	j.serviceContext = ctx
+	close(j.started)
+	<-ctx.Done()
+	return nil
+}
+
+// A cache entry stores its HTTP client by URI. Separate caches let filters
+// sharing a JWKS URI use different request timeouts.
+func (j *DefaultJWKSProvider) cacheForTimeout(timeout time.Duration) *jwk.Cache {
+	j.cacheMu.Lock()
+	defer j.cacheMu.Unlock()
+	if cache := j.cacheByTimeout[timeout]; cache != nil {
+		return cache
+	}
 	errSink := httprc.ErrSinkFunc(func(err error) {
 		log := j.log.With("operation", "jwks_refresh")
 		var refresh *httprc.RefreshError
@@ -85,16 +101,15 @@ func (j *DefaultJWKSProvider) ServeContext(ctx context.Context) error {
 			}
 			err = refresh.Err
 		}
-		_ = internal.LogRequestError(ctx, log, "JWKS auto refresh failed", err)
+		_ = internal.LogRequestError(j.serviceContext, log, "JWKS auto refresh failed", err)
 	})
-	j.cache = jwk.NewCache(ctx,
+	cache := jwk.NewCache(j.serviceContext,
 		jwk.WithErrSink(errSink),
 		jwk.WithRefreshWindow(getRefreshWindow(j.config)),
 	)
 
-	close(j.started) // signal channel start
-	<-ctx.Done()
-	return nil
+	j.cacheByTimeout[timeout] = cache
+	return cache
 }
 
 // Get the JWKS for the given OIDC configuration
@@ -123,7 +138,8 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 	log := j.log.Context(ctx)
 	jwksConfig := config.GetJwksFetcher()
 
-	if !j.cache.IsRegistered(jwksConfig.JwksUri) {
+	cache := j.cacheForTimeout(inthttp.IDPRequestTimeout(config))
+	if !cache.IsRegistered(jwksConfig.JwksUri) {
 		client, err := inthttp.NewHTTPClient(config, j.tlsPool, internal.Logger(internal.IDP))
 		if err != nil {
 			return nil, err
@@ -136,7 +152,7 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 
 		log.Info("configuring JWKS auto refresh", "interval", refreshInterval, "skip_verify", config.GetSkipVerifyPeerCert())
 
-		if err = j.cache.Register(jwksConfig.JwksUri,
+		if err = cache.Register(jwksConfig.JwksUri,
 			jwk.WithHTTPClient(jwksHTTPClient{client: client, ctx: j.serviceContext}),
 			jwk.WithRefreshInterval(refreshInterval),
 		); err != nil {
@@ -146,7 +162,7 @@ func (j *DefaultJWKSProvider) fetchDynamic(ctx context.Context, config *oidcv1.O
 
 	log.Debug("fetching JWKS")
 
-	jwks, err := j.cache.Get(ctx, jwksConfig.JwksUri)
+	jwks, err := cache.Get(ctx, jwksConfig.JwksUri)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrJWKSFetch, err)
 	}
@@ -174,7 +190,7 @@ func (j *DefaultJWKSProvider) fetchStatic(raw string) (jwk.Set, error) {
 
 	jwks, err := jwk.Parse([]byte(raw))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrJWKSParse, err)
+		return nil, fmt.Errorf("%w: %w", ErrJWKSParse, err)
 	}
 	return jwks, nil
 }

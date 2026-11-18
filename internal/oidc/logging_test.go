@@ -55,6 +55,10 @@ func TestSessionLogRedaction(t *testing.T) {
 			}))
 			_, err := store.GetTokenResponse(ctx, session)
 			require.NoError(t, err)
+			if backend == "redis" {
+				require.Contains(t, strings.Join(logs, "\n"), "failed to parse id token")
+				require.Contains(t, strings.Join(logs, "\n"), "error invalid JWT")
+			}
 			require.NoError(t, store.SetAuthorizationState(ctx, session, &AuthorizationState{
 				State: "private-state", Nonce: "private-nonce", CodeVerifier: "private-verifier", RequestedURL: "https://example.com/?code=private-code",
 			}))

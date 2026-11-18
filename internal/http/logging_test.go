@@ -86,7 +86,7 @@ func TestLoggingRoundTripper(t *testing.T) {
 				rendered := strings.Join(logs, "\n")
 				require.Contains(t, rendered, "public-request")
 				require.Contains(t, rendered, "example.com")
-				require.Contains(t, rendered, "duration")
+				require.Contains(t, rendered, "duration_ms")
 				require.NotContains(t, rendered, secret)
 			}
 			if test.fail && !test.cancel {

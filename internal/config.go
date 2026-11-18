@@ -200,11 +200,6 @@ func applyOIDCDefaults(config *oidcv1.OIDCConfig) {
 	config.Scopes = append(config.Scopes, ScopeOIDC)
 }
 
-func ConfigToJSONString(c *configv1.Config) string {
-	b, _ := protojson.Marshal(c)
-	return string(b)
-}
-
 func validateURLs(config *configv1.Config) error {
 	if err := validateOIDCConfigURLs(config.DefaultOidcConfig); err != nil {
 		return fmt.Errorf("invalid default OIDC config: %w", err)

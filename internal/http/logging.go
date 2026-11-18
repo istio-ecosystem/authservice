@@ -38,7 +38,7 @@ func (l LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error
 	log.Debug("HTTP request", fields...)
 	start := time.Now()
 	res, err := l.Delegate.RoundTrip(req)
-	fields = append(fields, "duration", time.Since(start))
+	fields = append(fields, "duration_ms", float64(time.Since(start))/float64(time.Millisecond))
 	if err != nil {
 		err = internal.LogRequestError(req.Context(), log, "HTTP request failed", err, fields...)
 	} else {

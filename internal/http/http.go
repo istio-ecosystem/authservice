@@ -113,20 +113,21 @@ func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool TLSConfigPool, log telemetry.
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
+	client := &http.Client{Transport: transport, Timeout: IDPRequestTimeout(cfg)}
 	if log != nil {
-		return &http.Client{
-			Transport: &LoggingRoundTripper{
-				Log:      log,
-				Delegate: transport,
-			},
-			Timeout: DefaultRequestTimeout,
-		}, nil
-
+		client.Transport = &LoggingRoundTripper{Log: log, Delegate: transport}
 	}
-
-	return &http.Client{Transport: transport, Timeout: DefaultRequestTimeout}, nil
+	return client, nil
 }
 
 // DefaultRequestTimeout bounds all IdP requests, including reading response bodies.
 // A caller's shorter deadline or cancellation takes precedence.
 const DefaultRequestTimeout = 10 * time.Second
+
+// IDPRequestTimeout returns the effective total HTTP timeout for this OIDC configuration.
+func IDPRequestTimeout(cfg *oidcv1.OIDCConfig) time.Duration {
+	if seconds := cfg.GetIdpRequestTimeoutSec(); seconds != 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	return DefaultRequestTimeout
+}

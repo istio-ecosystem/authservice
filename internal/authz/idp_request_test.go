@@ -99,14 +99,17 @@ func TestTokenRequestsCancel(t *testing.T) {
 
 func TestTokenRequestFailures(t *testing.T) {
 	for _, test := range []struct {
-		name   string
-		status int
-		body   string
-		level  telemetry.Level
+		name      string
+		status    int
+		body      string
+		level     telemetry.Level
+		oauthCode string
 	}{
-		{"denial", http.StatusBadRequest, "private-response", telemetry.LevelInfo},
-		{"service-error", http.StatusServiceUnavailable, "private-response", telemetry.LevelError},
-		{"invalid-json", http.StatusOK, "private-response", telemetry.LevelError},
+		{"denial", http.StatusBadRequest, `{"error":"invalid_client","error_description":"private-response"}`, telemetry.LevelInfo, "invalid_client"},
+		{"unknown-code", http.StatusBadRequest, `{"error":"private-response"}`, telemetry.LevelInfo, ""},
+		{"oversize-error", http.StatusBadRequest, strings.Repeat(" ", 4096) + `{"error":"invalid_grant"}`, telemetry.LevelInfo, ""},
+		{"service-error", http.StatusServiceUnavailable, "private-response", telemetry.LevelError, ""},
+		{"invalid-json", http.StatusOK, "private-response", telemetry.LevelError, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -134,7 +137,12 @@ func TestTokenRequestFailures(t *testing.T) {
 			require.NotContains(t, rendered, "private-")
 			require.Contains(t, rendered, "public-request")
 			require.Contains(t, rendered, "dependency")
-			require.Contains(t, rendered, "duration")
+			require.Contains(t, rendered, "duration_ms")
+			if test.oauthCode == "" {
+				require.NotContains(t, rendered, "oauth_error")
+			} else {
+				require.Contains(t, rendered, "oauth_error "+test.oauthCode)
+			}
 		})
 	}
 }

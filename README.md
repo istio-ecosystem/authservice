@@ -52,11 +52,16 @@ JSON records include `time`, `level`, `msg`, `scope`, and available request cont
 such as `x-request-id`. Service failures are visible at `info` verbosity; expected
 authentication denials and caller cancellations are not logged as service errors.
 Request diagnostics contain metadata, without headers, cookies, token bodies,
-callback queries, authorization state, or session IDs. Failure logs use a safe
-`reason` category instead of raw dependency error text.
+callback queries, authorization state, or session IDs. Request timings use the
+numeric `duration_ms` field in both formats. Failure logs include a `reason`
+category and safe error details when available. Token endpoint rejections can
+include a recognized `oauth_error` code.
 
 Discovery, JWKS fetches, token retrieval, refresh, and token exchange use HTTP
-clients with a 10-second total timeout, including reading response bodies.
+clients with a 10-second total timeout, including reading response bodies. Set
+`idp_request_timeout_sec` in the OIDC configuration to change the timeout.
+Omitting the field in an `oidc_override` inherits the value from
+`default_oidc_config`. Set it to zero to use the 10-second default.
 Discovery and token calls also honor the caller's earlier deadline or cancellation.
 Keep Envoy's ext_authz timeout appropriate for your deployment; a shorter Envoy
 deadline cancels discovery and token requests. Authentication failure policy is

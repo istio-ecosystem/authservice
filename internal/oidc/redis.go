@@ -240,7 +240,7 @@ func (r *redisStore) GetTokenResponse(ctx context.Context, sessionID string) (*T
 
 	tokenResponse := token.TokenResponse()
 	if _, err := tokenResponse.ParseIDToken(); err != nil {
-		log.Error("failed to parse id token", nil)
+		_ = internal.LogRequestError(ctx, log, "failed to parse id token", err)
 		return nil, nil
 	}
 

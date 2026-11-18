@@ -67,7 +67,7 @@ func TestLogMiddleware(t *testing.T) {
 				rendered := strings.Join(logs, "\n")
 				require.NotContains(t, rendered, "private-credential")
 				require.Contains(t, rendered, "public-request")
-				require.Contains(t, rendered, "duration")
+				require.Contains(t, rendered, "duration_ms")
 				if test.name == "service-failure" {
 					require.Equal(t, telemetry.LevelError, levels[0])
 				}

@@ -92,6 +92,7 @@ via the standard authorization code grant flow from an OIDC Provider.
 | redis_session_store_config | [RedisConfig](#authservice-config-v1-oidc-RedisConfig) |  | When specified, the Authservice will use the configured Redis server to store session data. Optional. |
 | skip_verify_peer_cert | [google.protobuf.Value](#google-protobuf-Value) |  | If set to true, the verification of the destination certificate will be skipped when making a request to the Token Endpoint. This option is useful when you want to use a self-signed certificate for testing purposes, but basically should not be set to true in any other cases. Optional. keep this field out from the trusted_ca_config one of for backward compatibility. |
 | token_exchange | [OIDCConfig.TokenExchange](#authservice-config-v1-oidc-OIDCConfig-TokenExchange) |  | When configured, the Authservice will exchange the OIDC access token for a service-specific token from the defined authorization server. This is useful to automatically exchange the access token obtained from the Identity Provider for a service-specific token issued by an internal authorization server. |
+| idp_request_timeout_sec | [uint32](#uint32) | optional | Total timeout in seconds for IdP HTTP requests, including reading response bodies. Applies to discovery, JWKS fetches, token retrieval, refresh, and token exchange. Defaults to 10 seconds when unset or zero. |
 
 
 
