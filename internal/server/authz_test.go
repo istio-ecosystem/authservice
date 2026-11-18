@@ -15,7 +15,12 @@
 package server
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	envoy "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/stretchr/testify/require"
@@ -24,6 +29,8 @@ import (
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
 	mockv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/mock"
+	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
+	inthttp "github.com/istio-ecosystem/authservice/internal/http"
 )
 
 func TestUnmatchedRequests(t *testing.T) {
@@ -362,5 +369,49 @@ func stringRegex(s string) *configv1.StringMatch {
 		MatchType: &configv1.StringMatch_Regex{
 			Regex: s,
 		},
+	}
+}
+
+func TestCheckCancelsDiscovery(t *testing.T) {
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	idp := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		close(started)
+		<-req.Context().Done()
+		close(stopped)
+	}))
+	defer idp.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	cfg := &configv1.Config{Chains: []*configv1.FilterChain{{Filters: []*configv1.Filter{{
+		Type: &configv1.Filter_Oidc{Oidc: &oidcv1.OIDCConfig{ConfigurationUri: idp.URL}},
+	}}}}}
+	pool := inthttp.NewTLSConfigPool(nil)
+	filter := NewExtAuthZFilter(cfg, pool, nil, nil)
+	done := make(chan error, 1)
+	go func() {
+		response, err := filter.Check(ctx, &envoy.CheckRequest{})
+		if response != nil {
+			done <- errors.New("discovery failure produced an auth verdict")
+			return
+		}
+		done <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("discovery did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Check ignored cancellation")
+	}
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("discovery continued after Check cancellation")
 	}
 }

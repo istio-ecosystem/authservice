@@ -30,6 +30,43 @@ Some of the features it provides:
 [This flowchart](https://miro.com/app/board/o9J_kvus6b4=/) explains how `authservice`
 makes decisions at different points in the login lifecycle.
 
+## Logging and IdP request timeouts
+
+Set the top-level `log_format` option in the Authservice JSON configuration to
+`json` for one JSON object per line, or `logfmt` (also accepted as `text`) for the
+existing text format. Omitting the option preserves logfmt output. For example,
+add these fields to your configuration file or the configuration embedded in a
+Kubernetes ConfigMap:
+
+```json
+{
+  "log_level": "info",
+  "log_format": "json"
+}
+```
+
+These fields are part of the full configuration described in the
+[configuration reference](config/README.md). Helm deployments should pass them
+through the chart's Authservice configuration rather than a separate logging flag.
+JSON records include `time`, `level`, `msg`, `scope`, and available request context
+such as `x-request-id`. Service failures are visible at `info` verbosity; expected
+authentication denials and caller cancellations are not logged as service errors.
+Request diagnostics contain metadata, without headers, cookies, token bodies,
+callback queries, authorization state, or session IDs. Request timings use the
+numeric `duration_ms` field in both formats. Failure logs include a `reason`
+category and safe error details when available. Token endpoint rejections can
+include a recognized `oauth_error` code.
+
+Discovery, JWKS fetches, token retrieval, refresh, and token exchange use HTTP
+clients with a 10-second total timeout, including reading response bodies. Set
+`idp_request_timeout_sec` in the OIDC configuration to change the timeout.
+Omitting the field in an `oidc_override` inherits the value from
+`default_oidc_config`. Set it to zero to use the 10-second default.
+Discovery and token calls also honor the caller's earlier deadline or cancellation.
+Keep Envoy's ext_authz timeout appropriate for your deployment; a shorter Envoy
+deadline cancels discovery and token requests. Authentication failure policy is
+unchanged. Background JWKS refresh remains tied to the service lifetime.
+
 ## Contributing
 
 Contributions are very welcome! Please read the [Contributing guidelines](CONTRIBUTING.md)

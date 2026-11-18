@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/run"
 	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	configv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1"
@@ -306,4 +307,72 @@ func newKey(t *testing.T) jwk.Key {
 	require.NoError(t, err)
 
 	return pub
+}
+
+func TestJWKSFetchStopsWithService(t *testing.T) {
+	started := make(chan struct{})
+	stopped := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		close(started)
+		<-req.Context().Done()
+		close(stopped)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, inthttp.NewTLSConfigPool(noopWatcher{}))
+	serviceDone := make(chan error, 1)
+	go func() { serviceDone <- provider.ServeContext(ctx) }()
+	cfg := &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: server.URL},
+	}}
+	done := make(chan error, 1)
+	go func() { _, err := provider.Get(t.Context(), cfg); done <- err }()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS fetch did not start")
+	}
+	cancel()
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS request ignored service shutdown")
+	}
+	select {
+	case err := <-done:
+		require.Error(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("JWKS lookup did not stop")
+	}
+	require.NoError(t, <-serviceDone)
+}
+
+func TestJWKSCacheRespectsRequestTimeout(t *testing.T) {
+	server := newTestServer(t, newKeySet(t, newKey(t)))
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, inthttp.NewTLSConfigPool(noopWatcher{}))
+	go func() { _ = provider.ServeContext(ctx) }()
+
+	cfg := &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: server.URL},
+	}}
+	shorter := proto.CloneOf(cfg)
+	shorter.IdpRequestTimeoutSec = proto.Uint32(1)
+	for _, config := range []*oidcv1.OIDCConfig{cfg, shorter, cfg, shorter} {
+		_, err := provider.Get(ctx, config)
+		require.NoError(t, err)
+	}
+	require.Equal(t, int32(2), atomic.LoadInt32(server.requestCount))
+}
+
+func TestJWKSWaitForStartupCancels(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	provider := NewJWKSProvider(&configv1.Config{}, nil)
+	_, err := provider.Get(ctx, &oidcv1.OIDCConfig{JwksConfig: &oidcv1.OIDCConfig_JwksFetcher{
+		JwksFetcher: &oidcv1.OIDCConfig_JwksFetcherConfig{JwksUri: "https://example.com/jwks"},
+	}})
+	require.ErrorIs(t, err, context.Canceled)
 }

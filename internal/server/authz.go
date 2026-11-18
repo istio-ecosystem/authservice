@@ -88,10 +88,7 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 	// If there are no trigger rules, allow the request with no check executions.
 	// TriggerRules are used to determine which request should be checked by the filter and which don't.
 	if !mustTriggerCheck(log, e.cfg.TriggerRules, req) {
-		log.Debug(fmt.Sprintf("no matching trigger rule, so allowing request to proceed without any authservice functionality %s://%s%s",
-			req.GetAttributes().GetRequest().GetHttp().GetScheme(),
-			req.GetAttributes().GetRequest().GetHttp().GetHost(),
-			req.GetAttributes().GetRequest().GetHttp().GetPath()))
+		log.Debug("no matching trigger rule, allowing request without authentication")
 		return allow, nil
 	}
 
@@ -123,7 +120,7 @@ func (e *ExtAuthZFilter) Check(ctx context.Context, req *envoy.CheckRequest) (re
 			case *configv1.Filter_Mock:
 				h = authz.NewMockHandler(ft.Mock)
 			case *configv1.Filter_Oidc:
-				if h, err = authz.NewOIDCHandler(ft.Oidc, e.tlsPool, e.jwks, e.sessions, oidc.Clock{}, oidc.NewRandomGenerator()); err != nil {
+				if h, err = authz.NewOIDCHandler(ctx, ft.Oidc, e.tlsPool, e.jwks, e.sessions, oidc.Clock{}, oidc.NewRandomGenerator()); err != nil {
 					return nil, err
 				}
 			}

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/tetratelabs/telemetry"
 
@@ -97,7 +98,7 @@ func BearerAuthHeader(token string) string {
 }
 
 // NewHTTPClient creates a new HTTP client with the given OIDC configuration and TLS pool.
-// If a logger is provided, it will log the requests and responses at debug level.
+// If a logger is provided, it logs safe request metadata at debug level and failures at error level.
 func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool TLSConfigPool, log telemetry.Logger) (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 
@@ -112,15 +113,21 @@ func NewHTTPClient(cfg *oidcv1.OIDCConfig, tlsPool TLSConfigPool, log telemetry.
 		transport.Proxy = http.ProxyURL(proxyURL)
 	}
 
-	if log != nil && log.Level() >= telemetry.LevelDebug {
-		return &http.Client{
-			Transport: &LoggingRoundTripper{
-				Log:      log,
-				Delegate: transport,
-			},
-		}, nil
-
+	client := &http.Client{Transport: transport, Timeout: IDPRequestTimeout(cfg)}
+	if log != nil {
+		client.Transport = &LoggingRoundTripper{Log: log, Delegate: transport}
 	}
+	return client, nil
+}
 
-	return &http.Client{Transport: transport}, nil
+// DefaultRequestTimeout bounds all IdP requests, including reading response bodies.
+// A caller's shorter deadline or cancellation takes precedence.
+const DefaultRequestTimeout = 10 * time.Second
+
+// IDPRequestTimeout returns the effective total HTTP timeout for this OIDC configuration.
+func IDPRequestTimeout(cfg *oidcv1.OIDCConfig) time.Duration {
+	if seconds := cfg.GetIdpRequestTimeoutSec(); seconds != 0 {
+		return time.Duration(seconds) * time.Second
+	}
+	return DefaultRequestTimeout
 }

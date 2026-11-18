@@ -16,8 +16,11 @@ package oidc
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -63,7 +66,7 @@ func TestWellKnownConfig(t *testing.T) {
 			t.Cleanup(s.Stop)
 			s.wellKnownConfig = tt.cfg
 
-			got, err := GetWellKnownConfig(s.newHTTPClient(), tt.url)
+			got, err := GetWellKnownConfig(t.Context(), s.newHTTPClient(), tt.url)
 			if tt.wantError {
 				require.Error(t, err)
 			} else {
@@ -80,7 +83,7 @@ func TestWellKnownConfigCache(t *testing.T) {
 	s.Start()
 	c := s.newHTTPClient()
 
-	got, err := GetWellKnownConfig(c, "http://example.com/.well-known/openid-configuration")
+	got, err := GetWellKnownConfig(t.Context(), c, "http://example.com/.well-known/openid-configuration")
 	require.NoError(t, err)
 	require.Equal(t, validWellKnown, got)
 
@@ -88,7 +91,7 @@ func TestWellKnownConfigCache(t *testing.T) {
 	// It should succeed and return the cached value.
 	s.Stop()
 
-	got, err = GetWellKnownConfig(c, "http://example.com/.well-known/openid-configuration")
+	got, err = GetWellKnownConfig(t.Context(), c, "http://example.com/.well-known/openid-configuration")
 	require.NoError(t, err)
 	require.Equal(t, validWellKnown, got)
 }
@@ -133,5 +136,30 @@ func (s *idpServer) newHTTPClient() *http.Client {
 				return s.listener.DialContext(ctx)
 			},
 		},
+	}
+}
+
+func TestWellKnownConfigConcurrent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(validWellKnownJSON))
+	}))
+	defer server.Close()
+	type result struct {
+		config WellKnownConfig
+		err    error
+	}
+	results := make(chan result, 10)
+	var group sync.WaitGroup
+	for i := range 10 {
+		group.Go(func() {
+			cfg, err := GetWellKnownConfig(t.Context(), server.Client(), fmt.Sprintf("%s/?id=%d", server.URL, i))
+			results <- result{cfg, err}
+		})
+	}
+	group.Wait()
+	close(results)
+	for result := range results {
+		require.NoError(t, result.err)
+		require.Equal(t, validWellKnown, result.config)
 	}
 }

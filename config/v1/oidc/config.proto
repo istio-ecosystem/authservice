@@ -439,4 +439,9 @@ message OIDCConfig {
   // This is useful to automatically exchange the access token obtained from the Identity Provider for a service-specific
   // token issued by an internal authorization server.
   TokenExchange token_exchange = 24;
+
+  // Total timeout in seconds for IdP HTTP requests, including reading response bodies.
+  // Applies to discovery, JWKS fetches, token retrieval, refresh, and token exchange.
+  // Defaults to 10 seconds when unset or zero.
+  optional uint32 idp_request_timeout_sec = 26;
 }

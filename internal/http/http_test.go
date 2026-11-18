@@ -15,12 +15,17 @@
 package http
 
 import (
+	"context"
 	"encoding/base64"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tetratelabs/telemetry"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	oidcv1 "github.com/istio-ecosystem/authservice/config/gen/go/v1/oidc"
@@ -152,6 +157,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 		client, err := NewHTTPClient(cfg, pool, nil)
 		require.NoError(t, err)
+		require.Equal(t, DefaultRequestTimeout, client.Timeout)
 		require.IsType(t, &http.Transport{}, client.Transport)
 		require.NotNil(t, client.Transport.(*http.Transport).Proxy)
 		require.True(t, client.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify)
@@ -169,15 +175,16 @@ func TestNewHTTPClient(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("disabled-logger", func(t *testing.T) {
-		cfg := &oidcv1.OIDCConfig{}
+	t.Run("info-logger", func(t *testing.T) {
+		cfg := &oidcv1.OIDCConfig{IdpRequestTimeoutSec: proto.Uint32(0)}
 		pool := NewTLSConfigPool(noopWatcher{})
 		log := telemetry.NoopLogger()
 		log.SetLevel(telemetry.LevelInfo)
 
 		client, err := NewHTTPClient(cfg, pool, log)
 		require.NoError(t, err)
-		require.IsType(t, &http.Transport{}, client.Transport)
+		require.Equal(t, DefaultRequestTimeout, client.Timeout)
+		require.IsType(t, &LoggingRoundTripper{}, client.Transport)
 	})
 
 	t.Run("enabled-logger", func(t *testing.T) {
@@ -188,6 +195,32 @@ func TestNewHTTPClient(t *testing.T) {
 
 		client, err := NewHTTPClient(cfg, pool, log)
 		require.NoError(t, err)
+		require.Equal(t, DefaultRequestTimeout, client.Timeout)
 		require.IsType(t, &LoggingRoundTripper{}, client.Transport)
 	})
+}
+
+func TestHTTPClientBoundsResponseBody(t *testing.T) {
+	stopped := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		<-req.Context().Done()
+		close(stopped)
+	}))
+	defer server.Close()
+	cfg := &oidcv1.OIDCConfig{IdpRequestTimeoutSec: proto.Uint32(1)}
+	client, err := NewHTTPClient(cfg, NewTLSConfigPool(noopWatcher{}), nil)
+	require.NoError(t, err)
+	require.Equal(t, time.Second, client.Timeout)
+	response, err := client.Get(server.URL)
+	require.NoError(t, err)
+	defer func() { _ = response.Body.Close() }()
+	_, err = io.ReadAll(response.Body)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("IdP request continued after the client timeout")
+	}
 }

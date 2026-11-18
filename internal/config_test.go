@@ -17,6 +17,8 @@ package internal
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -373,21 +375,25 @@ func TestLoadOIDC(t *testing.T) {
 	}
 }
 
-func TestConfigToJSONString(t *testing.T) {
-	tests := []struct {
-		name   string
-		config *configv1.Config
-		want   string
+func TestLoadOIDCRequestTimeout(t *testing.T) {
+	fixture, err := os.ReadFile("testdata/oidc-override.json")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name, override string
+		want           uint32
 	}{
-		{"nil", nil, "{}"},
-		{"empty", &configv1.Config{}, "{}"},
-		{"simple", &configv1.Config{ListenPort: 8080}, `{"listenPort":8080}`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ConfigToJSONString(tt.config)
-			require.JSONEq(t, tt.want, got)
+		{"inherit", "", 25},
+		{"override", `"idp_request_timeout_sec": 40,`, 40},
+		{"reset", `"idp_request_timeout_sec": 0,`, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := strings.Replace(string(fixture), `"default_oidc_config": {`, `"default_oidc_config": {"idp_request_timeout_sec": 25,`, 1)
+			data = strings.Replace(data, `"oidc_override": {`, `"oidc_override": {`+tc.override, 1)
+			path := filepath.Join(t.TempDir(), "config.json")
+			require.NoError(t, os.WriteFile(path, []byte(data), 0600))
+			cfg := &LocalConfigFile{path: path}
+			require.NoError(t, cfg.Validate())
+			require.Equal(t, tc.want, cfg.Config.GetChains()[0].GetFilters()[0].GetOidc().GetIdpRequestTimeoutSec())
 		})
 	}
 }
