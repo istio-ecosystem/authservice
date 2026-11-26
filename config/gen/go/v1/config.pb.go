@@ -501,6 +501,15 @@ func (x *Config) GetLogFormat() string {
 
 // Trigger rule to match against a request. The trigger rule is satisfied if
 // and only if both rules, excluded_paths and include_paths are satisfied.
+// Paths are matched against several forms of the request path: as sent; without its
+// query string and fragment; also without ';' parameters in its segments; and each of
+// the last two resolved, with and without decoding percent-encoded unreserved characters
+// (never '%2F'): repeated slashes merged and '.' and '..' segments removed, reading a
+// final '.' or '..' segment both with and without its trailing slash. Matching resolves
+// towards authentication: an excluded path applies only if it matches every form, and an
+// excluded regex must match the whole of each. An included path applies if it matches any
+// form, and an included regex may match any part of it. Other normalization, such as
+// '%2F' or backslashes, is left to Envoy's path normalization settings.
 type TriggerRule struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

@@ -46,6 +46,7 @@ func main() {
 	configLog := run.NewPreRunner("config-log", func() error {
 		cfgLog := internal.Logger(internal.Config)
 		cfgLog.Debug("configuration loaded", "chains", len(configFile.Config.GetChains()))
+		server.LogTriggerRuleWarnings(cfgLog, configFile.Config.GetTriggerRules())
 		return nil
 	})
 	fipsLog := run.NewPreRunner("fips", func() error {
